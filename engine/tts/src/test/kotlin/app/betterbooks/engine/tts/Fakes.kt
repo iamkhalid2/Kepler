@@ -20,12 +20,11 @@ class FakeAudioRepo : AudioRepository {
     val rows = mutableListOf<SyncRow>()
     private var next = 1L
     override fun segments(bookId: BookId): Flow<List<AudioSegment>> = segs
-    @Synchronized
-    override suspend fun addSegment(segment: AudioSegment, rows: List<SyncRow>): Long {
+    override suspend fun addSegment(segment: AudioSegment, rows: List<SyncRow>): Long = synchronized(this) {
         val id = next++
         segs.value = segs.value + segment.copy(id = id)
         this.rows += rows.map { it.copy(segmentId = id) }
-        return id
+        id
     }
     override suspend fun segmentFor(bookId: BookId, ordinal: Int) =
         segs.value.firstOrNull { ordinal in it.startOrdinal..it.endOrdinal }

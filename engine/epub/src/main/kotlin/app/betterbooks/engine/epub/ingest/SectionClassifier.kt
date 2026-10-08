@@ -61,7 +61,7 @@ internal object SectionClassifier {
     )
     private val backRe = Regex(
         """^(acknowledg(e)?ments?|about the (author|authors|translator|illustrator)s?|(author'?s? )?bio(graphy)?|(selected |select |annotated )?bibliography|references|works cited|sources|""" +
-            """(for )?(further|suggested|recommended) reading|resources|glossary|glossary of .*|appendix.*|appendices|colophon|afterword|back ?matter|end ?matter|""" +
+            """(for )?(further|suggested|recommended) reading|resources|glossary|glossary of .*|appendix.*|appendices|colophon|(the )?(full )?project gutenberg.{0,3} licen[sc]e|afterword|back ?matter|end ?matter|""" +
             """(a )?note on sources|reading group guide|discussion questions|questions for discussion|excerpt from .*)$""",
     )
 

@@ -253,7 +253,7 @@ class EpubIngestorTest {
     }
 
     @Test fun realGutenbergMeditations() {
-        val f = File("/private/tmp/claude-501/-Users-khalid-Documents-Codes-OpenAudiobook/8f8c2313-bdcf-4435-b43e-cdc0236f2b74/scratchpad/meditations.epub")
+        val f = File(System.getenv("BB_MEDITATIONS_EPUB") ?: "/private/tmp/claude-501/-Users-khalid-Documents-Codes-OpenAudiobook/f3601d13-d304-49ab-88e5-240324de0bee/scratchpad/meditations.epub")
         org.junit.Assume.assumeTrue(f.exists())
         val b = ingest(f)
         assertInvariants(b)

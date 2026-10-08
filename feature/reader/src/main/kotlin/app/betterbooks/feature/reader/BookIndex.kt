@@ -45,7 +45,11 @@ internal class BookIndex(sentences: List<Sentence>, sections: List<Section>) {
         return (indexOf(ordinal).toFloat() / (ordinals.size - 1)).coerceIn(0f, 1f)
     }
 
-    fun fractionOf(ordinal: Int): Float = fraction(ordinal)
+    /** The sentence ordinal at [fraction] (0..1) of the book. */
+    fun ordinalAt(fraction: Float): Int {
+        if (ordinals.isEmpty()) return 0
+        return ordinals[(fraction.coerceIn(0f, 1f) * (ordinals.size - 1)).toInt()]
+    }
 
     /** Minutes left until the end of the current chapter at [wpm]. */
     fun minutesLeftInChapter(ordinal: Int, wpm: Int = DEFAULT_WPM): Double {

@@ -40,5 +40,13 @@ class SegmentRendererTest {
 
         renderer.render(7, chunk, provider, voice, 1.5f)
         assertEquals(2, provider.calls.get())
+
+        // The same text later in the book reuses the audio under its own ordinals.
+        val repeat = Chunk(listOf(sentence(40, "one two three four", 9), sentence(41, "five six seven eight", 9)))
+        val reused = renderer.render(7, repeat, provider, voice, 1f)
+        assertFalse(reused.requested)
+        assertEquals(2, provider.calls.get())
+        assertEquals(40, reused.segment.startOrdinal)
+        assertEquals(listOf(40, 41), repo.rows.filter { it.ordinal >= 40 }.map { it.ordinal }.sorted())
     }
 }

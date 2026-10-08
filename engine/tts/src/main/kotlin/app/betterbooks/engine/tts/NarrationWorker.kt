@@ -27,12 +27,12 @@ import java.util.concurrent.TimeUnit
 
 /** Schedules the whole-book job. The default implementation uses WorkManager. */
 interface NarrationScheduler {
-    fun enqueue(bookId: BookId, config: NarrationConfig, fromOrdinal: Int)
+    fun enqueue(bookId: BookId, config: NarrationConfig, fromOrdinal: Int, delaySeconds: Long = 0)
     fun cancel(bookId: BookId)
 }
 
 class WorkManagerScheduler(private val context: Context) : NarrationScheduler {
-    override fun enqueue(bookId: BookId, config: NarrationConfig, fromOrdinal: Int) {
+    override fun enqueue(bookId: BookId, config: NarrationConfig, fromOrdinal: Int, delaySeconds: Long) {
         val network = if (config.voice.provider == SystemTtsProvider.ID) NetworkType.NOT_REQUIRED else NetworkType.CONNECTED
         val request = OneTimeWorkRequestBuilder<NarrationWorker>()
             .setInputData(
@@ -47,6 +47,7 @@ class WorkManagerScheduler(private val context: Context) : NarrationScheduler {
             )
             .setConstraints(Constraints.Builder().setRequiredNetworkType(network).setRequiresBatteryNotLow(true).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
             .addTag(NarrationWorker.TAG)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(uniqueName(bookId), ExistingWorkPolicy.REPLACE, request)
@@ -85,15 +86,20 @@ class NarrationWorker(context: Context, params: WorkerParameters) : CoroutineWor
         // The job still runs, checkpointed, until WorkManager stops it.
         runCatching { setForeground(foregroundInfo(0, 0)) }
 
+        val from = inputData.getInt(KEY_FROM, 0)
         return try {
-            when (val r = engine.runJob(bookId, config, inputData.getInt(KEY_FROM, 0))) {
+            when (val r = engine.runJob(bookId, config, from)) {
                 NarrationEngine.JobResult.Done, NarrationEngine.JobResult.Paused -> Result.success()
                 is NarrationEngine.JobResult.Failed -> if (r.retry && runAttemptCount < MAX_RETRIES) Result.retry() else Result.failure()
             }
         } catch (e: CancellationException) {
-            val reason = stopReason
-            if (reason != WorkInfo.STOP_REASON_CANCELLED_BY_APP) {
-                engine.onJobInterrupted(bookId, NarrationEngine.REASON_SYSTEM)
+            when (stopReason) {
+                WorkInfo.STOP_REASON_CANCELLED_BY_APP -> Unit
+                // Android 15+ dataSync time limit: stop cleanly and come back later. WorkManager may not
+                // reschedule a timed-out foreground worker by itself, so queue the continuation explicitly.
+                WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT ->
+                    engine.onJobInterrupted(bookId, config, from, NarrationEngine.REASON_SYSTEM, TIMEOUT_RESUME_SECONDS)
+                else -> engine.onJobInterrupted(bookId, config, from, NarrationEngine.REASON_SYSTEM, null)
             }
             throw e
         }
@@ -135,5 +141,6 @@ class NarrationWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private const val CHANNEL = "narration"
         private const val NOTIFICATION_BASE = 41_000
         private const val MAX_RETRIES = 8
+        private const val TIMEOUT_RESUME_SECONDS = 15 * 60L
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.betterbooks.core.model.Annotation
+import app.betterbooks.core.model.AppSettings
 import app.betterbooks.core.model.AnnotationVia
 import app.betterbooks.core.model.Book
 import app.betterbooks.core.model.BookId
@@ -17,6 +18,7 @@ import app.betterbooks.engine.epub.reader.ReadiumReaderEngine
 import app.betterbooks.engine.epub.reader.ReaderStyle
 import app.betterbooks.engine.epub.reader.SearchHit
 import app.betterbooks.engine.epub.reader.TextAnchor
+import app.betterbooks.engine.epub.reader.TextMark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.NonCancellable
@@ -72,12 +74,16 @@ internal class ReaderViewModel(
     val detached: StateFlow<Boolean> = _detached.asStateFlow()
 
     val style: StateFlow<ReaderStyle> = combine(deps.settings.settings, prefsStore.prefs, ::readerStyle)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, readerStyle(app.betterbooks.core.model.AppSettings(), prefsStore.prefs.value))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, readerStyle(AppSettings(), prefsStore.prefs.value))
 
     val annotations: StateFlow<List<Annotation>> = deps.annotations.annotations(bookId)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val bookmarks: StateFlow<List<Bookmark>> = deps.annotations.bookmarks(bookId)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** End of the contiguous consumed run (the spoiler fence), -1 if none. */
+    private val _frontier = MutableStateFlow(-1)
+    val frontier: StateFlow<Int> = _frontier.asStateFlow()
 
     private val _search = MutableStateFlow<SearchState>(SearchState())
     val search: StateFlow<SearchState> = _search.asStateFlow()
@@ -86,7 +92,7 @@ internal class ReaderViewModel(
     private var pendingJump = false
     /** Location changes before this time come from our own navigation (read-along follow, restyle). */
     private var programmaticUntil = 0L
-    var listening = false
+    private var listening = false
 
     init {
         viewModelScope.launch { open() }
@@ -111,6 +117,7 @@ internal class ReaderViewModel(
         tracker = ConsumptionTracker(words = index::words)
         _load.value = ReaderLoad.Ready(book, engine, mapper, index, sections, saved?.let(mapper::anchorFor))
         runCatching { deps.library.markOpened(bookId) }
+        refreshFrontier()
 
         engine.location.filterNotNull()
             .map { mapper.ordinalAt(it) }
@@ -128,11 +135,54 @@ internal class ReaderViewModel(
         val ours = now < programmaticUntil
         if (listening && !ours) _detached.value = true
         _ordinal.value = ordinal
-        val jump = pendingJump
+        // Our own moves (read-along follow, reflow after a style change) are not reading.
+        val jump = pendingJump || ours
         pendingJump = false
-        tracker?.onPage(ordinal, now, jump)?.forEach {
-            deps.positions.markConsumed(bookId, it.first, it.last, PositionKind.READING)
+        val consumed = tracker?.onPage(ordinal, now, jump).orEmpty()
+        consumed.forEach { deps.positions.markConsumed(bookId, it.first, it.last, PositionKind.READING) }
+        if (consumed.isNotEmpty()) refreshFrontier()
+    }
+
+    private suspend fun refreshFrontier() {
+        runCatching { deps.positions.frontier(bookId) }.onSuccess { _frontier.value = it }
+    }
+
+    /** Where the navigator should open after its view is recreated. */
+    fun currentAnchor(): TextAnchor? {
+        val r = ready() ?: return null
+        return _ordinal.value?.let(r.mapper::anchorFor) ?: r.initial
+    }
+
+    /** Paints saved highlights; [tints] are the six ARGB highlight colours from the palette. */
+    suspend fun paintHighlights(list: List<Annotation>, tints: List<Int>) {
+        val r = ready() ?: return
+        val marks = list.mapNotNull { a ->
+            val anchor = r.mapper.anchorForQuote(a.startOrdinal, a.endOrdinal, a.quote) ?: return@mapNotNull null
+            TextMark(id = a.id.toString(), anchor = anchor, tint = tints[a.color.coerceIn(0, tints.lastIndex)])
         }
+        r.engine.applyMarks(ReadiumReaderEngine.GROUP_HIGHLIGHTS, marks)
+    }
+
+    /** Paints the band on the sentence being spoken, or clears it when [ordinal] is null. */
+    suspend fun paintReadAlong(ordinal: Int?, tint: Int) {
+        val r = ready() ?: return
+        val anchor = ordinal?.let(r.mapper::anchorFor)
+        val marks = if (anchor == null) emptyList() else listOf(TextMark("s$ordinal", anchor, tint, band = true))
+        r.engine.applyMarks(ReadiumReaderEngine.GROUP_READ_ALONG, marks)
+    }
+
+    /** The current selection mapped onto the spine, or null when nothing usable is selected. */
+    suspend fun selection(): ReaderSelection? {
+        val r = ready() ?: return null
+        val sel = runCatching { r.engine.selection() }.getOrNull() ?: return null
+        val text = sel.anchor.highlight?.trim().orEmpty()
+        if (text.isEmpty()) return null
+        val range = r.mapper.rangeAt(sel.anchor) ?: _ordinal.value?.let { it..it } ?: return null
+        return ReaderSelection(range, text, sel.top, sel.bottom)
+    }
+
+    fun clearSelection() {
+        ready()?.engine?.clearSelection()
     }
 
     private fun ready(): ReaderLoad.Ready? = _load.value as? ReaderLoad.Ready
@@ -174,7 +224,7 @@ internal class ReaderViewModel(
     fun pauseTracking() = tracker?.pause()
     fun resumeTracking() = tracker?.resume(System.currentTimeMillis())
 
-    fun updateStyle(app: (app.betterbooks.core.model.AppSettings) -> app.betterbooks.core.model.AppSettings) {
+    fun updateStyle(app: (AppSettings) -> AppSettings) {
         programmaticUntil = System.currentTimeMillis() + PROGRAMMATIC_WINDOW_MS
         viewModelScope.launch { deps.settings.update(app) }
     }
@@ -184,8 +234,8 @@ internal class ReaderViewModel(
         prefsStore.update(transform)
     }
 
-    fun addHighlight(range: IntRange, quote: String, color: Int) {
-        prefsStore.update { it.copy(lastHighlightColor = color) }
+    fun addHighlight(range: IntRange, quote: String, color: Int = localPrefs.value.lastHighlightColor) {
+        if (color != localPrefs.value.lastHighlightColor) prefsStore.update { it.copy(lastHighlightColor = color) }
         viewModelScope.launch {
             deps.annotations.add(
                 Annotation(
@@ -198,6 +248,7 @@ internal class ReaderViewModel(
     }
 
     fun updateAnnotation(a: Annotation) {
+        if (a.color != localPrefs.value.lastHighlightColor) prefsStore.update { it.copy(lastHighlightColor = a.color) }
         viewModelScope.launch { deps.annotations.update(a) }
     }
 
@@ -245,6 +296,8 @@ internal class ReaderViewModel(
         const val BOOKMARK_SLACK = 2
     }
 }
+
+internal data class ReaderSelection(val range: IntRange, val text: String, val top: Float?, val bottom: Float?)
 
 internal data class SearchState(
     val query: String = "",

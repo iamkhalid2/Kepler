@@ -199,10 +199,12 @@ class NarrationEngine(
         val done = AtomicInteger(covered.cardinality())
         val tp = aggregateThroughput(provider)
         val capHit = AtomicBoolean(false)
-        var remainingSeconds = 0.0
+        // Seconds of audio per sentence, refined per page; ETA covers everything still missing.
+        var secondsPerSentence = 6.0
 
         fun publish() {
-            val eta = if (tp > 0) (remainingSeconds / tp).roundToLong() else 0
+            val remaining = (count - done.get()).coerceAtLeast(0)
+            val eta = if (tp > 0) (remaining * secondsPerSentence / tp).roundToLong() else 0
             flow.value = NarrationState.Running(bookId, done.get().coerceAtMost(count), count, eta)
         }
 
@@ -211,23 +213,29 @@ class NarrationEngine(
                 for ((a, b) in pages(range)) {
                     if (capHit.get()) break
                     val chunks = claim(work, spine.sentences(bookId, a, b), covered(bookId, config.voice), 0)
-                    remainingSeconds = chunks.sumOf { Estimator.audioSeconds(it.text, config.speed) }
+                    val pageSentences = chunks.sumOf { it.sentences.size }
+                    if (pageSentences > 0) {
+                        secondsPerSentence = chunks.sumOf { Estimator.audioSeconds(it.text, config.speed) } / pageSentences
+                    }
                     publish()
                     val gate = Semaphore(provider.capabilities.concurrency)
                     coroutineScope {
                         chunks.map { chunk ->
                             async {
-                                gate.withPermit {
-                                    val cost = chunk.text.toByteArray(Charsets.UTF_8).size * provider.centsPerByte()
-                                    if (capHit.get() || overCap(provider, cost)) {
-                                        capHit.set(true)
-                                        work.release(chunk)
-                                        return@withPermit
+                                try {
+                                    gate.withPermit {
+                                        val cost = chunk.text.toByteArray(Charsets.UTF_8).size * provider.centsPerByte()
+                                        if (capHit.get() || overCap(provider, cost)) {
+                                            capHit.set(true)
+                                            return@withPermit
+                                        }
+                                        renderTracked(bookId, work, chunk, provider, config)
+                                        done.addAndGet(chunk.sentences.size)
+                                        publish()
                                     }
-                                    renderTracked(bookId, work, chunk, provider, config)
-                                    done.addAndGet(chunk.sentences.size)
-                                    remainingSeconds -= Estimator.audioSeconds(chunk.text, config.speed)
-                                    publish()
+                                } finally {
+                                    // Also covers chunks cancelled while waiting for a permit.
+                                    work.release(chunk)
                                 }
                             }
                         }.awaitAll()
@@ -247,9 +255,15 @@ class NarrationEngine(
         }
     }
 
-    /** Called when the system stops the job (Android 15+ foreground-service timeout, OEM kill). */
-    fun onJobInterrupted(bookId: BookId, reason: String) {
+    /**
+     * Called when the system stops the job (Android 15+ foreground-service timeout, OEM kill).
+     * When [resumeAfterSeconds] is set the job is queued again; finished segments are not redone.
+     */
+    fun onJobInterrupted(bookId: BookId, config: NarrationConfig, fromOrdinal: Int, reason: String, resumeAfterSeconds: Long?) {
         stateFlow(bookId).value = NarrationState.Paused(bookId, reason)
+        if (resumeAfterSeconds != null) {
+            (scheduler ?: WorkManagerScheduler(appContext)).enqueue(bookId, config, fromOrdinal, resumeAfterSeconds)
+        }
     }
 
     // ---------------------------------------------------------------- internals
@@ -298,10 +312,11 @@ class NarrationEngine(
             self.complete(outcome.segment)
             return outcome.segment
         } catch (e: Throwable) {
-            work.release(chunk)
             self.completeExceptionally(e)
             throw e
         } finally {
+            // Once rendered the repository marks these sentences as covered, so the claim can go.
+            work.release(chunk)
             work.inFlight.remove(chunk.startOrdinal..chunk.endOrdinal)
         }
     }

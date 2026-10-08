@@ -6,10 +6,13 @@ import app.betterbooks.core.model.BookId
 import app.betterbooks.core.model.SyncRow
 import app.betterbooks.core.model.VoiceRef
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 @Serializable
 internal data class SegmentMeta(
@@ -42,6 +45,9 @@ class SegmentRenderer(
     private val repo: AudioRepository,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
+    /** Serialises renders of the same cache key so two identical chunks never write one file at once. */
+    private val keyLocks = ConcurrentHashMap<String, Mutex>()
+
     fun cacheKey(chunk: Chunk, provider: TtsProvider, voice: VoiceRef, speed: Float): String =
         CacheKeys.of(chunk.text, provider.id, provider.currentModel(), voice.id, speed)
 
@@ -53,41 +59,45 @@ class SegmentRenderer(
         val metaFile = File(dir, "$key.json")
         val bytes = chunk.text.toByteArray(Charsets.UTF_8).size.toLong()
 
-        val cached = withContext(Dispatchers.IO) {
-            if (audioFile.exists() && metaFile.exists()) {
-                runCatching { json.decodeFromString(SegmentMeta.serializer(), metaFile.readText()) }.getOrNull()
-                    ?.takeIf { it.startOrdinal == chunk.startOrdinal && it.endOrdinal == chunk.endOrdinal }
-            } else {
-                null
+        return keyLocks.computeIfAbsent(key) { Mutex() }.withLock {
+            val cached = withContext(Dispatchers.IO) {
+                if (audioFile.exists() && metaFile.exists()) {
+                    // Identical text elsewhere in the book (a repeated line) reuses the same audio and timings.
+                    runCatching { json.decodeFromString(SegmentMeta.serializer(), metaFile.readText()) }.getOrNull()
+                        ?.takeIf { it.spans.size == chunk.sentences.size }
+                        ?.copy(startOrdinal = chunk.startOrdinal, endOrdinal = chunk.endOrdinal, voice = voice)
+                } else {
+                    null
+                }
             }
-        }
-        if (cached != null) {
-            return RenderOutcome(register(bookId, audioFile, cached), requested = false, utf8Bytes = bytes, wallMs = now() - started)
-        }
-
-        val result = provider.synthesize(SynthesisRequest(chunk.texts, voice.id, speed))
-        val meta = withContext(Dispatchers.Default) {
-            val decoded = transcoder.decode(result.audio, scratchDir)
-            val totalMs = decoded.durationMs
-            val trim = AudioDsp.findTrim(decoded.samples, decoded.sampleRate)
-            val trimmed = decoded.samples.copyOfRange(trim.startSample, trim.endSample)
-            val pcm = SynthAudio.Pcm(AudioDsp.normalize(trimmed), decoded.sampleRate)
-            val leadMs = trim.startSample * 1000L / decoded.sampleRate
-
-            val exact = result.sentenceSpans?.takeIf { it.size == chunk.sentences.size }
-            val (raw, confidence) = if (exact != null) {
-                exact.map { SentenceSpan(it.first, it.second) } to 1.0
-            } else {
-                val a = SentenceAligner.align(chunk.texts, result.words, totalMs)
-                a.spans to a.confidence
+            if (cached != null) {
+                return@withLock RenderOutcome(register(bookId, audioFile, cached), requested = false, utf8Bytes = bytes, wallMs = now() - started)
             }
-            val spans = shift(raw, leadMs, pcm.durationMs)
-            transcoder.encodeAac(pcm, audioFile)
-            val m = SegmentMeta(chunk.startOrdinal, chunk.endOrdinal, pcm.durationMs, voice, spans.map { listOf(it.startMs, it.endMs) }, confidence)
-            metaFile.writeText(json.encodeToString(SegmentMeta.serializer(), m))
-            m
+
+            val result = provider.synthesize(SynthesisRequest(chunk.texts, voice.id, speed))
+            val meta = withContext(Dispatchers.Default) {
+                val decoded = transcoder.decode(result.audio, scratchDir)
+                val totalMs = decoded.durationMs
+                val trim = AudioDsp.findTrim(decoded.samples, decoded.sampleRate)
+                val trimmed = decoded.samples.copyOfRange(trim.startSample, trim.endSample)
+                val pcm = SynthAudio.Pcm(AudioDsp.normalize(trimmed), decoded.sampleRate)
+                val leadMs = trim.startSample * 1000L / decoded.sampleRate
+
+                val exact = result.sentenceSpans?.takeIf { it.size == chunk.sentences.size }
+                val (raw, confidence) = if (exact != null) {
+                    exact.map { SentenceSpan(it.first, it.second) } to 1.0
+                } else {
+                    val a = SentenceAligner.align(chunk.texts, result.words, totalMs)
+                    a.spans to a.confidence
+                }
+                val spans = shift(raw, leadMs, pcm.durationMs)
+                transcoder.encodeAac(pcm, audioFile)
+                val m = SegmentMeta(chunk.startOrdinal, chunk.endOrdinal, pcm.durationMs, voice, spans.map { listOf(it.startMs, it.endMs) }, confidence)
+                metaFile.writeText(json.encodeToString(SegmentMeta.serializer(), m))
+                m
+            }
+            RenderOutcome(register(bookId, audioFile, meta), requested = true, utf8Bytes = bytes, wallMs = now() - started)
         }
-        return RenderOutcome(register(bookId, audioFile, meta), requested = true, utf8Bytes = bytes, wallMs = now() - started)
     }
 
     private suspend fun register(bookId: BookId, file: File, meta: SegmentMeta): AudioSegment {

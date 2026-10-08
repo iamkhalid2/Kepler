@@ -13,6 +13,8 @@ data class TextAnchor(
     val highlight: String? = null,
     val after: String? = null,
     val totalProgression: Double? = null,
+    /** Readium's 1-based position (about one screen of text), when known. Used as a folio. */
+    val position: Int? = null,
 )
 
 /**

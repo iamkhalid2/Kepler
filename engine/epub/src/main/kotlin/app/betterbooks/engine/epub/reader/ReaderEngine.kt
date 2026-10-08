@@ -3,8 +3,20 @@ package app.betterbooks.engine.epub.reader
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
-/** A highlight-like mark painted over the text. [tint] is ARGB. */
-data class TextMark(val id: String, val anchor: TextAnchor, val tint: Int, val underline: Boolean = false)
+/**
+ * A mark painted over the text. [tint] is ARGB. Highlights and underlines use Readium's own opacity;
+ * a [band] (the read-along sentence) uses the tint's alpha as given.
+ */
+data class TextMark(
+    val id: String,
+    val anchor: TextAnchor,
+    val tint: Int,
+    val underline: Boolean = false,
+    val band: Boolean = false,
+)
+
+/** The current text selection. [top]/[bottom] are in px relative to the navigator view, when known. */
+data class TextSelection(val anchor: TextAnchor, val top: Float?, val bottom: Float?)
 
 data class SearchHit(val anchor: TextAnchor, val title: String?)
 
@@ -33,7 +45,7 @@ interface ReaderEngine {
 
     /** Replaces every mark of [group]. Remembered and re-applied when the view is recreated. */
     suspend fun applyMarks(group: String, marks: List<TextMark>)
-    suspend fun selection(): TextAnchor?
+    suspend fun selection(): TextSelection?
     fun clearSelection()
     suspend fun search(query: String, limit: Int = 100): List<SearchHit>
 }

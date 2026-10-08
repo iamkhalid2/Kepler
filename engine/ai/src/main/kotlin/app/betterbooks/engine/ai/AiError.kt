@@ -22,5 +22,8 @@ sealed class AiError(message: String, cause: Throwable? = null) : Exception(mess
     class NothingRead : AiError("Nothing has been read yet")
     /** Unknown section, or one that is excluded from the book. */
     class SectionUnavailable : AiError("This section is not available")
+    /** The section starts beyond what has been read, so nothing of it may be used yet. */
+    class SectionNotReached : AiError("This section has not been reached yet")
+    class BookNotFound : AiError("Book not found")
     class Unexpected(cause: Throwable) : AiError("Unexpected AI error: ${cause.message}", cause)
 }

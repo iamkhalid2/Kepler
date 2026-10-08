@@ -3,6 +3,8 @@
 package app.betterbooks.engine.epub.reader
 
 import android.content.Context
+import android.os.Parcel
+import android.os.Parcelable
 import android.view.ActionMode
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
@@ -25,6 +27,8 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.epub.css.FontStyle
+import org.readium.r2.navigator.html.HtmlDecorationTemplate
+import org.readium.r2.navigator.html.HtmlDecorationTemplates
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.Color
@@ -138,7 +142,12 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
         this.style = style
         val configuration = EpubNavigatorFragment.Configuration {
             servedAssets = listOf("fonts/.*")
+            decorationTemplates = HtmlDecorationTemplates.defaultTemplates().copy().apply {
+                set(BandStyle::class, bandTemplate)
+            }
             selectionActionModeCallback = selectionCallback
+            // The Compose host pads the navigator around its own chrome and the system bars.
+            shouldApplyInsetsPadding = false
             addFontFamilyDeclaration(FontFamily(ReaderFont.LITERATA.css!!)) {
                 addFontFace {
                     addSource("fonts/literata.ttf")
@@ -228,16 +237,21 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
 
     override suspend fun applyMarks(group: String, marks: List<TextMark>) {
         val decorations = marks.map { m ->
-            val style: Decoration.Style =
-                if (m.underline) Decoration.Style.Underline(m.tint) else Decoration.Style.Highlight(m.tint)
+            val style: Decoration.Style = when {
+                m.band -> BandStyle(m.tint)
+                m.underline -> Decoration.Style.Underline(m.tint)
+                else -> Decoration.Style.Highlight(m.tint)
+            }
             Decoration(id = m.id, locator = toLocator(m.anchor), style = style)
         }
         this.marks[group] = decorations
         navigator?.applyDecorations(decorations, group)
     }
 
-    override suspend fun selection(): TextAnchor? =
-        navigator?.currentSelection()?.locator?.let { it.toAnchor(textFrom = it) }
+    override suspend fun selection(): TextSelection? {
+        val sel = navigator?.currentSelection() ?: return null
+        return TextSelection(sel.locator.toAnchor(textFrom = sel.locator), sel.rect?.top, sel.rect?.bottom)
+    }
 
     override fun clearSelection() {
         navigator?.clearSelection()
@@ -280,6 +294,7 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
         highlight = textFrom.text.highlight,
         after = textFrom.text.after,
         totalProgression = locations.totalProgression,
+        position = locations.position,
     )
 
     private fun ReaderStyle.toPreferences(): EpubPreferences = EpubPreferences(
@@ -298,7 +313,34 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
         textAlign = if (publisherStyles) null else if (justify) TextAlign.JUSTIFY else TextAlign.START,
     )
 
+    /** The read-along sentence band: like a highlight, but honouring the tint's own alpha. */
+    class BandStyle(override val tint: Int) : Decoration.Style, Decoration.Style.Tinted {
+        override fun describeContents() = 0
+        override fun writeToParcel(dest: Parcel, flags: Int) = dest.writeInt(tint)
+        override fun equals(other: Any?) = other is BandStyle && other.tint == tint
+        override fun hashCode() = tint
+
+        companion object {
+            @JvmField val CREATOR = object : Parcelable.Creator<BandStyle> {
+                override fun createFromParcel(source: Parcel) = BandStyle(source.readInt())
+                override fun newArray(size: Int) = arrayOfNulls<BandStyle>(size)
+            }
+        }
+    }
+
     companion object {
+        private val bandTemplate = HtmlDecorationTemplate(
+            layout = HtmlDecorationTemplate.Layout.BOXES,
+            width = HtmlDecorationTemplate.Width.WRAP,
+            element = { d ->
+                val t = (d.style as? Decoration.Style.Tinted)?.tint ?: 0
+                val a = ((t ushr 24) and 0xFF) / 255.0
+                val rgba = "rgba(${(t shr 16) and 0xFF}, ${(t shr 8) and 0xFF}, ${t and 0xFF}, ${"%.3f".format(java.util.Locale.ROOT, a)})"
+                """<div class="bb-band" style="background-color: $rgba !important"/>"""
+            },
+            stylesheet = ".bb-band { margin-left: -2px; padding-right: 4px; border-radius: 2px; box-sizing: border-box; }",
+        )
+
         const val GROUP_HIGHLIGHTS = "highlights"
         const val GROUP_READ_ALONG = "readalong"
         const val GROUP_SEARCH = "search"

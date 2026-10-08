@@ -3,6 +3,7 @@ package app.betterbooks.engine.ai
 import app.betterbooks.core.model.AiStore
 import app.betterbooks.core.model.Book
 import app.betterbooks.core.model.ContentType
+import app.betterbooks.core.model.Section
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -57,35 +58,57 @@ internal class ChapterPackService(
 ) {
     private val locks = ConcurrentHashMap<String, Mutex>()
 
-    private fun spec(variantTag: String) = JsonSpec(
+    private val spec = JsonSpec(
         name = "chapter_pack", schema = Schemas.pack, serializer = ChapterPack.serializer(),
         validate = { if (it.gist.isBlank()) "gist is empty" else null },
-    ).also { variantTag.length }
+    )
 
     private fun variant(book: Book) =
         if (book.contentType == ContentType.FICTION) PromptRegistry.PACK_FICTION else PromptRegistry.PACK_NONFICTION
 
     private fun key(book: Book, text: SectionText) = sha256("pack", variant(book).tag, text.hash)
 
-    suspend fun cached(book: Book, text: SectionText): PackResult? =
-        store.get(KIND, key(book, text))?.let { decode(it, text) }
+    /**
+     * Cheap lookup that needs no section text: the pack previously built for this section clipped at `end`
+     * (the fence-clipped last ordinal). Because `end` is part of the key, a pack built from text beyond the
+     * current fence can never match.
+     */
+    suspend fun cachedFor(book: Book, section: Section, end: Int): PackResult? {
+        val json = store.get(REF_KIND, refKey(book, section, end)) ?: return null
+        return try {
+            val pack = AiJson.decodeFromString(ChapterPack.serializer(), json)
+            PackResult(pack, section.startOrdinal, end, end == section.endOrdinal)
+        } catch (e: Exception) { null }
+    }
+
+    private fun refKey(book: Book, section: Section, end: Int) =
+        "${book.id}:${section.id}:$end:${variant(book).tag}"
+
+    /** The pack for this text, building it with one request when it is not cached. */
+    suspend fun obtain(book: Book, text: SectionText, priority: Priority): PackResult =
+        get(book, text, priority, generate = true) ?: throw AiError.InvalidResponse("pack unavailable")
 
     /** Returns the cached pack, or builds it with one request when [generate] is true. */
     suspend fun get(book: Book, text: SectionText, priority: Priority, generate: Boolean = true): PackResult? {
         val k = key(book, text)
-        store.get(KIND, k)?.let { decode(it, text)?.let { r -> return r } }
+        store.get(KIND, k)?.let { decode(it, text)?.let { r -> remember(book, text, it); return r } }
         if (!generate) return null
         return locks.computeIfAbsent(k) { Mutex() }.withLock {
-            store.get(KIND, k)?.let { decode(it, text)?.let { r -> return@withLock r } }
+            store.get(KIND, k)?.let { decode(it, text)?.let { r -> remember(book, text, it); return@withLock r } }
             val prompt = variant(book)
             val pack = sanitize(
-                runner.json(priority, spec(prompt.tag), prompt.system, userMessage(book, text), maxTokens = 3500),
+                runner.json(priority, spec, prompt.system, userMessage(book, text), maxTokens = 3500),
                 text,
             )
-            store.put(KIND, k, AiJson.encodeToString(ChapterPack.serializer(), pack))
+            val json = AiJson.encodeToString(ChapterPack.serializer(), pack)
+            store.put(KIND, k, json)
+            remember(book, text, json)
             PackResult(pack, text.firstOrdinal, text.lastOrdinal, text.complete)
         }
     }
+
+    private suspend fun remember(book: Book, text: SectionText, json: String) =
+        store.put(REF_KIND, refKey(book, text.section, text.lastOrdinal), json)
 
     private fun userMessage(book: Book, text: SectionText) = buildString {
         if (includeBookMeta) appendLine("Book: ${book.title} by ${book.authors}")
@@ -115,5 +138,8 @@ internal class ChapterPackService(
         )
     }
 
-    private companion object { const val KIND = "chapter-pack" }
+    private companion object {
+        const val KIND = "chapter-pack"
+        const val REF_KIND = "chapter-pack-ref"
+    }
 }

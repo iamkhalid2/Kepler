@@ -23,7 +23,16 @@ object ModelRanker {
             it.id != "openrouter/free"
     }
 
-    /** Order: structured-output support, then context window bucket, then hint tier, then recency. */
+    private val sizeInName = Regex("(?<![0-9.])([0-9]+(?:\\.[0-9]+)?)b(?![a-z])", RegexOption.IGNORE_CASE)
+
+    /** Tiny models (under 10B parameters, or "mini"/"lite"/"nano") write poor study material even when they accept a schema. */
+    fun isSmall(id: String): Boolean {
+        val params = sizeInName.findAll(id.substringAfter('/')).mapNotNull { it.groupValues[1].toDoubleOrNull() }.toList()
+        // MoE names such as 26b-a4b carry active params too; judge by the largest figure.
+        return (params.isNotEmpty() && params.max() < 10.0) || Regex("(?i)(mini|lite|nano|tiny)").containsMatchIn(id.substringAfter('/'))
+    }
+
+    /** Order: not-tiny, structured-output support, context window bucket, hint tier, then recency. */
     fun rank(models: List<ModelInfo>, hints: List<Pair<String, Int>> = ModelHints.default): List<ModelInfo> {
         fun json(m: ModelInfo) = if (m.supportsStructured) 2 else if (m.supportsResponseFormat) 1 else 0
         fun ctx(m: ModelInfo) = when {
@@ -33,7 +42,8 @@ object ModelRanker {
         }
         fun tier(m: ModelInfo) = hints.firstOrNull { m.id.contains(it.first, ignoreCase = true) }?.second ?: 0
         return eligible(models).sortedWith(
-            compareByDescending<ModelInfo> { json(it) }
+            compareBy<ModelInfo> { isSmall(it.id) }
+                .thenByDescending { json(it) }
                 .thenByDescending { ctx(it) }
                 .thenByDescending { tier(it) }
                 .thenByDescending { it.created }
