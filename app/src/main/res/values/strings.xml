@@ -3,4 +3,7 @@
     <string name="tab_home">Home</string>
     <string name="tab_library">Library</string>
     <string name="tab_notebook">Notebook</string>
+    <string name="toast_cant_open">This file can’t be opened. It may be damaged or encrypted.</string>
+    <string name="toast_book_missing">That book isn’t in your library.</string>
+    <string name="toast_added">Added %s to your library.</string>
 </resources>

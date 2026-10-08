@@ -1,6 +1,5 @@
 package app.kepler.nav
 
-import android.net.Uri
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -15,7 +14,8 @@ sealed interface Route {
     data object Onboarding : Route
     data class Tabs(val tab: Tab) : Route
     data class Hub(val bookId: BookId) : Route
-    data class Reader(val bookId: BookId, val mode: ReaderMode = ReaderMode.READ) : Route
+    /** [nonce] distinguishes a reader opened afresh at a new position from the same reader switching mode. */
+    data class Reader(val bookId: BookId, val mode: ReaderMode = ReaderMode.READ, val nonce: Int = 0) : Route
     data class Player(val bookId: BookId) : Route
     data class Learn(val bookId: BookId, val tab: LearnTab = LearnTab.ASK) : Route
     data object Review : Route
@@ -26,7 +26,7 @@ sealed interface Route {
         Onboarding -> "onboarding"
         is Tabs -> "tabs/${tab.name}"
         is Hub -> "hub/$bookId"
-        is Reader -> "reader/$bookId/${mode.name}"
+        is Reader -> "reader/$bookId/${mode.name}/$nonce"
         is Player -> "player/$bookId"
         is Learn -> "learn/$bookId/${tab.name}"
         Review -> "review"
@@ -41,7 +41,7 @@ sealed interface Route {
                 "onboarding" -> Onboarding
                 "tabs" -> Tabs(Tab.valueOf(p[1]))
                 "hub" -> Hub(p[1].toLong())
-                "reader" -> Reader(p[1].toLong(), ReaderMode.valueOf(p[2]))
+                "reader" -> Reader(p[1].toLong(), ReaderMode.valueOf(p[2]), p.getOrNull(3)?.toInt() ?: 0)
                 "player" -> Player(p[1].toLong())
                 "learn" -> Learn(p[1].toLong(), LearnTab.valueOf(p[2]))
                 "review" -> Review
@@ -51,18 +51,6 @@ sealed interface Route {
             }
         }.getOrNull()
     }
-}
-
-/** A target from `kepler://book/<id>/s/<ordinal>`. */
-data class DeepLink(val bookId: BookId, val ordinal: Int)
-
-fun parseDeepLink(uri: Uri?): DeepLink? {
-    if (uri == null || uri.scheme != "kepler" || uri.host != "book") return null
-    val seg = uri.pathSegments
-    if (seg.size < 3 || seg[1] != "s") return null
-    val id = seg[0].toLongOrNull() ?: return null
-    val ordinal = seg[2].toIntOrNull() ?: return null
-    return DeepLink(id, ordinal.coerceAtLeast(0))
 }
 
 class BackStack(initial: List<Route>) {
@@ -78,6 +66,20 @@ class BackStack(initial: List<Route>) {
         if (entries.size <= 1) return false
         entries.removeAt(entries.lastIndex)
         return true
+    }
+
+    /**
+     * Opens the reader for a book at a freshly saved position. A reader of the same book already on top is
+     * replaced (bumping [Route.Reader.nonce] so it reloads the position); otherwise the reader is pushed, so
+     * Back from a passage opened out of Learn or the Notebook returns there.
+     */
+    fun showReader(route: Route.Reader) {
+        val top = entries.lastOrNull()
+        if (top is Route.Reader && top.bookId == route.bookId) {
+            entries[entries.lastIndex] = route.copy(nonce = top.nonce + 1)
+        } else {
+            push(route)
+        }
     }
 
     fun replaceTop(route: Route) {

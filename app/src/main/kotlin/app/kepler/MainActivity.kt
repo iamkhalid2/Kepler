@@ -13,18 +13,19 @@ import androidx.fragment.app.FragmentActivity
 import app.kepler.engine.epub.reader.ReaderFragmentFactory
 import app.kepler.feature.reader.ReaderKeys
 import app.kepler.nav.AppRoot
-import app.kepler.nav.DeepLink
-import app.kepler.nav.parseDeepLink
+import app.kepler.nav.Incoming
+import app.kepler.nav.toIncoming
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.withContext
 
 /** The single activity. A [FragmentActivity] because the Readium navigator is a fragment. */
 class MainActivity : FragmentActivity() {
 
-    private val deepLinks = MutableSharedFlow<DeepLink>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    /** Each external request is delivered once, even if it arrives before the UI starts collecting. */
+    private val incoming = Channel<Incoming>(Channel.UNLIMITED)
     private var pendingDocument: CompletableDeferred<Uri?>? = null
 
     private val createDocument = registerForActivityResult(CreateDocumentContract()) { uri ->
@@ -39,7 +40,7 @@ class MainActivity : FragmentActivity() {
         val container = (application as KeplerApp).container
         container.documentWriter = ::writeDocument
         if (savedInstanceState == null) handleIntent(intent)
-        setContent { AppRoot(container, deepLinks, onFinish = ::finish) }
+        setContent { AppRoot(container, incoming.receiveAsFlow(), onFinish = ::finish) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -51,13 +52,14 @@ class MainActivity : FragmentActivity() {
         val container = (application as KeplerApp).container
         if (container.documentWriter == ::writeDocument) container.documentWriter = null
         pendingDocument?.complete(null)
+        incoming.close()
         super.onDestroy()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean = ReaderKeys.dispatch(event) || super.dispatchKeyEvent(event)
 
     private fun handleIntent(intent: Intent?) {
-        parseDeepLink(intent?.data)?.let { deepLinks.tryEmit(it) }
+        intent?.toIncoming()?.let { incoming.trySend(it) }
     }
 
     private suspend fun writeDocument(name: String, mime: String, text: String) {

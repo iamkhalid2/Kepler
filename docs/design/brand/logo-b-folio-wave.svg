@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="512" height="512">
-  <title>BetterBooks — Concept B "Folio wave"</title>
-  <rect x="0" y="0" width="108" height="108" rx="30" fill="#17151F"/>
-  <path d="M20 66 C 31 50, 45 50, 54 66 C 63 50, 77 50, 88 66" fill="none" stroke="#8B7CFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M54 66 L54 80" fill="none" stroke="#8B7CFF" stroke-width="9" stroke-linecap="round"/>
-  <circle cx="54" cy="36" r="5.5" fill="#FF8F5C"/>
-</svg>

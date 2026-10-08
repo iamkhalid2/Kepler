@@ -1,3 +1,5 @@
+<img src="docs/design/brand/kepler-mark.svg" width="96" height="96" alt="Kepler mark">
+
 # Kepler
 
 **Read. Listen. Remember.**

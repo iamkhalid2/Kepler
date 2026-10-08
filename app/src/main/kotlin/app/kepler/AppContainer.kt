@@ -28,14 +28,26 @@ import app.kepler.feature.library.KeyKind
 import app.kepler.feature.library.LibraryDeps
 import app.kepler.feature.reader.ReaderDeps
 import app.kepler.feature.study.StudyDeps
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
-/** Manual dependency container: one instance per process, created in [KeplerApp]. */
+/**
+ * Manual dependency container: one instance per process, created in [KeplerApp.onCreate].
+ *
+ * Eager: the data layer, the narration engine (a WorkManager job may start this process and look for it) and the
+ * playback dependencies (the media service stops itself without them). Everything else is built on first use, so
+ * the first frame does not wait for it.
+ */
 class AppContainer(private val app: Application) {
     val data = DataLayer(app, EpubIngestor(app))
     val narration = NarrationEngine(app, data.settings, data.spine, data.audio)
-    val ai = OpenRouterAiService(data.settings, data.spine, data.positions, data.aiStore, data.library)
-    val scheduler: Scheduler = FsrsScheduler()
-    val reviewStats: ReviewStatsStore = PrefsReviewStatsStore(app)
+    val ai: OpenRouterAiService by lazy {
+        OpenRouterAiService(data.settings, data.spine, data.positions, data.aiStore, data.library)
+    }
+    val scheduler: Scheduler by lazy { FsrsScheduler() }
+    val reviewStats: ReviewStatsStore by lazy { PrefsReviewStatsStore(app) }
     val playback: PlaybackClient by lazy { PlaybackClient(app) }
 
     /** Set by the activity while it is alive; study export goes through the system file picker. */
@@ -47,7 +59,21 @@ class AppContainer(private val app: Application) {
         )
     }
 
-    val libraryDeps: LibraryDeps = object : LibraryDeps {
+    val libraryDeps: LibraryDeps by lazy { libraryDepsImpl() }
+    val readerDeps: ReaderDeps by lazy { readerDepsImpl() }
+    val studyDeps: StudyDeps by lazy { studyDepsImpl() }
+
+    /** Opens the database and settings file off the main thread so the first screen finds them warm. */
+    fun warmUp(scope: CoroutineScope) {
+        scope.launch(Dispatchers.IO) {
+            runCatching {
+                data.settings.settings.first()
+                data.library.books.first()
+            }
+        }
+    }
+
+    private fun libraryDepsImpl(): LibraryDeps = object : LibraryDeps {
         override val library: LibraryRepository = data.library
         override val settings: SettingsStore = data.settings
         override val narration: NarrationService = this@AppContainer.narration
@@ -87,7 +113,7 @@ class AppContainer(private val app: Application) {
         }
     }
 
-    val readerDeps: ReaderDeps = object : ReaderDeps {
+    private fun readerDepsImpl(): ReaderDeps = object : ReaderDeps {
         override val spine: SpineRepository = data.spine
         override val positions: PositionRepository = data.positions
         override val annotations: AnnotationRepository = data.annotations
@@ -95,7 +121,7 @@ class AppContainer(private val app: Application) {
         override val settings: SettingsStore = data.settings
     }
 
-    val studyDeps: StudyDeps = object : StudyDeps {
+    private fun studyDepsImpl(): StudyDeps = object : StudyDeps {
         override val ai: AiService = this@AppContainer.ai
         override val cards: CardRepository = data.cards
         override val scheduler: Scheduler = this@AppContainer.scheduler
@@ -108,15 +134,5 @@ class AppContainer(private val app: Application) {
             val w = documentWriter ?: error("No window to pick a file")
             w(name, mime, text)
         }
-    }
-}
-
-class KeplerApp : Application() {
-    lateinit var container: AppContainer
-        private set
-
-    override fun onCreate() {
-        super.onCreate()
-        container = AppContainer(this)
     }
 }

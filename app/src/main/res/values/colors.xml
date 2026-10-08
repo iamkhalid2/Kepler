@@ -1,3 +1,8 @@
 <resources>
+    <!-- Kept for themes.xml (windowBackground); not part of the brand. -->
     <color name="bb_ink">#05070D</color>
+    <!-- Kepler brand: launcher background is Cobalt taken down to ink; bone is shelf-language bone L .926. -->
+    <color name="kepler_night">#0F1E40</color>
+    <color name="kepler_bone">#ECE6D9</color>
+    <color name="kepler_cobalt">#4D8BFF</color>
 </resources>

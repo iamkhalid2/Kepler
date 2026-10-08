@@ -1,8 +1,11 @@
 package app.kepler.nav
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -20,10 +23,12 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,18 +45,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import app.kepler.AppContainer
+import app.kepler.R
 import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.KpMotion
+import app.kepler.core.designsystem.KpToastHost
 import app.kepler.core.designsystem.rememberReducedMotion
 import app.kepler.core.model.AppSettings
 import app.kepler.core.model.BookId
+import app.kepler.core.model.ImportResult
 import app.kepler.core.model.PositionKind
 import app.kepler.core.model.ReaderMode
 import app.kepler.feature.library.KeplerTheme
@@ -73,6 +85,7 @@ import app.kepler.feature.study.LearnRoute
 import app.kepler.feature.study.LearnTab
 import app.kepler.feature.study.NotebookRoute
 import app.kepler.feature.study.ReviewRoute
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -89,15 +102,16 @@ private sealed interface SheetReq {
 /** Key of a back-stack entry's state: changing the reader mode or Learn tab keeps the same screen state. */
 private fun Route.stateKey(): String = when (this) {
     is Route.Tabs -> "tabs"
-    is Route.Reader -> "reader/$bookId"
+    is Route.Reader -> "reader/$bookId/$nonce"
     is Route.Learn -> "learn/$bookId"
     else -> encode()
 }
 
 @Composable
-fun AppRoot(container: AppContainer, deepLinks: Flow<DeepLink>, onFinish: () -> Unit) {
+fun AppRoot(container: AppContainer, incoming: Flow<Incoming>, onFinish: () -> Unit) {
     val settings by produceState<AppSettings?>(null) { value = container.data.settings.settings.first() }
     KeplerTheme(container.data.settings) {
+        SystemBarsFollowTheme()
         ProvideLibraryDeps(container.libraryDeps) {
             val s = settings
             if (s == null) {
@@ -106,19 +120,20 @@ fun AppRoot(container: AppContainer, deepLinks: Flow<DeepLink>, onFinish: () -> 
                 val stack = rememberSaveable(saver = BackStack.Saver) {
                     BackStack(listOf(if (s.onboarded) Route.Tabs(Tab.HOME) else Route.Onboarding))
                 }
-                AppNavHost(container, stack, deepLinks, onFinish)
+                AppNavHost(container, stack, incoming, onFinish)
             }
         }
     }
 }
 
 @Composable
-private fun AppNavHost(container: AppContainer, stack: BackStack, deepLinks: Flow<DeepLink>, onFinish: () -> Unit) {
+private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow<Incoming>, onFinish: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val playback = container.playback
     val data = container.data
     var sheet by remember { mutableStateOf<SheetReq?>(null) }
+    var toast by remember { mutableStateOf<String?>(null) }
 
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     fun askNotificationsOnce() {
@@ -135,18 +150,53 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, deepLinks: Flo
         stack.push(Route.Player(bookId))
     }
 
-    fun read(bookId: BookId, mode: ReaderMode = ReaderMode.READ) = stack.push(Route.Reader(bookId, mode))
+    fun read(bookId: BookId, mode: ReaderMode = ReaderMode.READ) = stack.showReader(Route.Reader(bookId, mode))
 
     fun jumpTo(bookId: BookId, ordinal: Int, mode: ReaderMode = ReaderMode.READ) {
         scope.launch {
             data.positions.savePosition(bookId, PositionKind.READING, ordinal)
-            val top = stack.top
-            if (top is Route.Reader && top.bookId == bookId) stack.pop()
             read(bookId, mode)
         }
     }
 
-    LaunchedEffect(deepLinks) { deepLinks.collect { jumpTo(it.bookId, it.ordinal) } }
+    val bookMissing = stringResource(R.string.toast_book_missing)
+    val cantOpen = stringResource(R.string.toast_cant_open)
+    val addedFormat = stringResource(R.string.toast_added)
+    LaunchedEffect(incoming) {
+        incoming.collect { item ->
+            when (item) {
+                is Incoming.Link -> {
+                    val link = item.link
+                    if (data.library.book(link.bookId).first() == null) toast = bookMissing
+                    else {
+                        data.positions.savePosition(link.bookId, PositionKind.READING, link.ordinal)
+                        stack.showReader(Route.Reader(link.bookId))
+                    }
+                }
+                is Incoming.EpubFile -> {
+                    val result = try {
+                        data.library.importBook(item.uri)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        ImportResult.Failed(e.message.orEmpty())
+                    }
+                    val book = when (result) {
+                        is ImportResult.Imported -> result.book
+                        is ImportResult.Duplicate -> result.book
+                        is ImportResult.Failed -> { toast = cantOpen; null }
+                    }
+                    if (book != null) {
+                        if (stack.top == Route.Onboarding) toast = addedFormat.format(book.title)
+                        else {
+                            stack.resetTo(Route.Tabs(Tab.LIBRARY))
+                            stack.push(Route.Hub(book.id))
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Pressing back on a non-home tab at the root returns to Home, as on every tabbed Android app.
     val top = stack.top
@@ -235,11 +285,15 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, deepLinks: Flo
                         onOpenSettings = { stack.push(Route.Settings) },
                     )
                     Route.Review -> ReviewRoute(container.studyDeps, onClose = { stack.pop() })
-                    is Route.Setup -> NarrationSetupRoute(
-                        bookId = route.bookId,
-                        onBack = { stack.pop() },
-                        onOpenSettings = { stack.push(Route.Settings) },
-                    )
+                    is Route.Setup -> {
+                        // Narration runs as a foreground service with a notification, so this is where we ask.
+                        LaunchedEffect(Unit) { askNotificationsOnce() }
+                        NarrationSetupRoute(
+                            bookId = route.bookId,
+                            onBack = { stack.pop() },
+                            onOpenSettings = { stack.push(Route.Settings) },
+                        )
+                    }
                     Route.Settings -> SettingsRoute(onBack = { stack.pop() })
                 }
             }
@@ -260,7 +314,35 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, deepLinks: Flo
                 onSaved = { sheet = null },
             )
         }
+
+        val chrome = if (top is Route.Tabs) TabBarHeight else 0.dp
+        KpToastHost(
+            message = toast,
+            onDismiss = { toast = null },
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = chrome + 16.dp),
+        )
     }
+}
+
+/** Status and navigation bar icons follow the app's own light/dark theme, not the system's. */
+@Composable
+private fun SystemBarsFollowTheme() {
+    val view = LocalView.current
+    val palette = Kp.palette
+    if (view.isInEditMode) return
+    SideEffect {
+        val window = view.context.findActivity()?.window ?: return@SideEffect
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.isAppearanceLightStatusBars = !palette.isDark
+        controller.isAppearanceLightNavigationBars = !palette.isDark
+        window.setBackgroundDrawable(ColorDrawable(palette.bg.toArgb()))
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable
@@ -355,7 +437,7 @@ private fun TabsHost(
     var bottomPx by remember { mutableIntStateOf(0) }
     val bottom = with(density) { bottomPx.toDp() }
     val playback = container.playback
-    val playingBook by playback.state.collectAsState()
+    val hasBook by remember(playback) { playback.state.map { it.bookId != null }.distinctUntilChanged() }.collectAsState(false)
 
     Box(Modifier.fillMaxSize().background(Kp.palette.bg)) {
         Box(
@@ -382,10 +464,10 @@ private fun TabsHost(
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { bottomPx = it.height },
         ) {
-            if (playingBook.bookId != null) {
+            if (hasBook) {
                 NowBar(
                     controller = playback,
-                    onOpen = { playingBook.bookId?.let(onOpenPlayer) },
+                    onOpen = { playback.state.value.bookId?.let(onOpenPlayer) },
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
             }

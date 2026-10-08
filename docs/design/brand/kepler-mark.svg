@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="432" height="432" role="img" aria-label="Kepler">
+  <rect width="108" height="108" rx="24" fill="#0F1E40"/>
+  <defs>
+    <mask id="halo" maskUnits="userSpaceOnUse" x="-54" y="-54" width="108" height="108">
+      <rect x="-54" y="-54" width="108" height="108" fill="#fff"/>
+      <circle cx="-22.12" cy="-10.61" r="6.5" fill="#000"/>
+    </mask>
+  </defs>
+  <g transform="translate(55 54) rotate(-18)">
+    <g mask="url(#halo)" fill="#ECE6D9">
+      <ellipse cx="0" cy="0" rx="27" ry="18.5" fill="none" stroke="#ECE6D9" stroke-width="3.5"/>
+      <path d="M19.67,0 L-22.12,10.61 A27,18.5 0 0 1 -22.12,-10.61 Z"/>
+      <circle cx="19.67" cy="0" r="3.2"/>
+    </g>
+    <circle cx="-22.12" cy="-10.61" r="4.5" fill="#4D8BFF"/>
+  </g>
+</svg>
