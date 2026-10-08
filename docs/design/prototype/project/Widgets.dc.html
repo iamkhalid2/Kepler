@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Widgets and system surfaces</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1240px; height: 1000px; box-sizing: border-box; padding: 56px; background-color: #0B0B0E; color: #F5F5F7; font-family: 'Geist', system-ui, sans-serif; display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 40px;">
+
+  <div style="border-radius: 40px; background-color: #23202E; padding: 28px 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; position: relative; overflow: hidden;">
+    <div style="position: absolute; right: -80px; top: 120px; width: 260px; height: 260px; border-radius: 50%; background-color: #2E2A40;"></div>
+    <div style="position: absolute; left: -60px; bottom: 80px; width: 200px; height: 200px; border-radius: 50%; background-color: #2A2738;"></div>
+    <div style="position: relative; font-size: 13px; letter-spacing: 0.12em; color: #B9B4D6; font-weight: 600;">HOME SCREEN WIDGETS</div>
+
+    <div style="position: relative; border-radius: 30px; background-color: #1E1838; padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow: hidden;">
+      <div style="position: absolute; right: -40px; top: -50px; width: 160px; height: 160px; border-radius: 50%; background-color: #8B7CFF; opacity: 0.28; filter: blur(40px);"></div>
+      <div style="position: relative; display: flex; gap: 14px; align-items: center;">
+        <div style="position: relative; width: 64px; height: 64px; border-radius: 16px; overflow: hidden; background-color: #2A2350; flex-shrink: 0;"><div style="position: absolute; left: 35%; top: 15%; width: 70%; aspect-ratio: 1; border-radius: 50%; background-color: #8B7CFF;"></div></div>
+        <div style="flex-grow: 1; min-width: 0;">
+          <div style="font-size: 17px; font-weight: 600;">Meditations</div>
+          <div style="font-size: 13px; color: #B9B4D6;">Book II · §1 · 18 min left</div>
+          <div style="font-size: 12px; color: #FFB08C; margin-top: 4px; font-family: 'Geist Mono', monospace;">6:20 ahead</div>
+        </div>
+        <svg viewBox="0 0 44 44" style="width: 44px; height: 44px; transform: rotate(-90deg); flex-shrink: 0;" aria-hidden="true"><circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.14)" style="stroke-width: 4"></circle><circle cx="22" cy="22" r="18" fill="none" stroke="#F5F5F7" style="stroke-width: 4; stroke-linecap: round; stroke-dasharray: 46.4 113.1;"></circle></svg>
+      </div>
+      <div style="position: relative; display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" aria-label="Back 15 seconds" style="width: 52px; height: 44px; border-radius: 22px; border: 0; background-color: rgba(255,255,255,0.08); color: #F5F5F7; font-family: 'Geist Mono', monospace; font-size: 13px;">−15</button>
+        <button type="button" aria-label="Pause" style="width: 104px; height: 48px; border-radius: 16px; border: 0; background-color: #F5F5F7; color: #0B0B0E; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: currentColor; stroke: none;"><rect x="6.5" y="5" width="4" height="14" rx="1.2"></rect><rect x="13.5" y="5" width="4" height="14" rx="1.2"></rect></svg></button>
+        <button type="button" aria-label="Forward 30 seconds" style="width: 52px; height: 44px; border-radius: 22px; border: 0; background-color: rgba(255,255,255,0.08); color: #F5F5F7; font-family: 'Geist Mono', monospace; font-size: 13px;">+30</button>
+      </div>
+      <div style="position: relative; font-size: 11px; color: #85809E; text-align: right; font-family: 'Geist Mono', monospace;">Now Playing · 4×2</div>
+    </div>
+
+    <div style="position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+      <div style="border-radius: 30px; background-color: #141418; padding: 16px; display: flex; flex-direction: column; gap: 8px; height: 176px; box-sizing: border-box;">
+        <div style="font-size: 11px; letter-spacing: 0.08em; color: #A99CFF; font-weight: 600;">REVIEW</div>
+        <div style="display: flex; align-items: baseline; gap: 6px;"><span style="font-family: 'Geist Mono', monospace; font-size: 40px; line-height: 40px; font-weight: 500; letter-spacing: -0.04em;">12</span><span style="font-size: 12px; color: #A1A1AA;">≈ 6 min</span></div>
+        <div style="font-size: 12px; line-height: 16px; color: #D6D6DC;">Why can no one truly injure Marcus?</div>
+        <div style="flex-grow: 1;"></div>
+        <div style="display: flex; gap: 4px;">
+          <span style="width: 14px; height: 14px; border-radius: 7px; background-color: #8B7CFF;"></span><span style="width: 14px; height: 14px; border-radius: 7px; background-color: #8B7CFF;"></span><span style="width: 14px; height: 14px; border-radius: 7px; background-color: #8B7CFF;"></span><span style="width: 14px; height: 14px; border-radius: 7px; border: 1px solid #3A3A44; box-sizing: border-box;"></span><span style="width: 14px; height: 14px; border-radius: 7px; background-color: #8B7CFF;"></span><span style="width: 14px; height: 14px; border-radius: 7px; border: 1px solid #3A3A44; box-sizing: border-box;"></span><span style="width: 14px; height: 14px; border-radius: 7px; border: 1px solid #3A3A44; box-sizing: border-box;"></span>
+        </div>
+      </div>
+      <div style="border-radius: 30px; background-color: #141418; padding: 16px; display: flex; flex-direction: column; gap: 8px; height: 176px; box-sizing: border-box; align-items: flex-start;">
+        <div style="font-size: 11px; letter-spacing: 0.08em; color: #3DDC97; font-weight: 600;">ALL CAUGHT UP</div>
+        <div style="width: 44px; height: 44px; border-radius: 22px; background-color: #3DDC97; color: #0B0B0E; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></div>
+        <div style="font-size: 13px; line-height: 18px; color: #D6D6DC;">Next review tomorrow, 9:00</div>
+        <div style="flex-grow: 1;"></div>
+        <div style="font-size: 11px; color: #85858F; font-family: 'Geist Mono', monospace;">Review Due · 2×2</div>
+      </div>
+    </div>
+
+    <div style="position: relative; border-radius: 26px; background-color: #F7F3EA; color: #2A2622; padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+      <div style="position: relative; width: 36px; height: 54px; border-radius: 6px; overflow: hidden; background-color: #1F3B2D; flex-shrink: 0;"><div style="position: absolute; left: -10%; top: 30%; width: 80%; aspect-ratio: 1; border-radius: 50%; background-color: #7FD1A1;"></div></div>
+      <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; justify-content: space-between;"><span style="font-size: 14px; font-weight: 600;">On the Origin of Species</span><span style="font-size: 12px; color: #6F675C;">22%</span></div>
+        <div style="height: 4px; border-radius: 2px; background-color: rgba(42,38,34,0.12);"><div style="width: 22%; height: 4px; border-radius: 2px; background-color: #2A2622;"></div></div>
+        <div style="font-size: 12px; color: #6F675C;">12 min left in chapter III · Continue Reading 4×1</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 28px;">
+    <div style="font-size: 13px; letter-spacing: 0.12em; color: #A1A1AA; font-weight: 600;">ANDROID AUTO</div>
+    <div style="width: 700px; height: 394px; border-radius: 28px; background-color: #0E0E12; border: 1px solid #22222A; display: flex; overflow: hidden;">
+      <div style="width: 84px; background-color: #15151A; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; color: #85858F;">
+        <svg viewBox="0 0 24 24" style="width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;"><path d="M4 11l8-6.5 8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5H9v5.5H5.5A1.5 1.5 0 0 1 4 19z"></path></svg>
+        <div style="width: 44px; height: 44px; border-radius: 12px; background-color: #8B7CFF; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 108 108" style="width: 34px; height: 34px;"><rect x="31" y="25" width="11" height="59" rx="5.5" fill="#0D0A1F"></rect><circle cx="55" cy="62" r="16.5" fill="none" stroke="#0D0A1F" style="stroke-width: 11"></circle></svg></div>
+        <svg viewBox="0 0 24 24" style="width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v4l3 2"></path></svg>
+      </div>
+      <div style="flex-grow: 1; padding: 26px 28px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-size: 22px; font-weight: 600;">BetterBooks</div>
+        <div style="display: flex; gap: 16px; align-items: center; background-color: #1E1838; border-radius: 22px; padding: 14px;">
+          <div style="position: relative; width: 96px; height: 96px; border-radius: 16px; overflow: hidden; background-color: #2A2350; flex-shrink: 0;"><div style="position: absolute; left: 35%; top: 15%; width: 70%; aspect-ratio: 1; border-radius: 50%; background-color: #8B7CFF;"></div></div>
+          <div style="flex-grow: 1;"><div style="font-size: 13px; color: #FFB08C; letter-spacing: 0.06em; font-weight: 600;">CONTINUE</div><div style="font-size: 24px; font-weight: 600;">Meditations</div><div style="font-size: 16px; color: #B9B4D6;">Book II · 18 min left</div></div>
+          <div style="width: 72px; height: 72px; border-radius: 36px; background-color: #F5F5F7; color: #0B0B0E; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width: 32px; height: 32px; fill: currentColor; stroke: none;"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"></path></svg></div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+          <div style="background-color: #17171C; border-radius: 18px; padding: 16px; font-size: 18px; font-weight: 600;">Recently played<div style="font-size: 13px; color: #85858F; font-weight: 400; margin-top: 4px;">4 books</div></div>
+          <div style="background-color: #17171C; border-radius: 18px; padding: 16px; font-size: 18px; font-weight: 600;">Library<div style="font-size: 13px; color: #85858F; font-weight: 400; margin-top: 4px;">ready to play</div></div>
+          <div style="background-color: #17171C; border-radius: 18px; padding: 16px; font-size: 18px; font-weight: 600;">Collections<div style="font-size: 13px; color: #85858F; font-weight: 400; margin-top: 4px;">3</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size: 13px; letter-spacing: 0.12em; color: #A1A1AA; font-weight: 600; margin-top: 8px;">MEDIA NOTIFICATION</div>
+    <div style="width: 420px; border-radius: 28px; background-color: #1E1838; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <svg viewBox="0 0 108 108" style="width: 20px; height: 20px;" aria-hidden="true"><rect x="31" y="25" width="11" height="59" rx="5.5" fill="#B9B4D6"></rect><circle cx="55" cy="62" r="16.5" fill="none" stroke="#B9B4D6" style="stroke-width: 11"></circle></svg>
+        <span style="font-size: 13px; color: #B9B4D6;">BetterBooks · Book II · §1</span>
+      </div>
+      <div style="display: flex; gap: 14px; align-items: center;">
+        <div style="flex-grow: 1;"><div style="font-size: 18px; font-weight: 600;">Meditations</div><div style="font-size: 14px; color: #B9B4D6;">Marcus Aurelius · Ava</div></div>
+        <div style="position: relative; width: 60px; height: 60px; border-radius: 14px; overflow: hidden; background-color: #2A2350;"><div style="position: absolute; left: 35%; top: 15%; width: 70%; aspect-ratio: 1; border-radius: 50%; background-color: #8B7CFF;"></div></div>
+      </div>
+      <div style="height: 4px; border-radius: 2px; background-color: rgba(255,255,255,0.14);"><div style="width: 41%; height: 4px; border-radius: 2px; background-color: #F5F5F7;"></div></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; font-family: 'Geist Mono', monospace; font-size: 13px; color: #F5F5F7;">
+        <span style="width: 56px; text-align: center;">−15</span>
+        <span style="width: 52px; height: 52px; border-radius: 16px; background-color: #F5F5F7; color: #0B0B0E; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: currentColor; stroke: none;"><rect x="6.5" y="5" width="4" height="14" rx="1.2"></rect><rect x="13.5" y="5" width="4" height="14" rx="1.2"></rect></svg></span>
+        <span style="width: 56px; text-align: center;">+30</span>
+        <span style="width: 56px; display: flex; justify-content: center;"><svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;"><path d="M7 4h10v16l-5-3.5L7 20z"></path></svg></span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1240,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

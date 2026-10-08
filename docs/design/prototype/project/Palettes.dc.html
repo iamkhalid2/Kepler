@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Palette options</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 2040px; height: 1080px; box-sizing: border-box; padding: 52px 56px; background-color: #0B0B0E; color: #F5F5F7; font-family: 'Geist', system-ui, sans-serif; display: flex; flex-direction: column; gap: 28px;">
+  <div style="display: flex; align-items: baseline; gap: 16px;">
+    <div style="font-size: 30px; font-weight: 600; letter-spacing: -0.02em;">Palette options</div>
+    <div style="font-size: 15px; color: #A1A1AA;">The same Home and reader moment in six palettes</div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 24px;">
+    <sc-for list="{{palettes}}" as="p" hint-placeholder-count="6">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between;">
+          <span style="font-size: 20px; font-weight: 600;">{{p.name}}</span>
+          <span style="font-size: 11px; color: #A1A1AA; font-family: 'Geist Mono', monospace;">{{p.tag}}</span>
+        </div>
+        <div style="font-size: 13px; line-height: 18px; color: #A1A1AA; height: 36px;">{{p.mood}}</div>
+        <div style="display: flex; gap: 8px;">
+          <sc-for list="{{p.sw}}" as="c" hint-placeholder-count="5">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+              <div style="width: 40px; height: 40px; border-radius: 20px; background-color: {{c.hex}}; border: 1px solid #2E2E38;"></div>
+              <div style="font-family: 'Geist Mono', monospace; font-size: 9px; color: #85858F;">{{c.hex}}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="height: 780px; border-radius: 34px; background-color: {{p.bg}}; color: {{p.text}}; border: 1px solid {{p.line}}; padding: 20px 18px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 108 108" style="width: 30px; height: 30px;" aria-hidden="true"><rect x="0" y="0" width="108" height="108" rx="30" fill="{{p.s2}}"></rect><rect x="31" y="25" width="11" height="59" rx="5.5" fill="{{p.accent}}"></rect><circle cx="55" cy="62" r="16.5" fill="none" stroke="{{p.accent}}" style="stroke-width: 11"></circle><circle cx="55" cy="62" r="4.6" fill="{{p.second}}"></circle></svg>
+            <span style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">BetterBooks</span>
+          </div>
+          <div style="font-size: 24px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em;">Welcome back</div>
+
+          <div style="position: relative; overflow: hidden; border-radius: 22px; background-color: {{p.s1}}; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="position: absolute; right: -40px; top: -50px; width: 140px; height: 140px; border-radius: 50%; background-color: {{p.accent}}; opacity: 0.28; filter: blur(34px);"></div>
+            <div style="position: relative; display: flex; gap: 12px; align-items: center;">
+              <div style="position: relative; width: 48px; height: 72px; border-radius: 8px; overflow: hidden; background-color: {{p.cover}}; flex-shrink: 0;"><div style="position: absolute; left: 34%; top: 16%; width: 70%; aspect-ratio: 1; border-radius: 50%; background-color: {{p.accent}};"></div></div>
+              <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                <span style="font-size: 10px; letter-spacing: 0.08em; font-weight: 600; color: {{p.second}};">LISTENING · BOOK II</span>
+                <span style="font-size: 16px; font-weight: 600;">Meditations</span>
+                <span style="font-size: 12px; color: {{p.text2}};">18 min left</span>
+              </div>
+            </div>
+            <div style="position: relative; height: 4px; border-radius: 2px; background-color: {{p.line}};"><div style="width: 41%; height: 4px; border-radius: 2px; background-color: {{p.text}};"></div></div>
+            <div style="position: relative; height: 40px; border-radius: 20px; background-color: {{p.text}}; color: {{p.bg}}; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600;">Resume</div>
+          </div>
+
+          <div style="border-radius: 20px; background-color: {{p.page}}; color: {{p.pageInk}}; padding: 14px; font-family: 'Literata', serif; font-size: 14px; line-height: 22px; border: 1px solid {{p.line}};">
+            Whatever this is that I am, <span style="background-color: {{p.speak}}; border-radius: 4px;">it is a little flesh and breath, and the ruling part.</span> <span style="box-shadow: inset 0 -2px 0 {{p.second}};">Throw away thy books;</span> no longer distract thyself.
+          </div>
+
+          <div style="border-radius: 22px; background-color: {{p.s1}}; padding: 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: baseline; gap: 6px;"><span style="font-family: 'Geist Mono', monospace; font-size: 28px; line-height: 28px; font-weight: 500; letter-spacing: -0.04em;">12</span><span style="font-size: 12px; color: {{p.text2}};">due · 6 min</span></div>
+              <div style="display: flex; gap: 4px;">
+                <span style="width: 12px; height: 12px; border-radius: 6px; background-color: {{p.accent}};"></span><span style="width: 12px; height: 12px; border-radius: 6px; background-color: {{p.accent}};"></span><span style="width: 12px; height: 12px; border-radius: 6px; background-color: {{p.accent}};"></span><span style="width: 12px; height: 12px; border-radius: 6px; border: 1px solid {{p.line}}; box-sizing: border-box;"></span><span style="width: 12px; height: 12px; border-radius: 6px; background-color: {{p.accent}};"></span><span style="width: 12px; height: 12px; border-radius: 6px; border: 1px solid {{p.line}}; box-sizing: border-box;"></span><span style="width: 12px; height: 12px; border-radius: 6px; border: 1px solid {{p.line}}; box-sizing: border-box;"></span>
+              </div>
+            </div>
+            <div style="width: 56px; height: 56px; border-radius: 28px; background-color: {{p.accent}}; color: {{p.onAccent}}; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;">Start</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;">
+            <div style="height: 46px; border-radius: 14px; background-color: {{p.s2}}; color: {{p.neg}}; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">Again<span style="font-family: 'Geist Mono', monospace; font-weight: 400; opacity: 0.8;">1d</span></div>
+            <div style="height: 46px; border-radius: 14px; background-color: {{p.s2}}; color: {{p.warn}}; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">Hard<span style="font-family: 'Geist Mono', monospace; font-weight: 400; opacity: 0.8;">3d</span></div>
+            <div style="height: 46px; border-radius: 14px; background-color: {{p.s2}}; color: {{p.pos}}; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">Good<span style="font-family: 'Geist Mono', monospace; font-weight: 400; opacity: 0.8;">8d</span></div>
+            <div style="height: 46px; border-radius: 14px; background-color: {{p.s2}}; color: {{p.accentText}}; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">Easy<span style="font-family: 'Geist Mono', monospace; font-weight: 400; opacity: 0.8;">21d</span></div>
+          </div>
+
+          <div style="flex-grow: 1;"></div>
+          <div style="height: 58px; border-radius: 20px; background-color: {{p.s1}}; display: flex; align-items: center; justify-content: space-around; font-size: 11px; font-weight: 500;">
+            <span style="height: 30px; padding: 0 12px; border-radius: 15px; background-color: {{p.s2}}; color: {{p.text}}; display: flex; align-items: center;">Home</span>
+            <span style="color: {{p.text2}};">Library</span>
+            <span style="color: {{p.text2}};">Notebook</span>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2040,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const palettes = [
+      { name: 'Lumen', tag: 'current', mood: 'Violet and ember on ink. Focused, a little magical.',
+        bg: '#0B0B0E', s1: '#141418', s2: '#1C1C22', line: '#2E2E38', text: '#F5F5F7', text2: '#A1A1AA',
+        accent: '#8B7CFF', accentText: '#A99CFF', second: '#FF8F5C', onAccent: '#0D0A1F', cover: '#2A2350',
+        page: '#1B1B1F', pageInk: '#D6D3CC', speak: 'rgba(139,124,255,0.30)', pos: '#3DDC97', warn: '#FFC857', neg: '#FF5D73' },
+      { name: 'Cobalt', tag: 'Revolut-like', mood: 'Black and white with one electric blue. Crisp, fintech-clean.',
+        bg: '#000000', s1: '#101012', s2: '#1A1A1E', line: '#2A2A30', text: '#FFFFFF', text2: '#9B9BA3',
+        accent: '#4D8BFF', accentText: '#7AA8FF', second: '#2DD4BF', onAccent: '#020A1C', cover: '#13233F',
+        page: '#111114', pageInk: '#D9D9DE', speak: 'rgba(77,139,255,0.30)', pos: '#34D399', warn: '#FBBF24', neg: '#F87171' },
+      { name: 'Ember', tag: 'literary', mood: 'Warm ink, ember and saffron. Like a reading lamp.',
+        bg: '#100D0B', s1: '#1A1613', s2: '#241E1A', line: '#352C26', text: '#F6EFE7', text2: '#B3A79B',
+        accent: '#FF7A45', accentText: '#FF9A6E', second: '#F2C14E', onAccent: '#1A0E08', cover: '#3A2418',
+        page: '#1C1714', pageInk: '#E4D9CC', speak: 'rgba(255,122,69,0.26)', pos: '#7ED6A0', warn: '#F2C14E', neg: '#FF6B6B' },
+      { name: 'Moss', tag: 'calm study', mood: 'Jade and lilac on deep green. Quiet, library-at-night.',
+        bg: '#0A0E0C', s1: '#121916', s2: '#1A231F', line: '#26332D', text: '#EEF5F0', text2: '#9DB0A6',
+        accent: '#4FD69C', accentText: '#6FE3B0', second: '#B9A6FF', onAccent: '#06140D', cover: '#17352A',
+        page: '#141B18', pageInk: '#D3DED8', speak: 'rgba(79,214,156,0.24)', pos: '#4FD69C', warn: '#E9C46A', neg: '#F2727F' },
+      { name: 'Dusk', tag: 'expressive', mood: 'Coral and teal on plum. Bold, a bit playful.',
+        bg: '#110B14', s1: '#1A1220', s2: '#241A2C', line: '#33263D', text: '#F7F0FA', text2: '#B6A6C0',
+        accent: '#FF6F91', accentText: '#FF8FA9', second: '#5ED3C8', onAccent: '#22040D', cover: '#3B1D33',
+        page: '#1B1420', pageInk: '#E2D6E8', speak: 'rgba(255,111,145,0.26)', pos: '#5ED3C8', warn: '#FFC46B', neg: '#FF8A65' },
+      { name: 'Paper', tag: 'light first', mood: 'Ink on warm paper with ultramarine. Bright and bookish.',
+        bg: '#F6F2EA', s1: '#FFFFFF', s2: '#EFE9DE', line: '#E2DBCD', text: '#1B1916', text2: '#5E584F',
+        accent: '#3E4BFF', accentText: '#3E4BFF', second: '#E8642C', onAccent: '#FFFFFF', cover: '#1E2A5A',
+        page: '#FFFDF8', pageInk: '#2A2622', speak: 'rgba(62,75,255,0.14)', pos: '#1F9D6A', warn: '#B7791F', neg: '#D64545' }
+    ];
+    return {
+      palettes: palettes.map((p) => Object.assign({}, p, {
+        sw: [{ hex: p.bg }, { hex: p.s1 }, { hex: p.text }, { hex: p.accent }, { hex: p.second }]
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

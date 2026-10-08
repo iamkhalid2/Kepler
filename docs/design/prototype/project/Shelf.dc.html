@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BetterBooks Shelf prototype</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..800,0..100;1,9..144,300..800,0..100&amp;family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400;1,7..72,500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000}
+.scene{perspective:1300px;perspective-origin:50% 36%}
+.slot{position:absolute;left:0;top:0;width:150px;height:225px;transform-style:preserve-3d;transition:transform .95s cubic-bezier(.22,.9,.18,1.02),opacity .45s ease}
+.bob{width:100%;height:100%;transform-style:preserve-3d}
+.bob.float{animation:sFloat 4.4s ease-in-out infinite}
+.bk{position:absolute;left:0;top:0;width:150px;height:225px;transform-style:preserve-3d}
+.f{position:absolute;overflow:hidden;backface-visibility:hidden}
+.f-front{left:0;top:0;width:150px;height:225px;border-radius:2px 5px 5px 2px;transform:translateZ(calc(var(--t) / 2))}
+.f-back{left:0;top:0;width:150px;height:225px;transform:rotateY(180deg) translateZ(calc(var(--t) / 2))}
+.f-spine{top:0;height:225px;width:var(--t);left:calc(var(--t) / -2);transform:rotateY(-90deg)}
+.f-pages{top:2px;height:221px;width:calc(var(--t) - 4px);left:calc(150px - var(--t) / 2 + 2px);transform:rotateY(90deg);background:repeating-linear-gradient(0deg,#ebe3cf 0 1.2px,#cdc4ae 1.2px 2.4px)}
+.f-top{left:2px;width:146px;height:calc(var(--t) - 4px);top:calc(var(--t) / -2 + 2px);transform:rotateX(90deg);background:repeating-linear-gradient(90deg,#ebe3cf 0 1.2px,#cdc4ae 1.2px 2.4px)}
+.f-bot{left:2px;width:146px;height:calc(var(--t) - 4px);top:calc(225px - var(--t) / 2 + 2px);transform:rotateX(-90deg);background:#b9b09a}
+.sh{position:absolute;inset:0;background:#000;pointer-events:none}
+.ptr{transition:transform .25s cubic-bezier(.3,1.5,.5,1),opacity .2s,background-color .25s,color .25s}
+.ptr:active{transform:translateY(1px) scale(.97)}
+.sIn{animation:sIn .6s cubic-bezier(.2,.9,.2,1) both}
+.sUp{animation:sUp .7s cubic-bezier(.2,.9,.15,1.04) both}
+.sOpen{transform-origin:0% 50%;animation:sOpen 1s cubic-bezier(.2,.85,.15,1) both}
+.sFlip{transition:transform .8s cubic-bezier(.3,1.25,.4,1);transform-style:preserve-3d}
+.sRib{transform-origin:50% 0%;animation:sRib 6s cubic-bezier(.3,.7,.4,1) infinite}
+.sMorph{transition:border-radius .5s cubic-bezier(.3,1.4,.4,1),width .5s cubic-bezier(.3,1.4,.4,1),background-color .3s}
+.sScroll{overflow-y:auto;scrollbar-width:none}
+.sScroll::-webkit-scrollbar{display:none}
+input[type=range]{accent-color:#4D8BFF}
+@keyframes sFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes sIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes sUp{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:none}}
+@keyframes sOpen{0%{transform:perspective(1400px) rotateY(-96deg);opacity:.2}60%{opacity:1}100%{transform:perspective(1400px) rotateY(0)}}
+@keyframes sRib{0%{transform:rotate(0)}8%{transform:rotate(5deg)}20%{transform:rotate(-3deg)}32%{transform:rotate(1.6deg)}44%{transform:rotate(-.7deg)}56%,100%{transform:rotate(0)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background-color: #000000; color: #FFFFFF; font-family: 'Albert Sans', sans-serif; -webkit-font-smoothing: antialiased;">
+
+<svg width="0" height="0" style="position: absolute;" aria-hidden="true"><defs><filter id="sCloth" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.5 0.45" numOctaves="2" seed="7" result="n"></feTurbulence><feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.1 -0.5" result="s"></feColorMatrix><feComposite in="s" in2="SourceGraphic" operator="in"></feComposite></filter></defs></svg>
+
+<!-- ===== lacquer plank (library only) ===== -->
+<div class="sIn" style="position: absolute; left: 0; top: 548px; width: 390px; height: 40px; opacity: {{plankOp}}; transition: opacity .5s; pointer-events: none;">
+  <div style="height: 14px; background: linear-gradient(#000, #0C0C0E);"></div>
+  <div style="height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.28), rgba(255,255,255,0.12) 60%, rgba(255,255,255,0.03));"></div>
+  <div style="height: 10px; background: #070708;"></div>
+</div>
+
+<!-- ===== THE 3D BOOKS ===== -->
+<div class="scene" style="position: absolute; left: 0; top: 0; width: 390px; height: 844px; pointer-events: none; z-index: {{sceneZ}};">
+  <sc-for list="{{books}}" as="b" hint-placeholder-count="6">
+    <div class="slot" style="transform: {{b.xf}}; opacity: {{b.op}};">
+      <div class="bob {{b.bob}}">
+        <div class="bk" style="--t: {{b.t}}px;">
+          <div class="f f-front" style="background-color: {{b.cover}}; color: {{b.ink}};">
+            <div style="position: absolute; inset: 0; background: #fff; opacity: 0.5; filter: url(#sCloth); mix-blend-mode: overlay;"></div>
+            <div style="position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0) 42%, rgba(0,0,0,0.38));"></div>
+            <div style="position: absolute; left: 11px; top: 0; bottom: 0; width: 1.5px; background: rgba(0,0,0,0.5);"></div>
+            <div style="position: absolute; left: 12.5px; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.14);"></div>
+            <div style="position: absolute; left: 24px; right: 14px; top: 22px; font-family: 'Fraunces', serif; font-size: 12px; line-height: 15px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; font-variation-settings: 'SOFT' 100, 'opsz' 14;">{{b.title}}</div>
+            <svg viewBox="0 0 60 60" style="position: absolute; left: 50px; top: 92px; width: 60px; height: 60px; fill: none; stroke: currentColor; stroke-width: 5; opacity: 0.9;"><circle cx="30" cy="30" r="20"></circle><circle cx="30" cy="30" r="4.4" style="fill: currentColor; stroke: none;"></circle></svg>
+            <div style="position: absolute; left: 24px; right: 14px; bottom: 18px; font-family: 'Fraunces', serif; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.8;">{{b.author}}</div>
+            <div class="sh" style="opacity: {{b.shFront}};"></div>
+          </div>
+          <div class="f f-back" style="background-color: {{b.cover}};"><div class="sh" style="opacity: 0.35;"></div></div>
+          <div class="f f-spine" style="background-color: {{b.cover}}; color: {{b.ink}};">
+            <div style="position: absolute; inset: 0; background: #fff; opacity: 0.5; filter: url(#sCloth); mix-blend-mode: overlay;"></div>
+            <div style="position: absolute; inset: 0; background: linear-gradient(90deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 40%, rgba(0,0,0,0.3));"></div>
+            <div style="position: absolute; left: 0; right: 0; top: 14px; display: flex; justify-content: center;"><span style="width: 8px; height: 8px; border-radius: 4px; background: currentColor; opacity: 0.9;"></span></div>
+            <div style="position: absolute; left: 0; right: 0; top: 34px; bottom: 36px; display: flex; justify-content: center;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-family: 'Fraunces', serif; font-size: 15px; font-weight: 600; letter-spacing: 0.06em; white-space: nowrap; font-variation-settings: 'SOFT' 100, 'opsz' 18;">{{b.title}}</span></div>
+            <div style="position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-family: 'Fraunces', serif; font-size: 8px; letter-spacing: 0.1em;">BB</div>
+            <div class="sh" style="opacity: {{b.shSpine}};"></div>
+          </div>
+          <div class="f f-pages"><div class="sh" style="opacity: {{b.shPages}};"></div></div>
+          <div class="f f-top"><div class="sh" style="opacity: 0.2;"></div></div>
+          <div class="f f-bot"></div>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+</div>
+
+<!-- hit targets for the shelf (spines) -->
+<sc-if value="{{isLibrary}}" hint-placeholder-val="{{ false }}">
+  <sc-for list="{{books}}" as="h" hint-placeholder-count="6">
+    <button type="button" class="ptr" onClick="{{h.pick}}" aria-label="Open {{h.title}}" style="position: absolute; left: {{h.hx}}px; top: {{h.hy}}px; width: {{h.hw}}px; height: {{h.hh}}px; border: 0; background: transparent; padding: 0; z-index: 12; cursor: pointer;"></button>
+  </sc-for>
+</sc-if>
+
+<!-- ============ HOME ============ -->
+<sc-if value="{{isHome}}" hint-placeholder-val="{{ true }}">
+<div class="sIn" style="position: absolute; inset: 0; z-index: 8;">
+  <div style="position: absolute; left: 14px; top: 20px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+    <svg viewBox="0 0 108 108" style="width: 30px; height: 30px;" aria-label="BetterBooks"><rect x="31" y="25" width="11" height="59" rx="5.5" style="fill: #FFFFFF;"></rect><circle cx="55" cy="62" r="16.5" style="fill: none; stroke: #FFFFFF; stroke-width: 11;"></circle><circle cx="55" cy="62" r="4.6" style="fill: #4D8BFF;"></circle></svg>
+  </div>
+  <div style="position: absolute; left: 62px; top: 35px; font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: 0.16em; color: #9B9BA3;">THURSDAY · 8 OCTOBER</div>
+  <h1 style="position: absolute; left: 22px; top: 66px; margin: 0; font-family: 'Fraunces', serif; font-weight: 360; font-size: 36px; line-height: 42px; letter-spacing: -0.02em; font-variation-settings: 'SOFT' 100, 'opsz' 96;">Good <span style="font-style: italic;">evening.</span></h1>
+  <div style="position: absolute; left: 0; top: 392px; width: 390px;"><div style="height: 14px; background: linear-gradient(#000, #0C0C0E);"></div><div style="height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.28), rgba(255,255,255,0.12) 60%, rgba(255,255,255,0.03));"></div></div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 418px;">
+    <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.16em; color: #7AA8FF;">LISTENING · BOOK II · 1.4×</div>
+    <div style="font-family: 'Fraunces', serif; font-size: 30px; line-height: 34px; font-weight: 420; margin-top: 4px; font-variation-settings: 'SOFT' 100, 'opsz' 72;">Meditations</div>
+    <div style="font-size: 14px; color: #9B9BA3; margin-top: 2px;">Marcus Aurelius · read by Ava · 18 min left in Book II</div>
+    <div style="display: flex; gap: 10px; margin-top: 14px;">
+      <button type="button" class="ptr" onClick="{{goResume}}" style="height: 48px; padding: 0 22px; border-radius: 12px; border: 0; background-color: #4D8BFF; color: #020A1C; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);">Resume listening</button>
+      <button type="button" class="ptr" onClick="{{goHubHome}}" style="height: 48px; padding: 0 18px; border-radius: 12px; border: 1px solid #2A2A30; background-color: transparent; color: #FFFFFF; font-size: 15px; font-weight: 600; cursor: pointer;">Open book</button>
+    </div>
+  </div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 578px; border-top: 1px solid #2A2A30; padding-top: 12px;">
+    <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.16em; color: #9B9BA3;">PREVIOUSLY ON · AWAY 4 DAYS</div>
+    <div style="font-family: 'Literata', serif; font-size: 15.5px; line-height: 23px; color: #D9D9DE; margin-top: 6px;">Marcus opened Book II by bracing for difficult people, then argued we are built for co-operation, so anger works against our own nature.</div>
+  </div>
+  <button type="button" class="ptr" onClick="{{goNotebook}}" style="position: absolute; left: 22px; right: 22px; top: 690px; height: 56px; border: 0; border-top: 1px solid #2A2A30; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: space-between; padding: 0; cursor: pointer; text-align: left;">
+    <span><span style="font-family: 'Fraunces', serif; font-size: 26px; font-weight: 420;">12</span><span style="font-size: 14px; color: #9B9BA3; margin-left: 8px;">cards due · about 6 min</span></span>
+    <span style="font-size: 14px; font-weight: 600; color: #7AA8FF;">Review →</span>
+  </button>
+</div>
+</sc-if>
+
+<!-- ============ LIBRARY ============ -->
+<sc-if value="{{isLibrary}}" hint-placeholder-val="{{ false }}">
+<div class="sIn" style="position: absolute; inset: 0; z-index: 8; pointer-events: none;">
+  <h1 style="position: absolute; left: 22px; top: 50px; margin: 0; font-family: 'Fraunces', serif; font-weight: 360; font-size: 36px; line-height: 42px; letter-spacing: -0.02em; font-variation-settings: 'SOFT' 100, 'opsz' 96;">Your <span style="font-style: italic;">shelf.</span></h1>
+  <div style="position: absolute; left: 22px; top: 104px; font-size: 14px; color: #9B9BA3;">6 books · tap a spine to take it down</div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 616px; border-top: 1px solid #2A2A30; padding-top: 12px; display: flex; justify-content: space-between; font-size: 13px; color: #9B9BA3;">
+    <span>Cobalt ribbon: listened</span><span>Bone ribbon: read</span>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ HUB ============ -->
+<sc-if value="{{isHub}}" hint-placeholder-val="{{ false }}">
+<div class="sIn" style="position: absolute; inset: 0; z-index: 8;">
+  <button type="button" class="ptr" onClick="{{goLibrary}}" aria-label="Back to shelf" style="position: absolute; left: 8px; top: 20px; width: 48px; height: 48px; border: 0; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M15 5l-7 7 7 7"></path></svg></button>
+  <div style="position: absolute; left: 22px; right: 22px; top: 404px; text-align: center;">
+    <div style="font-family: 'Fraunces', serif; font-size: 32px; line-height: 36px; font-weight: 420; font-variation-settings: 'SOFT' 100, 'opsz' 96;">{{cur.title}}</div>
+    <div style="font-size: 14px; color: #9B9BA3; margin-top: 4px;">{{cur.author}}</div>
+  </div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 488px; display: flex; justify-content: space-between; border-top: 1px solid #2A2A30; border-bottom: 1px solid #2A2A30; padding: 12px 0;">
+    <div><div style="font-family: 'Fraunces', serif; font-size: 24px;">{{cur.read}}</div><div style="font-size: 11px; letter-spacing: 0.12em; color: #9B9BA3;">READ</div></div>
+    <div><div style="font-family: 'Fraunces', serif; font-size: 24px;">{{cur.listen}}</div><div style="font-size: 11px; letter-spacing: 0.12em; color: #9B9BA3;">LISTENED</div></div>
+    <div><div style="font-family: 'Fraunces', serif; font-size: 24px;">{{cur.cards}}</div><div style="font-size: 11px; letter-spacing: 0.12em; color: #9B9BA3;">CARDS</div></div>
+  </div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 566px; display: flex; gap: 10px;">
+    <button type="button" class="ptr" onClick="{{goReader}}" style="flex: 1; height: 54px; border-radius: 12px; border: 1px solid #2A2A30; background-color: #101012; color: #FFFFFF; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);">Read</button>
+    <button type="button" class="ptr" onClick="{{goPlayer}}" style="flex: 1; height: 54px; border-radius: 12px; border: 0; background-color: #4D8BFF; color: #020A1C; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);">Listen</button>
+  </div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 640px; display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; color: #7AA8FF;">
+    <button type="button" class="ptr" onClick="{{learnAsk}}" style="border: 0; background: transparent; color: inherit; font: inherit; padding: 8px 0; cursor: pointer;">Ask</button>
+    <button type="button" class="ptr" onClick="{{learnRecap}}" style="border: 0; background: transparent; color: inherit; font: inherit; padding: 8px 0; cursor: pointer;">Recap</button>
+    <button type="button" class="ptr" onClick="{{learnConcepts}}" style="border: 0; background: transparent; color: inherit; font: inherit; padding: 8px 0; cursor: pointer;">Concepts</button>
+    <button type="button" class="ptr" onClick="{{learnMap}}" style="border: 0; background: transparent; color: inherit; font: inherit; padding: 8px 0; cursor: pointer;">Map</button>
+    <button type="button" class="ptr" onClick="{{goSetup}}" style="border: 0; background: transparent; color: #9B9BA3; font: inherit; padding: 8px 0; cursor: pointer;">Narration</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ READER ============ -->
+<sc-if value="{{isReader}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 8; perspective: 1400px; background: #000;">
+  <div class="sOpen" style="position: absolute; inset: 0; background-color: #111114; box-shadow: -30px 0 60px rgba(0,0,0,0.6);">
+    <div style="position: absolute; left: 0; top: 0; width: 390px; height: 100px; border-bottom: 1px solid #2A2A30; background-color: #111114; z-index: 3;">
+      <button type="button" class="ptr" onClick="{{goHub}}" aria-label="Close book" style="position: absolute; left: 4px; top: 22px; width: 48px; height: 48px; border: 0; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M15 5l-7 7 7 7"></path></svg></button>
+      <div style="position: absolute; left: 112px; top: 28px;"><div style="font-family: 'Fraunces', serif; font-size: 17px; font-weight: 500;">{{cur.title}}</div><div style="font-size: 12px; color: #9B9BA3;">Book II · §1</div></div>
+      <button type="button" class="ptr" onClick="{{toastAa}}" aria-label="Text settings" style="position: absolute; right: 52px; top: 26px; width: 44px; height: 44px; border: 0; background: transparent; color: #D9D9DE; font-family: 'Literata', serif; font-size: 19px; cursor: pointer;">Aa</button>
+      <button type="button" class="ptr" onClick="{{goLearn}}" aria-label="Learn" style="position: absolute; right: 8px; top: 26px; width: 44px; height: 44px; border: 0; background: transparent; color: #7AA8FF; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg></button>
+    </div>
+    <div class="sRib" style="position: absolute; right: 30px; top: 100px; width: 14px; height: 74px; background: linear-gradient(90deg, #2F63D8, #86B2FF, #3A6FE4); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%); z-index: 4;"></div>
+    <div class="sScroll" style="position: absolute; left: 0; top: 100px; width: 390px; bottom: {{chromeH}}px; box-sizing: border-box; padding: 20px 30px 30px;">
+      <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.22em; color: #9B9BA3;">BOOK II</div>
+      <div style="font-family: 'Fraunces', serif; font-size: 28px; line-height: 32px; font-weight: 400; margin: 6px 0 16px; font-variation-settings: 'SOFT' 100, 'opsz' 72;">The ruling <span style="font-style: italic;">part</span></div>
+      <p style="margin: 0 0 18px; font-family: 'Literata', serif; font-size: 18.5px; line-height: 1.62; color: #D9D9DE;">
+        <sc-for list="{{sentsA}}" as="s" hint-placeholder-count="3">
+          <a href="#read" onClick="{{s.tap}}" style="color: {{s.color}}; background-color: {{s.bg}}; box-shadow: {{s.shadow}}; text-decoration: none; border-radius: 3px; transition: background-color .4s, color .4s;">{{s.text}} </a>
+        </sc-for>
+      </p>
+      <p style="margin: 0; font-family: 'Literata', serif; font-size: 18.5px; line-height: 1.62; color: #D9D9DE;">
+        <sc-for list="{{sentsB}}" as="s" hint-placeholder-count="3">
+          <a href="#read" onClick="{{s.tap}}" style="color: {{s.color}}; background-color: {{s.bg}}; box-shadow: {{s.shadow}}; text-decoration: none; border-radius: 3px; transition: background-color .4s, color .4s;">{{s.text}} </a>
+        </sc-for>
+      </p>
+    </div>
+    <div style="position: absolute; left: 0; bottom: 0; width: 390px; height: {{chromeH}}px; box-sizing: border-box; padding: 10px 22px 20px; border-top: 1px solid #2A2A30; background-color: #111114; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; z-index: 5;">
+      <sc-if value="{{rl}}" hint-placeholder-val="{{ true }}">
+        <div class="sIn" style="display: flex; align-items: center; justify-content: space-between;">
+          <button type="button" class="ptr" onClick="{{cycleSpeed}}" style="width: 58px; height: 40px; border-radius: 10px; border: 1px solid #2A2A30; background: transparent; color: #FFFFFF; font-size: 14px; font-weight: 600; cursor: pointer;">{{speedLabel}}</button>
+          <button type="button" class="ptr" onClick="{{prevS}}" aria-label="Previous sentence" style="width: 48px; height: 48px; border: 0; background: transparent; color: #FFFFFF; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M4 12a8 8 0 1 0 2.4-5.7"></path><path d="M4 4v4h4"></path></svg></button>
+          <button type="button" class="ptr sMorph" onClick="{{togglePlay}}" aria-label="Play or pause" style="width: 58px; height: 58px; border-radius: {{playR}}px; border: 0; background-color: #4D8BFF; color: #020A1C; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+            <sc-if value="{{playing}}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor;"><rect x="6.5" y="5" width="4" height="14" rx="1.2"></rect><rect x="13.5" y="5" width="4" height="14" rx="1.2"></rect></svg></sc-if>
+            <sc-if value="{{paused}}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor;"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"></path></svg></sc-if>
+          </button>
+          <button type="button" class="ptr" onClick="{{nextS}}" aria-label="Next sentence" style="width: 48px; height: 48px; border: 0; background: transparent; color: #FFFFFF; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M20 12a8 8 0 1 1-2.4-5.7"></path><path d="M20 4v4h-4"></path></svg></button>
+          <div style="width: 58px; text-align: right; font-size: 11px; line-height: 14px; color: #7AA8FF;">6:20<br>ahead</div>
+        </div>
+      </sc-if>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: #9B9BA3;"><span>Book II · 34%</span><span>{{timeLeft}}</span></div>
+      <div style="position: relative; display: flex; border: 1px solid #2A2A30; border-radius: 12px; padding: 3px; height: 44px; box-sizing: border-box;">
+        <div class="sMorph" style="position: absolute; top: 3px; left: {{segLeft}}px; width: 157px; height: 36px; border-radius: 9px; background-color: #FFFFFF;"></div>
+        <button type="button" onClick="{{modeRead}}" style="position: relative; flex: 1; border: 0; background: transparent; color: {{ink0}}; font-size: 14px; font-weight: 700; cursor: pointer;">Read</button>
+        <button type="button" onClick="{{modeRl}}" style="position: relative; flex: 1; border: 0; background: transparent; color: {{ink1}}; font-size: 14px; font-weight: 700; cursor: pointer;">Read + Listen</button>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ PLAYER ============ -->
+<sc-if value="{{isPlayer}}" hint-placeholder-val="{{ false }}">
+<div class="sIn" style="position: absolute; inset: 0; z-index: 8;">
+  <button type="button" class="ptr" onClick="{{goHub}}" aria-label="Close player" style="position: absolute; left: 8px; top: 20px; width: 48px; height: 48px; border: 0; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M6 9l6 6 6-6"></path></svg></button>
+  <button type="button" class="ptr" onClick="{{goReaderRl}}" style="position: absolute; right: 16px; top: 28px; height: 36px; padding: 0 4px; border: 0; background: transparent; color: #7AA8FF; font-size: 14px; font-weight: 600; cursor: pointer;">Read along →</button>
+  <div style="position: absolute; left: 22px; right: 22px; top: 400px; text-align: center;">
+    <div style="font-family: 'Fraunces', serif; font-size: 28px; line-height: 32px; font-weight: 420; font-variation-settings: 'SOFT' 100, 'opsz' 72;">{{cur.title}}</div>
+    <div style="font-size: 14px; color: #9B9BA3; margin-top: 3px;">Book II · §{{sec}} · read by Ava</div>
+  </div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 462px;">
+    <input type="range" min="0" max="100" value="{{scrub}}" onChange="{{onScrub}}" aria-label="Position in book: turns the book" style="width: 100%; margin: 0;">
+    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #9B9BA3; font-variant-numeric: tabular-nums;"><span>{{elapsed}}</span><span>{{remaining}}</span></div>
+  </div>
+  <div style="position: absolute; left: 0; right: 0; top: 536px; display: flex; align-items: center; justify-content: center; gap: 30px;">
+    <button type="button" class="ptr" onClick="{{back15}}" aria-label="Back 15 seconds" style="width: 56px; height: 56px; border: 0; background: transparent; color: #FFFFFF; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;"><svg viewBox="0 0 24 24" style="width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M4 12a8 8 0 1 0 2.4-5.7"></path><path d="M4 4v4h4"></path></svg>15</button>
+    <button type="button" class="ptr sMorph" onClick="{{togglePlay}}" aria-label="Play or pause" style="width: 76px; height: 76px; border-radius: {{bigPlayR}}px; border: 0; background-color: #4D8BFF; color: #020A1C; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);">
+      <sc-if value="{{playing}}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" style="width: 30px; height: 30px; fill: currentColor;"><rect x="6.5" y="5" width="4" height="14" rx="1.2"></rect><rect x="13.5" y="5" width="4" height="14" rx="1.2"></rect></svg></sc-if>
+      <sc-if value="{{paused}}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" style="width: 30px; height: 30px; fill: currentColor;"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"></path></svg></sc-if>
+    </button>
+    <button type="button" class="ptr" onClick="{{fwd30}}" aria-label="Forward 30 seconds" style="width: 56px; height: 56px; border: 0; background: transparent; color: #FFFFFF; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;"><svg viewBox="0 0 24 24" style="width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M20 12a8 8 0 1 1-2.4-5.7"></path><path d="M20 4v4h-4"></path></svg>30</button>
+  </div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 640px; display: flex; justify-content: space-between; border-top: 1px solid #2A2A30; padding-top: 6px;">
+    <button type="button" class="ptr" onClick="{{cycleSpeed}}" style="border: 0; background: transparent; color: #FFFFFF; font-size: 14px; font-weight: 600; padding: 12px 6px; cursor: pointer;">{{speedLabel}} speed</button>
+    <button type="button" class="ptr" onClick="{{toastSleep}}" style="border: 0; background: transparent; color: #FFFFFF; font-size: 14px; font-weight: 600; padding: 12px 6px; cursor: pointer;">Sleep</button>
+    <button type="button" class="ptr" onClick="{{toastMark}}" style="border: 0; background: transparent; color: #FFFFFF; font-size: 14px; font-weight: 600; padding: 12px 6px; cursor: pointer;">Bookmark</button>
+    <button type="button" class="ptr" onClick="{{toastAB}}" style="border: 0; background: transparent; color: #FFFFFF; font-size: 14px; font-weight: 600; padding: 12px 6px; cursor: pointer;">A/B</button>
+  </div>
+  <div style="position: absolute; left: 22px; right: 22px; top: 704px; text-align: center; font-size: 12px; color: #7AA8FF;">Generated 6:20 ahead · drag the line to turn the book</div>
+</div>
+</sc-if>
+
+<!-- ============ NOTEBOOK / REVIEW ============ -->
+<sc-if value="{{isNotebook}}" hint-placeholder-val="{{ false }}">
+<div class="sIn" style="position: absolute; inset: 0; z-index: 8;">
+  <h1 style="position: absolute; left: 22px; top: 50px; margin: 0; font-family: 'Fraunces', serif; font-weight: 360; font-size: 36px; line-height: 42px; letter-spacing: -0.02em; font-variation-settings: 'SOFT' 100, 'opsz' 96;">Today's <span style="font-style: italic;">review.</span></h1>
+  <div style="position: absolute; left: 22px; top: 104px; font-size: 14px; color: #9B9BA3;">{{reviewLine}}</div>
+  <div style="position: absolute; left: 30px; top: 150px; width: 330px; height: 320px; perspective: 1200px;">
+    <div class="sFlip" style="position: relative; width: 330px; height: 320px; transform: rotateY({{flipDeg}}deg);">
+      <div style="position: absolute; inset: 0; backface-visibility: hidden; border-radius: 6px 14px 14px 6px; background-color: #10151F; border: 1px solid #1F2A44; padding: 22px 24px; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 24px 40px rgba(0,0,0,0.6);">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.16em; color: #7AA8FF;">MEDITATIONS · II.1</div>
+        <div style="font-family: 'Fraunces', serif; font-size: 26px; line-height: 31px; font-weight: 420; margin-top: 14px; font-variation-settings: 'SOFT' 100, 'opsz' 48;">Why does Marcus say no one can truly injure him?</div>
+        <div style="flex-grow: 1;"></div>
+        <button type="button" class="ptr" onClick="{{flipCard}}" style="height: 48px; border-radius: 12px; border: 0; background-color: #FFFFFF; color: #000000; font-size: 15px; font-weight: 700; cursor: pointer;">Show answer</button>
+      </div>
+      <div style="position: absolute; inset: 0; backface-visibility: hidden; transform: rotateY(180deg); border-radius: 14px 6px 6px 14px; background-color: #E6DECD; color: #14130F; padding: 22px 24px; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 24px 40px rgba(0,0,0,0.6);">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.16em; color: #3A5FC8;">ANSWER</div>
+        <div style="font-family: 'Literata', serif; font-size: 18px; line-height: 27px; margin-top: 12px;">Because the only real harm is doing wrong yourself, and no one else can make you do that.</div>
+        <div style="flex-grow: 1;"></div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+          <button type="button" class="ptr" onClick="{{gradeCard}}" style="height: 52px; border-radius: 10px; border: 1px solid #14130F33; background: transparent; color: #14130F; font-size: 12px; font-weight: 700; cursor: pointer;">Again<br><span style="font-weight: 500;">1d</span></button>
+          <button type="button" class="ptr" onClick="{{gradeCard}}" style="height: 52px; border-radius: 10px; border: 1px solid #14130F33; background: transparent; color: #14130F; font-size: 12px; font-weight: 700; cursor: pointer;">Hard<br><span style="font-weight: 500;">3d</span></button>
+          <button type="button" class="ptr" onClick="{{gradeCard}}" style="height: 52px; border-radius: 10px; border: 0; background: #14130F; color: #E6DECD; font-size: 12px; font-weight: 700; cursor: pointer;">Good<br><span style="font-weight: 500;">8d</span></button>
+          <button type="button" class="ptr" onClick="{{gradeCard}}" style="height: 52px; border-radius: 10px; border: 1px solid #14130F33; background: transparent; color: #14130F; font-size: 12px; font-weight: 700; cursor: pointer;">Easy<br><span style="font-weight: 500;">21d</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ LEARN (stub for the flow) ============ -->
+<sc-if value="{{isLearn}}" hint-placeholder-val="{{ false }}">
+<div class="sUp" style="position: absolute; inset: 0; z-index: 9; background-color: #000;">
+  <button type="button" class="ptr" onClick="{{goHub}}" aria-label="Back" style="position: absolute; left: 8px; top: 20px; width: 48px; height: 48px; border: 0; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;"><path d="M15 5l-7 7 7 7"></path></svg></button>
+  <div style="position: absolute; left: 22px; right: 22px; top: 84px;">
+    <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.16em; color: #7AA8FF;">{{learnKicker}}</div>
+    <div style="font-family: 'Fraunces', serif; font-size: 34px; line-height: 38px; font-weight: 400; margin-top: 8px; font-variation-settings: 'SOFT' 100, 'opsz' 72;">{{learnTitle}}</div>
+    <div style="font-family: 'Literata', serif; font-size: 17px; line-height: 26px; color: #D9D9DE; margin-top: 18px;">{{learnBody}}</div>
+    <div style="font-size: 12px; color: #9B9BA3; margin-top: 18px;">Cited from the book · II.1, II.2 · limited to what you have reached</div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ TAB BAR ============ -->
+<sc-if value="{{showTabs}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; left: 0; bottom: 0; width: 390px; height: 78px; border-top: 1px solid #2A2A30; background-color: #000000; z-index: 30;">
+  <div class="sMorph" style="position: absolute; top: 8px; left: {{dotX}}px; width: 6px; height: 6px; border-radius: 3px; background-color: #4D8BFF; transition: left .55s cubic-bezier(.3,1.4,.4,1);"></div>
+  <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+    <button type="button" class="ptr" onClick="{{t.pick}}" style="position: absolute; top: 14px; left: {{t.x}}px; width: 130px; height: 52px; border: 0; background: transparent; color: {{t.ink}}; font-size: 14px; font-weight: 600; cursor: pointer;">{{t.label}}</button>
+  </sc-for>
+</div>
+</sc-if>
+
+<!-- ============ TOAST ============ -->
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{ false }}">
+  <div class="sUp" role="status" style="position: absolute; left: 22px; right: 22px; top: 22px; min-height: 46px; border-radius: 12px; background-color: #FFFFFF; color: #000000; display: flex; align-items: center; padding: 10px 16px; box-sizing: border-box; font-size: 14px; font-weight: 600; z-index: 60;">{{toast}}</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"start":{"editor":"enum","options":["home","library","hub","reader","player","notebook"],"default":"home"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const v = props.start || 'home';
+    this.state = { view: v, sel: 0, speak: 3, playing: v === 'player', rl: v === 'reader' ? false : true, speed: 1.4, scrub: 41, flipped: false, done: 0, toast: '', learn: 'ask', saved: { 2: true } };
+  }
+
+  componentDidMount() { this.timer = setInterval(() => this.tick(), 2200); }
+  componentWillUnmount() { clearInterval(this.timer); clearTimeout(this.tt); }
+  componentDidUpdate(prev) { if (prev.start !== this.props.start) this.setState({ view: this.props.start || 'home', sel: 0 }); }
+
+  buzz(p) { try { if (navigator && navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+
+  tick() {
+    const s = this.state;
+    if (!s.playing) return;
+    if (s.view !== 'reader' && s.view !== 'player') return;
+    this.setState({ speak: s.speak >= 6 ? 0 : s.speak + 1, scrub: Math.min(100, s.scrub + 1) });
+  }
+
+  say(m) { clearTimeout(this.tt); this.setState({ toast: m }); this.tt = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  go(view, extra) { this.buzz(10); this.setState(Object.assign({ view: view }, extra || {})); }
+
+  bookData() {
+    return [
+      { title: 'Meditations', author: 'Marcus Aurelius', t: 46, S: 0.64, cover: '#19347E', ink: '#F4F6FC', read: '34%', listen: '41%', cards: '38' },
+      { title: 'Origin of Species', author: 'Charles Darwin', t: 58, S: 0.7, cover: '#E6DECD', ink: '#14130F', read: '22%', listen: '9%', cards: '14' },
+      { title: 'Walden', author: 'H. D. Thoreau', t: 40, S: 0.6, cover: '#1E1F24', ink: '#F2F2F4', read: '64%', listen: '0%', cards: '21' },
+      { title: 'Pride and Prejudice', author: 'Jane Austen', t: 52, S: 0.66, cover: '#4D8BFF', ink: '#020A1C', read: '100%', listen: '58%', cards: '9' },
+      { title: 'The Art of War', author: 'Sun Tzu', t: 36, S: 0.58, cover: '#0B1B4A', ink: '#E7ECFA', read: '12%', listen: '0%', cards: '3' },
+      { title: 'Frankenstein', author: 'Mary Shelley', t: 50, S: 0.68, cover: '#CFC8B6', ink: '#1A1915', read: '0%', listen: '0%', cards: '0' }
+    ];
+  }
+
+  sents() {
+    return [
+      'Begin the morning by saying to thyself, I shall meet with the busy-body, the ungrateful, arrogant, deceitful, envious, unsocial.',
+      'All these things happen to them by reason of their ignorance of what is good and evil.',
+      'But I who have seen the nature of the good that it is beautiful, and of the bad that it is ugly, I can neither be injured by any of them, nor can I be angry with my kinsman, nor hate him.',
+      'For we are made for co-operation, like feet, like hands, like eyelids, like the rows of the upper and lower teeth.',
+      'To act against one another then is contrary to nature; and it is acting against one another to be vexed and to turn away.',
+      'Whatever this is that I am, it is a little flesh and breath, and the ruling part.',
+      'Throw away thy books; no longer distract thyself: it is not allowed.'
+    ];
+  }
+
+  renderVals() {
+    const s = this.state;
+    const self = this;
+    const bd = this.bookData();
+    const v = s.view;
+    const cur = bd[s.sel] || bd[0];
+    const totalW = bd.reduce((a, b) => a + b.t * b.S * 1.35, 0) + 5 * (bd.length - 1);
+    let acc = (390 - totalW) / 2;
+    const spineHit = [];
+    const books = bd.map((b, i) => {
+      const SS = b.S * 1.35;
+      const w = b.t * SS;
+      const cx = acc + w / 2;
+      acc += w + 5;
+      const shelfCy = 548 - 225 * SS / 2;
+      let cxx = cx, cy = shelfCy, tz = 0, rx = 0, ry = 90, S = SS, op = 1;
+      const isSel = i === s.sel;
+      const hideAway = (x) => { cxx = x; cy = shelfCy + 40; op = 0; };
+      if (v === 'library') { /* spines on the shelf */ }
+      else if (v === 'home') {
+        if (i === 0) { cxx = 195; cy = 262; ry = 26; rx = -3; S = 1.0; }
+        else hideAway(cx);
+      } else if (v === 'hub' || v === 'learn') {
+        if (isSel) { cxx = 195; cy = 232; ry = 24; rx = -4; S = 1.12; } else hideAway(cx);
+      } else if (v === 'reader') {
+        if (isSel) { cxx = 84; cy = 60; ry = 24; rx = -2; S = 0.3; op = 1; } else hideAway(cx);
+      } else if (v === 'player') {
+        if (isSel) { cxx = 195; cy = 218; ry = 42 - (s.scrub / 100) * 84; rx = -6; S = 1.14; } else hideAway(cx);
+      } else { hideAway(cx); }
+      const xf = 'translate3d(' + (cxx - 75).toFixed(1) + 'px,' + (cy - 112.5).toFixed(1) + 'px,' + tz + 'px) rotateX(' + rx + 'deg) rotateY(' + ry.toFixed(1) + 'deg) scale(' + S.toFixed(3) + ')';
+      const ar = Math.abs(ry);
+      spineHit.push({ x: cx - w / 2 - 2, y: shelfCy - 225 * SS / 2, w: w + 4, h: 225 * SS });
+      return {
+        title: b.title, author: b.author, t: b.t, cover: b.cover, ink: b.ink,
+        xf: xf, op: op,
+        bob: (v === 'player' && s.playing && isSel) ? 'float' : '',
+        shFront: Math.min(0.55, ar / 150).toFixed(2),
+        shSpine: (ry >= 0 ? 0.05 + 0.3 * (1 - ry / 90) : 0.7).toFixed(2),
+        shPages: (ry < 0 ? 0.1 + 0.3 * (1 + ry / 90) : 0.7).toFixed(2),
+        hx: spineHit[i].x, hy: spineHit[i].y, hw: spineHit[i].w, hh: spineHit[i].h,
+        pick: () => { self.buzz([8, 30, 14]); self.setState({ sel: i, view: 'hub' }); }
+      };
+    });
+
+    const si = this.sents();
+    const mk = (idx) => {
+      const speaking = s.rl && s.speak === idx;
+      const saved = !!s.saved[idx];
+      return {
+        text: si[idx], color: speaking ? '#FFFFFF' : '#D9D9DE',
+        bg: speaking ? 'rgba(77,139,255,0.30)' : (saved ? 'rgba(251,191,36,0.14)' : 'transparent'),
+        shadow: saved && !speaking ? 'inset 0 -2px 0 rgba(251,191,36,0.8)' : 'none',
+        tap: (e) => { if (e && e.preventDefault) e.preventDefault(); self.buzz(10); if (s.rl) self.setState({ speak: idx, playing: true }); else { const sv = Object.assign({}, s.saved); sv[idx] = !sv[idx]; self.setState({ saved: sv }); self.say(sv[idx] ? 'Highlighted' : 'Highlight removed'); } }
+      };
+    };
+
+    const learnMap = { ask: ['ASK THE BOOK', 'What does he mean by “the ruling part”?', 'The mind’s governing reason: the faculty that judges and chooses. Marcus counts it as the third part of the self, after flesh and breath.'],
+      recap: ['PREVIOUSLY ON', 'Up to Book II, §1', 'Marcus opened Book II by bracing for difficult people, then argued we are built for co-operation, so anger works against our own nature.'],
+      concepts: ['CONCEPTS', 'Seven so far', 'The ruling part, impermanence, good and evil, anger, co-operation, kinship, nature.'],
+      map: ['CONCEPT MAP', 'How the ideas connect', 'Co-operation leads to kinship; kinship undercuts anger; the ruling part is the one thing no one can injure.'] }[s.learn];
+
+    const tabsDef = [{ id: 'home', label: 'Home' }, { id: 'library', label: 'Library' }, { id: 'notebook', label: 'Notebook' }];
+    const tabIdx = Math.max(0, tabsDef.findIndex((t) => t.id === v));
+    const tabVisible = v === 'home' || v === 'library' || v === 'notebook';
+    const spd = [0.8, 1.0, 1.2, 1.4, 1.6, 2.0, 2.5, 3.0];
+    const t = Math.round(s.scrub * 26.5);
+    const tr = Math.round((100 - s.scrub) * 26.5);
+
+    return {
+      books: books, cur: cur,
+      isHome: v === 'home', isLibrary: v === 'library', isHub: v === 'hub', isReader: v === 'reader',
+      isPlayer: v === 'player', isNotebook: v === 'notebook', isLearn: v === 'learn',
+      sceneZ: v === 'reader' ? 9 : 6,
+      plankOp: v === 'library' ? 1 : 0,
+
+      goResume: () => { self.buzz([10, 40, 20]); self.setState({ sel: 0, view: 'player', playing: true }); },
+      goHubHome: () => self.go('hub', { sel: 0 }),
+      goNotebook: () => self.go('notebook', { flipped: false }),
+      goLibrary: () => self.go('library'),
+      goHub: () => self.go('hub'),
+      goReader: () => self.go('reader', { rl: false, playing: false }),
+      goReaderRl: () => self.go('reader', { rl: true, playing: true }),
+      goPlayer: () => self.go('player', { playing: true }),
+      goLearn: () => self.go('learn', { learn: 'ask' }),
+      goSetup: () => self.say('Narration setup: voice, style, expression, cost'),
+      learnAsk: () => self.go('learn', { learn: 'ask' }),
+      learnRecap: () => self.go('learn', { learn: 'recap' }),
+      learnConcepts: () => self.go('learn', { learn: 'concepts' }),
+      learnMap: () => self.go('learn', { learn: 'map' }),
+      learnKicker: learnMap[0], learnTitle: learnMap[1], learnBody: learnMap[2],
+
+      sentsA: [0, 1, 2].map(mk), sentsB: [3, 4, 5, 6].map(mk),
+      chromeH: s.rl ? 156 : 100,
+      rl: s.rl, playing: s.playing, paused: !s.playing,
+      playR: s.playing ? 14 : 29, bigPlayR: s.playing ? 18 : 38,
+      timeLeft: s.rl ? '18 min left at ' + s.speed.toFixed(1) + '×' : '12 min left in book II',
+      segLeft: s.rl ? 160 : 3,
+      ink0: s.rl ? '#FFFFFF' : '#000000', ink1: s.rl ? '#000000' : '#FFFFFF',
+      modeRead: () => { self.buzz(10); self.setState({ rl: false }); },
+      modeRl: () => { self.buzz(10); self.setState({ rl: true, playing: true }); },
+      togglePlay: () => { self.buzz(14); self.setState({ playing: !s.playing }); },
+      speedLabel: s.speed.toFixed(1) + '×',
+      cycleSpeed: () => { self.buzz(8); self.setState({ speed: spd[(spd.indexOf(s.speed) + 1) % spd.length] }); },
+      prevS: () => { self.buzz(8); self.setState({ speak: Math.max(0, s.speak - 1) }); },
+      nextS: () => { self.buzz(8); self.setState({ speak: Math.min(6, s.speak + 1) }); },
+      toastAa: () => self.say('Text: size, font, themes, spacing'),
+      scrub: s.scrub,
+      onScrub: (e) => { self.setState({ scrub: Number(e.target.value) }); },
+      elapsed: Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'),
+      remaining: '−' + Math.floor(tr / 60) + ':' + String(tr % 60).padStart(2, '0'),
+      sec: s.speak <= 2 ? '1' : '2',
+      back15: () => { self.buzz(8); self.setState({ scrub: Math.max(0, s.scrub - 1) }); },
+      fwd30: () => { self.buzz(8); self.setState({ scrub: Math.min(100, s.scrub + 2) }); },
+      toastSleep: () => self.say('Sleep timer: 15, 30, 45 min or end of section'),
+      toastMark: () => { self.buzz([10, 30, 18]); self.say('Bookmarked Book II · §' + (s.speak <= 2 ? '1' : '2')); },
+      toastAB: () => self.say('A/B: same passage in Ava, then Theo'),
+
+      flipDeg: s.flipped ? 180 : 0,
+      flipCard: () => { self.buzz(12); self.setState({ flipped: true }); },
+      gradeCard: () => { self.buzz([12, 40, 24]); self.setState({ flipped: false, done: s.done + 1 }); self.say('Scheduled. ' + (11 - s.done) + ' left today'); },
+      reviewLine: (12 - s.done) + ' cards due · about ' + Math.max(1, Math.round((12 - s.done) / 2)) + ' min',
+
+      showTabs: tabVisible, dotX: 65 + tabIdx * 130 - 3,
+      tabs: tabsDef.map((tb, i) => ({ label: tb.label, x: i * 130, ink: tb.id === v ? '#FFFFFF' : '#85858F', pick: () => { if (tb.id !== v) self.go(tb.id); } })),
+      hasToast: s.toast !== '', toast: s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

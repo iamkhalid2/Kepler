@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Folio Home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Instrument+Serif:ital@0;1&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000000;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+@keyframes folio-press{0%,100%{opacity:1}50%{opacity:0.2}}
+.folio-press{animation:folio-press 2.4s ease-in-out infinite;}
+@media (prefers-reduced-motion: reduce){.folio-press{animation:none;}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background-color: #000000; color: #FFFFFF; font-family: 'Newsreader', Georgia, serif;">
+
+  <main style="position:absolute;left:24px;right:24px;top:28px;">
+
+    <header style="display:flex;align-items:center;justify-content:space-between;height:44px;">
+      <a href="#home" aria-label="BetterBooks home" style="display:flex;align-items:center;gap:9px;height:44px;color:#FFFFFF;text-decoration:none;">
+        <svg width="21" height="24" viewBox="22 20 57 66" style="display:block;fill:#FFFFFF;" aria-hidden="true"><path d="M31 84V34Q31 30.5 25.5 30V28.6L42 22V84Z"></path><path d="M33 62A22 22 0 1 0 77 62A22 22 0 1 0 33 62ZM43 62A12 17 0 1 0 67 62A12 17 0 1 0 43 62Z" style="fill-rule:evenodd;"></path><circle cx="55" cy="62" r="4.6" style="fill:#4D8BFF;"></circle></svg>
+        <span style="font-family:'Instrument Serif',serif;font-size:24px;line-height:24px;">Better<span style="font-style:italic;">Books</span></span>
+      </a>
+      <button type="button" aria-label="Search your library" style="width:44px;height:44px;margin-right:-11px;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;color:#FFFFFF;cursor:pointer;">
+        <svg width="22" height="22" viewBox="0 0 24 24" style="display:block;fill:none;stroke:#FFFFFF;stroke-width:1.5;stroke-linecap:round;" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.75"></circle><path d="M15.5 15.5L20.5 20.5"></path></svg>
+      </button>
+    </header>
+
+    <div aria-hidden="true" style="margin-top:6px;height:2px;background-color:#FFFFFF;"></div>
+    <div aria-hidden="true" style="margin-top:2px;height:1px;background-color:#FFFFFF;"></div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;padding:9px 0 9px;border-bottom:1px solid #2A2A30;">
+      <span style="font-style:italic;font-size:15px;line-height:20px;color:#FFFFFF;">Good morning.</span>
+      <span style="font-family:'Hanken Grotesk',sans-serif;font-size:11px;line-height:14px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#9B9BA3;">Thursday 8 October</span>
+    </div>
+
+    <section aria-label="Resume" style="margin-top:20px;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="width:234px;">
+        <p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:11px;line-height:12px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#FFFFFF;">Listening<span style="color:#9B9BA3;"> · 1.4× · Ava</span></p>
+        <h1 style="margin:8px 0 0;font-family:'Instrument Serif',serif;font-weight:400;font-size:50px;line-height:46px;letter-spacing:-0.015em;">Meditations</h1>
+        <p style="margin:5px 0 0;font-style:italic;font-size:16px;line-height:22px;color:#9B9BA3;">Marcus Aurelius · Book II, §1</p>
+        <svg width="234" height="14" viewBox="0 0 234 14" style="display:block;margin-top:16px;" aria-hidden="true">
+          <path d="M0.5 1V13M65.5 3V11M77.5 3V11M103.5 3V11M117.5 3V11M131.5 3V11M146.5 3V11M161.5 3V11M176.5 3V11M189.5 3V11M202.5 3V11M215.5 3V11M226.5 3V11M233.5 1V13" style="fill:none;stroke:#3A3A42;stroke-width:1;"></path>
+          <path d="M0 4.5H234M0 9.5H234" style="fill:none;stroke:#2A2A30;stroke-width:1;"></path>
+          <path d="M0 4.5H80" style="fill:none;stroke:#FFFFFF;stroke-width:2;"></path>
+          <path d="M0 9.5H96" style="fill:none;stroke:#4D8BFF;stroke-width:2;"></path>
+        </svg>
+        <div style="display:flex;gap:12px;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:14px;">
+          <span style="color:#FFFFFF;">Read 34%</span>
+          <span style="color:#7AA8FF;">Heard 41%</span>
+          <span style="color:#9B9BA3;margin-left:auto;">18 min left</span>
+        </div>
+      </div>
+      <a href="#book" aria-label="Meditations by Marcus Aurelius, book details" style="position:relative;display:block;flex:none;width:88px;height:132px;overflow:hidden;background-color:#ECEAE4;text-decoration:none;">
+        <span aria-hidden="true" style="position:absolute;right:-16px;top:-22px;font-family:'Instrument Serif',serif;font-style:italic;font-size:124px;line-height:124px;color:#0B0B0D;">M</span>
+        <span aria-hidden="true" style="position:absolute;left:8px;right:8px;bottom:31px;height:1px;background-color:#0B0B0D;"></span>
+        <span aria-hidden="true" style="position:absolute;left:8px;bottom:8px;font-family:'Hanken Grotesk',sans-serif;font-size:5.5px;line-height:7px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:#0B0B0D;">Marcus Aurelius</span>
+        <span aria-hidden="true" style="position:absolute;left:8px;bottom:17px;display:flex;align-items:baseline;gap:2px;font-family:'Instrument Serif',serif;font-size:13px;line-height:13px;color:#0B0B0D;">Meditations<span style="display:inline-block;width:3.5px;height:3.5px;border-radius:50%;background-color:#2456D6;"></span></span>
+      </a>
+    </section>
+
+    <div style="display:flex;align-items:center;gap:22px;margin-top:16px;">
+      <a href="#reader" style="display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 20px 0 17px;background-color:#FFFFFF;color:#000000;border-radius:2px;text-decoration:none;font-family:'Hanken Grotesk',sans-serif;font-size:15px;font-weight:600;">
+        <svg width="11" height="13" viewBox="0 0 11 13" style="display:block;fill:#000000;" aria-hidden="true"><path d="M0.5 0.8L10.5 6.5L0.5 12.2Z"></path></svg>
+        Resume listening
+      </a>
+      <a href="#reader-read" style="display:inline-flex;align-items:center;height:48px;font-family:'Hanken Grotesk',sans-serif;font-size:15px;font-weight:500;color:#FFFFFF;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:5px;text-decoration-color:#9B9BA3;">Read instead</a>
+    </div>
+
+    <section aria-label="Previously on" style="margin-top:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <h2 style="margin:0;font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;font-size:22px;line-height:24px;">Previously on…</h2>
+        <span style="font-family:'Hanken Grotesk',sans-serif;font-size:11px;line-height:14px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#9B9BA3;">4 days away</span>
+      </div>
+      <p style="margin:8px 0 0;font-size:16px;line-height:24px;color:#D9D9DE;"><span style="float:left;font-family:'Instrument Serif',serif;font-size:56px;line-height:44px;margin:3px 7px 0 -1px;color:#FFFFFF;">M</span>arcus opened Book II by bracing for difficult people, then argued we are built for co-operation, so anger works against our own nature.</p>
+    </section>
+
+    <nav aria-label="Today" style="margin-top:16px;">
+      <a href="#review" style="display:block;padding:11px 0 11px;border-top:1px solid #2A2A30;color:#FFFFFF;text-decoration:none;">
+        <span style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:22px;line-height:24px;">Daily review</span>
+          <span aria-hidden="true" style="flex:1;height:2px;background-image:radial-gradient(circle,#5A5A62 0.9px,transparent 1.2px);background-size:6px 2px;background-repeat:repeat-x;"></span>
+          <span style="font-family:'Instrument Serif',serif;font-size:22px;line-height:24px;">12 due</span>
+        </span>
+        <span style="display:flex;align-items:center;justify-content:space-between;margin-top:3px;">
+          <span style="font-style:italic;font-size:14px;line-height:19px;color:#9B9BA3;">about 6 min</span>
+          <span role="img" aria-label="Reviewed Friday, Monday, Tuesday and Wednesday. Today is due." style="display:flex;gap:2px;">
+            <span style="width:16px;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:12px;color:#FFFFFF;">F<span style="width:4px;height:4px;border-radius:50%;background-color:#4D8BFF;"></span></span>
+            <span style="width:16px;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:12px;color:#9B9BA3;">S<span style="width:4px;height:4px;"></span></span>
+            <span style="width:16px;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:12px;color:#9B9BA3;">S<span style="width:4px;height:4px;"></span></span>
+            <span style="width:16px;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:12px;color:#FFFFFF;">M<span style="width:4px;height:4px;border-radius:50%;background-color:#4D8BFF;"></span></span>
+            <span style="width:16px;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:12px;color:#FFFFFF;">T<span style="width:4px;height:4px;border-radius:50%;background-color:#4D8BFF;"></span></span>
+            <span style="width:16px;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:12px;color:#FFFFFF;">W<span style="width:4px;height:4px;border-radius:50%;background-color:#4D8BFF;"></span></span>
+            <span style="width:16px;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:12px;color:#FFFFFF;font-weight:500;">T<span style="width:4px;height:4px;box-sizing:border-box;border-radius:50%;border:1px solid #FFFFFF;"></span></span>
+          </span>
+        </span>
+      </a>
+
+      <a href="#library-origin" style="display:block;padding:11px 0 11px;border-top:1px solid #2A2A30;color:#FFFFFF;text-decoration:none;">
+        <span style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:22px;line-height:24px;">On the Origin of Species</span>
+          <span aria-hidden="true" style="flex:1;height:2px;background-image:radial-gradient(circle,#5A5A62 0.9px,transparent 1.2px);background-size:6px 2px;background-repeat:repeat-x;"></span>
+          <span style="font-family:'Instrument Serif',serif;font-size:22px;line-height:24px;">62%</span>
+        </span>
+        <span style="display:flex;align-items:center;justify-content:space-between;margin-top:3px;">
+          <span style="display:flex;align-items:center;gap:7px;font-style:italic;font-size:14px;line-height:19px;color:#9B9BA3;"><span class="folio-press" aria-hidden="true" style="width:5px;height:5px;border-radius:50%;background-color:#FFFFFF;"></span>At the press · narration being set</span>
+          <svg width="64" height="6" viewBox="0 0 64 6" style="display:block;" aria-hidden="true"><path d="M0 3H40" style="fill:none;stroke:#FFFFFF;stroke-width:2;"></path><path d="M44 3H64" style="fill:none;stroke:#6A6A72;stroke-width:1.5;stroke-linecap:round;stroke-dasharray:0 4;"></path></svg>
+        </span>
+      </a>
+
+      <a href="#notebook-highlight" style="display:block;position:relative;padding:13px 0 0;border-top:1px solid #2A2A30;color:#FFFFFF;text-decoration:none;">
+        <span style="display:block;position:relative;font-style:italic;font-size:17px;line-height:24px;color:#FFFFFF;"><span aria-hidden="true" style="position:absolute;left:-15px;top:-1px;font-family:'Instrument Serif',serif;font-style:normal;font-size:32px;line-height:32px;color:#7AA8FF;">“</span>For we are made for co-operation, like feet, like hands, like eyelids…”</span>
+        <span style="display:block;margin-top:6px;font-family:'Hanken Grotesk',sans-serif;font-size:11px;line-height:14px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#9B9BA3;">Your highlight · Meditations II.1</span>
+      </a>
+    </nav>
+  </main>
+
+  <div style="position:absolute;left:0;right:0;top:728px;height:56px;background-color:#101012;">
+    <div aria-hidden="true" style="position:absolute;left:0;right:0;top:0;height:1px;background-color:#2A2A30;"></div>
+    <div aria-hidden="true" style="position:absolute;left:0;top:0;width:160px;height:2px;background-color:#4D8BFF;"></div>
+    <div style="display:flex;align-items:center;height:56px;padding:0 12px 0 24px;gap:12px;">
+      <a href="#player" aria-label="Open player, Meditations, Book II section 1" style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;height:56px;color:#FFFFFF;text-decoration:none;">
+        <span aria-hidden="true" style="position:relative;flex:none;width:26px;height:38px;overflow:hidden;background-color:#ECEAE4;">
+          <span style="position:absolute;right:-7px;top:-9px;font-family:'Instrument Serif',serif;font-style:italic;font-size:40px;line-height:40px;color:#0B0B0D;">M</span>
+          <span style="position:absolute;left:3px;right:3px;bottom:6px;height:1px;background-color:#0B0B0D;"></span>
+        </span>
+        <span style="display:block;min-width:0;">
+          <span style="display:flex;align-items:baseline;gap:8px;">
+            <span style="font-family:'Instrument Serif',serif;font-size:18px;line-height:20px;">Meditations</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:14px;color:#9B9BA3;">II · §1</span>
+          </span>
+          <span style="display:block;font-style:italic;font-size:13.5px;line-height:18px;color:#9B9BA3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">For we are made for co-operation, like feet, like hands…</span>
+        </span>
+      </a>
+      <button type="button" aria-label="Play" style="width:44px;height:44px;flex:none;display:flex;align-items:center;justify-content:center;background:none;border:1px solid #FFFFFF;border-radius:2px;padding:0;cursor:pointer;">
+        <svg width="11" height="13" viewBox="0 0 11 13" style="display:block;fill:#FFFFFF;margin-left:2px;" aria-hidden="true"><path d="M0.5 0.8L10.5 6.5L0.5 12.2Z"></path></svg>
+      </button>
+    </div>
+  </div>
+
+  <nav aria-label="Main" style="position:absolute;left:0;right:0;top:784px;height:60px;background-color:#000000;border-top:1px solid #2A2A30;display:flex;padding:0 16px;box-sizing:border-box;">
+    <a href="#home" aria-current="page" style="flex:1;height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#FFFFFF;text-decoration:none;font-family:'Instrument Serif',serif;font-style:italic;font-size:21px;line-height:23px;">Home<svg width="38" height="6" viewBox="0 0 38 6" style="display:block;fill:#4D8BFF;" aria-hidden="true"><path d="M1 3.6C9 2.2 25 1.9 37 2.6L37.4 3.5C25 3.7 10 4.6 1.2 5.1Z"></path></svg></a>
+    <a href="#library" style="flex:1;height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#9B9BA3;text-decoration:none;font-family:'Instrument Serif',serif;font-size:21px;line-height:23px;">Library<span aria-hidden="true" style="display:block;height:6px;"></span></a>
+    <a href="#notebook" style="flex:1;height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#9B9BA3;text-decoration:none;font-family:'Instrument Serif',serif;font-size:21px;line-height:23px;">Notebook<span aria-hidden="true" style="display:block;height:6px;"></span></a>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Folio Reader</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Instrument+Serif:ital@0;1&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#111114;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+@keyframes folio-ink{0%{background-size:0% 2px,100% 1px}84%{background-size:100% 2px,100% 1px}100%{background-size:100% 2px,100% 1px}}
+.folio-ink{animation:folio-ink 7s linear infinite;}
+@media (prefers-reduced-motion: reduce){.folio-ink{animation:none;}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background-color: #111114; color: #D9D9DE; font-family: 'Newsreader', Georgia, serif;">
+
+  <header style="position:absolute;left:8px;right:12px;top:30px;height:44px;display:flex;align-items:center;">
+    <a href="#home" aria-label="Back to Home" style="width:44px;height:44px;flex:none;display:flex;align-items:center;justify-content:center;color:#FFFFFF;">
+      <svg width="22" height="22" viewBox="0 0 24 24" style="display:block;fill:none;stroke:#FFFFFF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;" aria-hidden="true"><path d="M14.5 5.5L8 12L14.5 18.5"></path></svg>
+    </a>
+    <div style="flex:1;min-width:0;padding-left:4px;">
+      <div style="font-family:'Hanken Grotesk',sans-serif;font-size:10.5px;line-height:14px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:#9B9BA3;">Meditations</div>
+      <div style="font-style:italic;font-size:14px;line-height:18px;color:#D9D9DE;">Book II, §1</div>
+    </div>
+    <button type="button" aria-label="Search in book" style="width:44px;height:44px;flex:none;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;cursor:pointer;">
+      <svg width="21" height="21" viewBox="0 0 24 24" style="display:block;fill:none;stroke:#FFFFFF;stroke-width:1.5;stroke-linecap:round;" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.75"></circle><path d="M15.5 15.5L20.5 20.5"></path></svg>
+    </button>
+    <button type="button" aria-label="Text settings" style="width:44px;height:44px;flex:none;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;cursor:pointer;color:#FFFFFF;font-family:'Instrument Serif',serif;font-size:23px;line-height:23px;">A<span style="font-size:16px;">a</span></button>
+    <a href="#learn" style="height:44px;flex:none;display:flex;align-items:center;margin-left:4px;text-decoration:none;">
+      <span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px 0 9px;border:1px solid #3A3A42;border-radius:2px;color:#FFFFFF;font-family:'Hanken Grotesk',sans-serif;font-size:13px;font-weight:600;">
+        <svg width="14" height="14" viewBox="0 0 14 14" style="display:block;fill:none;stroke:#FFFFFF;stroke-width:1.5;" aria-hidden="true"><circle cx="7" cy="7" r="5"></circle><circle cx="7" cy="7" r="1.9" style="fill:#4D8BFF;stroke:none;"></circle></svg>
+        Learn
+      </span>
+    </a>
+  </header>
+
+  <div role="group" aria-label="Mode" style="position:absolute;left:24px;right:24px;top:78px;height:44px;display:flex;align-items:stretch;gap:26px;border-bottom:1px solid #2A2A30;">
+    <button type="button" aria-pressed="false" style="position:relative;height:44px;background:none;border:0;padding:0;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;font-size:14px;font-weight:500;color:#9B9BA3;">Read</button>
+    <button type="button" aria-pressed="true" style="position:relative;height:44px;background:none;border:0;padding:0;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;font-size:14px;font-weight:600;color:#FFFFFF;">Read + Listen<svg width="100" height="6" viewBox="0 0 100 6" preserveAspectRatio="none" style="position:absolute;left:-2px;bottom:-3px;width:calc(100% + 4px);height:6px;display:block;fill:#4D8BFF;" aria-hidden="true"><path d="M0 3.4C22 2 70 1.7 100 2.5L100 3.6C70 3.8 24 4.6 0 5.2Z"></path></svg></button>
+    <button type="button" aria-pressed="false" style="position:relative;height:44px;background:none;border:0;padding:0;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;font-size:14px;font-weight:500;color:#9B9BA3;">Listen</button>
+    <span style="margin-left:auto;align-self:center;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:14px;color:#9B9BA3;">p. 41</span>
+  </div>
+
+  <article aria-label="Meditations, Book II" style="position:absolute;left:46px;width:320px;top:140px;font-size:18px;line-height:28.8px;color:#BDBDC4;text-align:justify;text-wrap:pretty;hyphens:auto;-webkit-hyphens:auto;font-optical-sizing:auto;font-variant-numeric:oldstyle-nums;">
+    <span aria-hidden="true" style="position:absolute;left:-36px;top:0;width:24px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:28.8px;color:#9B9BA3;">§1</span>
+    <span aria-hidden="true" style="position:absolute;left:-17px;top:149px;width:6px;height:309px;border:1.5px solid #4D8BFF;border-right:0;box-sizing:border-box;"></span>
+    <span aria-hidden="true" style="position:absolute;left:-20px;top:142px;width:7px;height:7px;border-radius:50%;background-color:#4D8BFF;"></span>
+    <p style="margin:0;"><span style="float:left;font-family:'Instrument Serif',serif;font-size:98px;line-height:78px;margin:5px 9px 0 -3px;color:#FFFFFF;">B</span><span style="text-transform:uppercase;font-size:14.5px;letter-spacing:0.08em;color:#FFFFFF;">egin the morning</span> by saying to thyself, I shall meet with the busy-body, the ungrateful, arrogant, deceitful, envious, unsocial. All these things happen to them by reason of their ignorance of what is good and evil. <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">Your highlight:</span><span>But I who have seen the nature of the good that it is beautiful, and of the bad that it is ugly, and the nature of him who does wrong, that it is akin to me, not only of the same blood or seed, but that it participates in the same intelligence and the same portion of the divinity, I can neither be injured by any of them, for no one can fix on me what is ugly, nor can I be angry with my kinsman, nor hate him.</span> <span class="folio-ink" aria-current="true" style="color:#FFFFFF;background-image:linear-gradient(#4D8BFF,#4D8BFF),linear-gradient(rgba(77,139,255,0.42),rgba(77,139,255,0.42));background-repeat:no-repeat;background-position:0 100%,0 100%;background-size:100% 2px,100% 1px;padding-bottom:2px;">For we are made for co-operation, like feet, like hands, like eyelids, like the rows of the upper and lower teeth.</span> To act against one another then is contrary to nature; and it is acting against one another to be vexed and to turn away.</p>
+    <p style="margin:0;position:relative;text-indent:1.4em;"><span aria-hidden="true" style="position:absolute;left:-36px;top:0;width:24px;text-align:right;text-indent:0;font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:28.8px;color:#9B9BA3;">§2</span>Whatever this is that I am, it is a little flesh and breath, and the ruling part. Throw away thy books; no longer distract thyself: it is not allowed; but as if thou wast now dying, despise the flesh; it is blood and bones and a network, a contexture of nerves, veins, and arteries.</p>
+  </article>
+
+  <div style="position:absolute;left:0;right:0;top:712px;bottom:0;background-color:#111114;border-top:1px solid #2A2A30;">
+    <div style="position:absolute;left:24px;right:24px;top:11px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:14px;">
+        <span style="color:#D9D9DE;">Book II · 34%</span>
+        <span style="color:#9B9BA3;">18 min left in Book II</span>
+      </div>
+      <div role="slider" aria-label="Position in book" aria-valuemin="0" aria-valuemax="100" aria-valuenow="34" aria-valuetext="34 percent, Book II" tabindex="0" style="margin-top:5px;height:20px;">
+        <svg width="342" height="20" viewBox="0 0 342 20" style="display:block;overflow:visible;" aria-hidden="true">
+          <path d="M0.5 4V16M96.5 7V13M113.5 7V13M150.5 7V13M171.5 7V13M192.5 7V13M214.5 7V13M236.5 7V13M258.5 7V13M277.5 7V13M296.5 7V13M315.5 7V13M330.5 7V13M341.5 4V16" style="fill:none;stroke:#3A3A42;stroke-width:1;"></path>
+          <path d="M0 10.5H342" style="fill:none;stroke:#2A2A30;stroke-width:1;"></path>
+          <path d="M113 10.5H150" style="fill:none;stroke:#6A6A72;stroke-width:1;"></path>
+          <path d="M0 10H116" style="fill:none;stroke:#4D8BFF;stroke-width:2;"></path>
+          <circle cx="116" cy="10" r="5.5" style="fill:#111114;stroke:#FFFFFF;stroke-width:1.5;"></circle>
+          <circle cx="116" cy="10" r="2.2" style="fill:#4D8BFF;stroke:none;"></circle>
+        </svg>
+      </div>
+    </div>
+    <div style="position:absolute;left:16px;right:16px;top:58px;height:60px;display:flex;align-items:center;justify-content:space-between;">
+      <button type="button" aria-label="Playback speed, 1.4 times" style="width:58px;height:44px;display:flex;align-items:center;justify-content:center;background:none;border:1px solid #3A3A42;border-radius:2px;padding:0;cursor:pointer;color:#FFFFFF;font-family:'IBM Plex Mono',monospace;font-size:14px;">1.4×</button>
+      <button type="button" aria-label="Previous sentence" style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;cursor:pointer;">
+        <svg width="26" height="26" viewBox="0 0 26 26" style="display:block;fill:none;stroke:#FFFFFF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;" aria-hidden="true"><path d="M17.5 6.5L11 13L17.5 19.5"></path><circle cx="6" cy="13" r="1.9" style="fill:#FFFFFF;stroke:none;"></circle></svg>
+      </button>
+      <button type="button" aria-label="Pause" style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background-color:#FFFFFF;border:0;border-radius:2px;padding:0;cursor:pointer;">
+        <svg width="18" height="20" viewBox="0 0 18 20" style="display:block;fill:#000000;" aria-hidden="true"><rect x="2" y="1" width="4.5" height="18"></rect><rect x="11.5" y="1" width="4.5" height="18"></rect></svg>
+      </button>
+      <button type="button" aria-label="Next sentence" style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;cursor:pointer;">
+        <svg width="26" height="26" viewBox="0 0 26 26" style="display:block;fill:none;stroke:#FFFFFF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;" aria-hidden="true"><path d="M8.5 6.5L15 13L8.5 19.5"></path><circle cx="20" cy="13" r="1.9" style="fill:#FFFFFF;stroke:none;"></circle></svg>
+      </button>
+      <a href="#player" aria-label="Open full player" style="width:58px;height:44px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #3A3A42;border-radius:2px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" style="display:block;fill:none;stroke:#FFFFFF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;" aria-hidden="true"><path d="M6 15L12 9L18 15"></path></svg>
+      </a>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

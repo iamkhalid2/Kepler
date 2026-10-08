@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shelf Home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..800,0..100;1,9..144,300..800,0..100&amp;family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400;1,7..72,500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000000}
+@keyframes dircH-ribbon-settle{
+  0%{transform:rotate(0deg)}
+  8%{transform:rotate(4deg)}
+  20%{transform:rotate(-2.6deg)}
+  32%{transform:rotate(1.4deg)}
+  44%{transform:rotate(-0.6deg)}
+  56%{transform:rotate(0.2deg)}
+  66%,100%{transform:rotate(0deg)}
+}
+.dircH-swing{transform-box:fill-box;transform-origin:50% 0%;animation:dircH-ribbon-settle 8s cubic-bezier(.3,.7,.4,1) 1.2s infinite}
+.dircH-swing-b{transform-box:fill-box;transform-origin:50% 0%;animation:dircH-ribbon-settle 8s cubic-bezier(.3,.7,.4,1) 1.32s infinite}
+.dircH-press{transition:transform 120ms ease-out}
+.dircH-press:active{transform:translateY(1px) scale(.985)}
+@media (prefers-reduced-motion: reduce){
+  .dircH-swing,.dircH-swing-b{animation:none}
+  .dircH-press{transition:none}
+}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background-color: #000000; color: #FFFFFF; font-family: 'Albert Sans', sans-serif;">
+
+  <!-- ============ TOP ROW: mark + date + actions ============ -->
+  <a href="#home" aria-label="BetterBooks home" style="position: absolute; left: 14px; top: 20px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+    <svg viewBox="0 0 108 108" style="width: 30px; height: 30px; display: block;" aria-hidden="true">
+      <rect x="31" y="25" width="11" height="59" rx="5.5" style="fill: #FFFFFF;"></rect>
+      <circle cx="55" cy="62" r="16.5" style="fill: none; stroke: #FFFFFF; stroke-width: 11;"></circle>
+      <circle cx="55" cy="62" r="4.6" style="fill: #4D8BFF;"></circle>
+    </svg>
+  </a>
+  <div style="position: absolute; left: 62px; top: 35px; font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: 0.16em; color: #9B9BA3;">THURSDAY · 8 OCTOBER</div>
+  <button aria-label="Search your shelf" class="dircH-press" style="position: absolute; left: 286px; top: 20px; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+    <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: none; stroke: #D9D9DE; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;">
+      <circle cx="10.5" cy="10.5" r="6.5"></circle>
+      <path d="M15.5 15.5L20.5 20.5"></path>
+    </svg>
+  </button>
+  <button aria-label="Profile and settings" class="dircH-press" style="position: absolute; left: 332px; top: 20px; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+    <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: none; stroke: #D9D9DE; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;">
+      <circle cx="12" cy="8.5" r="3.6"></circle>
+      <path d="M4.8 20c1.3-3.7 4-5.4 7.2-5.4s5.9 1.7 7.2 5.4"></path>
+    </svg>
+  </button>
+
+  <!-- ============ GREETING ============ -->
+  <h1 style="position: absolute; left: 22px; top: 66px; margin: 0; font-family: 'Fraunces', serif; font-weight: 360; font-size: 36px; line-height: 42px; letter-spacing: -0.02em; font-variation-settings: 'SOFT' 100, 'opsz' 96; color: #FFFFFF;">Good <span style="font-style: italic; font-weight: 340;">evening.</span></h1>
+
+  <!-- ============ HERO: the book standing on a lacquer shelf ============ -->
+  <svg viewBox="0 110 390 230" style="position: absolute; left: 0; top: 110px; width: 390px; height: 230px; display: block; overflow: visible;" aria-hidden="true">
+    <defs>
+      <filter id="dircH-cloth" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="1.5 0.45" numOctaves="2" seed="7" result="noise"></feTurbulence>
+        <feColorMatrix in="noise" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.1 -0.5" result="speck"></feColorMatrix>
+        <feComposite in="speck" in2="SourceGraphic" operator="in"></feComposite>
+      </filter>
+      <filter id="dircH-soft" x="-30%" y="-400%" width="160%" height="900%">
+        <feGaussianBlur stdDeviation="3"></feGaussianBlur>
+      </filter>
+      <filter id="dircH-blur6" x="-20%" y="-50%" width="140%" height="200%">
+        <feGaussianBlur stdDeviation="5"></feGaussianBlur>
+      </filter>
+      <linearGradient id="dircH-light" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" style="stop-color: #FFFFFF; stop-opacity: 0.18;"></stop>
+        <stop offset="0.42" style="stop-color: #FFFFFF; stop-opacity: 0;"></stop>
+        <stop offset="1" style="stop-color: #000000; stop-opacity: 0.38;"></stop>
+      </linearGradient>
+      <linearGradient id="dircH-silk" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" style="stop-color: #2F63D8;"></stop>
+        <stop offset="0.45" style="stop-color: #86B2FF;"></stop>
+        <stop offset="1" style="stop-color: #3A6FE4;"></stop>
+      </linearGradient>
+      <linearGradient id="dircH-bone" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" style="stop-color: #B9B19F;"></stop>
+        <stop offset="0.45" style="stop-color: #F4EEE2;"></stop>
+        <stop offset="1" style="stop-color: #C6BEAC;"></stop>
+      </linearGradient>
+      <linearGradient id="dircH-plank" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" style="stop-color: #000000;"></stop>
+        <stop offset="1" style="stop-color: #0C0C0E;"></stop>
+      </linearGradient>
+      <linearGradient id="dircH-plankfade" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" style="stop-color: #FFFFFF; stop-opacity: 0.22;"></stop>
+        <stop offset="0.55" style="stop-color: #FFFFFF; stop-opacity: 0.12;"></stop>
+        <stop offset="1" style="stop-color: #FFFFFF; stop-opacity: 0.02;"></stop>
+      </linearGradient>
+    </defs>
+
+    <!-- shelf plank: lacquer top, a single lit edge, front face -->
+    <rect x="0" y="268" width="390" height="16" style="fill: url(#dircH-plank);"></rect>
+    <rect x="34" y="272" width="96" height="10" style="fill: #2A4FB0; opacity: 0.32; filter: url(#dircH-blur6);"></rect>
+    <rect x="0" y="283.6" width="390" height="0.9" style="fill: url(#dircH-plankfade);"></rect>
+    <rect x="0" y="284.5" width="390" height="9" style="fill: #070708;"></rect>
+
+    <!-- contact shadow -->
+    <ellipse cx="86" cy="276" rx="64" ry="3" style="fill: #000000; opacity: 1; filter: url(#dircH-soft);"></ellipse>
+
+    <!-- head (top face) -->
+    <polygon points="28,126 37,120 137,120 128,126" style="fill: #162E70;"></polygon>
+    <polygon points="30.6,125.2 38.4,120.7 134,120.7 126.4,125.2" style="fill: #E6DECD;"></polygon>
+    <!-- fore-edge (page block in shade): front 34% thumbed lighter -->
+    <polygon points="128,126 137,120 137,270 128,276" style="fill: #0E2257;"></polygon>
+    <polygon points="129.4,127 135.6,123 135.6,268.6 129.4,272.6" style="fill: #7D7667;"></polygon>
+    <polygon points="129.4,127 131.5,125.6 131.5,271.2 129.4,272.6" style="fill: #A69E8C;"></polygon>
+    <path d="M131 126 L131 271.6 M132.6 125 L132.6 270.6 M134.2 124 L134.2 269.6" style="stroke: #5F594C; stroke-width: 0.5;"></path>
+
+    <!-- cover: cobalt bookcloth with directional light -->
+    <rect x="28" y="126" width="100" height="150" rx="1.5" style="fill: #19347E;"></rect>
+    <rect x="28" y="126" width="100" height="150" rx="1.5" style="fill: #FFFFFF; opacity: 0.5; filter: url(#dircH-cloth); mix-blend-mode: overlay;"></rect>
+    <rect x="28" y="126" width="100" height="150" rx="1.5" style="fill: url(#dircH-light);"></rect>
+    <rect x="36.4" y="126" width="1.2" height="150" style="fill: #081740; opacity: 0.95;"></rect>
+    <rect x="37.6" y="126" width="0.8" height="150" style="fill: #FFFFFF; opacity: 0.14;"></rect>
+    <text x="82" y="166" style="font-family: 'Fraunces', serif; font-size: 10px; font-weight: 600; letter-spacing: 1.9px; fill: #F4F6FC; text-anchor: middle; font-variation-settings: 'SOFT' 100, 'opsz' 12;">MEDITATIONS</text>
+    <circle cx="82" cy="203" r="14" style="fill: none; stroke: #081740; stroke-width: 4.2; opacity: 0.6;"></circle>
+    <circle cx="82" cy="203.8" r="14" style="fill: none; stroke: #FFFFFF; stroke-width: 0.6; opacity: 0.16;"></circle>
+    <circle cx="82" cy="203" r="3" style="fill: #F4F6FC;"></circle>
+    <text x="82" y="254" style="font-family: 'Fraunces', serif; font-size: 6.6px; font-weight: 500; letter-spacing: 1.5px; fill: #BFCDF2; text-anchor: middle; font-variation-settings: 'opsz' 9;">MARCUS AURELIUS</text>
+
+    <!-- two ribbons over the shelf edge: bone = read 34%, cobalt = listened 41% -->
+    <g class="dircH-swing-b">
+      <path d="M48 275 L55.6 275 L56 284 L56 318 L52 312.4 L48 318 L48 284 Z" style="fill: url(#dircH-bone);"></path>
+      <rect x="48" y="283.4" width="8" height="1.6" style="fill: #FFFFFF; opacity: 0.6;"></rect>
+    </g>
+    <g class="dircH-swing">
+      <path d="M61 275 L68.6 275 L69 284 L69 332 L65 326.4 L61 332 L61 284 Z" style="fill: url(#dircH-silk);"></path>
+      <rect x="61" y="283.4" width="8" height="1.6" style="fill: #FFFFFF; opacity: 0.55;"></rect>
+    </g>
+  </svg>
+
+  <!-- ribbon legend -->
+  <div style="position: absolute; left: 84px; top: 300px; display: flex; align-items: baseline; gap: 14px; font-size: 12px; color: #9B9BA3;">
+    <span><span style="font-family: 'Fraunces', serif; font-size: 15px; font-weight: 500; color: #7AA8FF; font-variation-settings: 'opsz' 18;">41%</span> listened</span>
+    <span><span style="font-family: 'Fraunces', serif; font-size: 15px; font-weight: 500; color: #E6DFCF; font-variation-settings: 'opsz' 18;">34%</span> read</span>
+  </div>
+
+  <!-- hero info -->
+  <div style="position: absolute; left: 158px; top: 116px; width: 210px;">
+    <div style="display: flex; align-items: center; gap: 7px; font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: 0.14em; color: #9B9BA3;">
+      <svg viewBox="0 0 16 16" style="width: 14px; height: 14px; fill: none; stroke: #7AA8FF; stroke-width: 1.6; stroke-linecap: round;" aria-hidden="true">
+        <path d="M2.5 7v2M5.5 4.5v7M8.5 2.5v11M11.5 5.5v5M14 7.2v1.6"></path>
+      </svg>
+      <span><span style="color: #7AA8FF;">LISTENING</span> · AVA · 1.4×</span>
+    </div>
+    <div style="margin-top: 9px; font-family: 'Fraunces', serif; font-size: 29px; line-height: 32px; font-weight: 420; letter-spacing: -0.015em; font-variation-settings: 'SOFT' 50, 'opsz' 48;">Meditations</div>
+    <div style="margin-top: 1px; font-family: 'Literata', serif; font-style: italic; font-size: 14px; line-height: 20px; color: #9B9BA3;">Marcus Aurelius</div>
+    <div style="margin-top: 7px; font-size: 13.5px; line-height: 18px; font-weight: 600; color: #FFFFFF;">Book II · §1 <span style="font-weight: 400; color: #9B9BA3;">· 18 min left in Book II</span></div>
+  </div>
+  <a href="#player" class="dircH-press" style="position: absolute; left: 158px; top: 220px; width: 208px; height: 48px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 10px; background-color: #ECE6D9; color: #0E0E10; border-radius: 4px; text-decoration: none; font-size: 15px; font-weight: 600; box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -1px 0 rgba(0,0,0,0.2), 0 2px 0 rgba(0,0,0,0.9);">
+    <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: #0E0E10; stroke: none;" aria-hidden="true">
+      <path d="M7.5 4.8v14.4L19 12z"></path>
+    </svg>
+    Resume listening
+  </a>
+
+  <!-- ============ PREVIOUSLY ON: a paper slip ============ -->
+  <a href="#recap" class="dircH-press" style="position: absolute; left: 24px; top: 344px; width: 342px; box-sizing: border-box; padding: 14px 16px 13px 16px; background-color: #E9E2D3; color: #1C1A16; border-radius: 3px; text-decoration: none; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 12px 24px -14px rgba(0,0,0,1);">
+    <svg style="position: absolute; left: 0; top: 0; width: 342px; height: 140px; display: block; pointer-events: none;" aria-hidden="true">
+      <defs>
+        <filter id="dircH-paper" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="2"></feTurbulence>
+          <feColorMatrix type="matrix" values="0 0 0 0 0.35  0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0.9 -0.38"></feColorMatrix>
+        </filter>
+      </defs>
+      <rect x="0" y="0" width="342" height="140" style="filter: url(#dircH-paper); opacity: 0.5;"></rect>
+    </svg>
+    <div style="position: relative; font-family: 'Literata', serif; font-size: 14.5px; line-height: 21px; color: #1C1A16;"><span style="font-family: 'Fraunces', serif; font-style: italic; font-weight: 600; font-size: 15.5px; font-variation-settings: 'SOFT' 100, 'opsz' 18;">Previously on…</span> Marcus opened Book II by bracing for difficult people, then argued we are built for co-operation, so anger works against our own nature.</div>
+    <div style="position: relative; margin-top: 9px; display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; line-height: 14px; font-weight: 700; letter-spacing: 0.14em; color: #5E584C;">
+      <span>4 DAYS AWAY · BOOK II</span>
+      <span style="display: flex; align-items: center; gap: 3px;">FULL RECAP
+        <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: none; stroke: #5E584C; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </span>
+    </div>
+  </a>
+
+  <!-- ============ DAILY REVIEW: a stack of index cards ============ -->
+  <div style="position: absolute; left: 24px; top: 498px; width: 342px; height: 68px;">
+    <svg viewBox="0 0 40 46" style="position: absolute; left: 0; top: 4px; width: 40px; height: 46px; display: block;" aria-hidden="true">
+      <rect x="2" y="22" width="30" height="20" rx="1" style="fill: #121215; stroke: #2F2F36; stroke-width: 0.8;"></rect>
+      <rect x="3.5" y="19.5" width="30" height="20" rx="1" style="fill: #16161A; stroke: #36363E; stroke-width: 0.8;"></rect>
+      <rect x="5" y="17" width="30" height="20" rx="1" style="fill: #1A1A1E; stroke: #3E3E46; stroke-width: 0.8;"></rect>
+      <rect x="6.5" y="14.5" width="30" height="20" rx="1" style="fill: #1E1E23; stroke: #484851; stroke-width: 0.8;"></rect>
+      <rect x="8" y="10" width="30" height="20" rx="1" style="fill: #ECE6D9;"></rect>
+      <rect x="8" y="14" width="30" height="0.9" style="fill: #4D8BFF;"></rect>
+      <rect x="11" y="18.5" width="20" height="0.7" style="fill: #B5AD9B;"></rect>
+      <rect x="11" y="22" width="22" height="0.7" style="fill: #B5AD9B;"></rect>
+      <rect x="11" y="25.5" width="14" height="0.7" style="fill: #B5AD9B;"></rect>
+    </svg>
+    <div style="position: absolute; left: 54px; top: 0; font-family: 'Fraunces', serif; font-size: 19px; line-height: 24px; font-weight: 450; font-variation-settings: 'SOFT' 50, 'opsz' 24;">Daily review</div>
+    <div style="position: absolute; left: 54px; top: 24px; font-size: 13px; line-height: 18px; color: #9B9BA3;"><span style="color: #FFFFFF; font-weight: 600;">12 due</span> · about 6 min</div>
+    <div role="img" aria-label="Last seven days: Friday, Monday, Tuesday and Wednesday reviewed; today pending" style="position: absolute; left: 54px; top: 48px; display: flex; gap: 4px;">
+      <span style="width: 18px; height: 18px; border-radius: 50%; background-color: #ECE6D9; color: #0E0E10; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;">F</span>
+      <span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1px solid #3A3A42; color: #8A8A92; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;">S</span>
+      <span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1px solid #3A3A42; color: #8A8A92; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;">S</span>
+      <span style="width: 18px; height: 18px; border-radius: 50%; background-color: #ECE6D9; color: #0E0E10; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;">M</span>
+      <span style="width: 18px; height: 18px; border-radius: 50%; background-color: #ECE6D9; color: #0E0E10; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;">T</span>
+      <span style="width: 18px; height: 18px; border-radius: 50%; background-color: #ECE6D9; color: #0E0E10; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;">W</span>
+      <span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed #7AA8FF; color: #FFFFFF; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;">T</span>
+    </div>
+    <a href="#review" class="dircH-press" style="position: absolute; right: 0; top: 12px; width: 84px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #3A3A42; border-radius: 4px; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 600; background-color: #101012; box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);">Start
+      <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: none; stroke: #FFFFFF; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+    </a>
+  </div>
+
+  <!-- ============ GENERATING: a spine on the bindery bench ============ -->
+  <a href="#book-origin" aria-label="On the Origin of Species: narration 62 percent ready" style="position: absolute; left: 24px; top: 582px; width: 342px; height: 52px; display: block; text-decoration: none; color: #FFFFFF;">
+    <svg viewBox="0 0 342 30" style="position: absolute; left: 0; top: 0; width: 342px; height: 30px; display: block;" aria-hidden="true">
+      <defs>
+        <linearGradient id="dircH-spine" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" style="stop-color: #3A3A42;"></stop>
+          <stop offset="0.35" style="stop-color: #26262C;"></stop>
+          <stop offset="1" style="stop-color: #111114;"></stop>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="1" width="342" height="28" rx="3" style="fill: url(#dircH-spine);"></rect>
+      <rect x="0" y="1" width="342" height="28" rx="3" style="fill: #FFFFFF; opacity: 0.35; filter: url(#dircH-cloth); mix-blend-mode: overlay;"></rect>
+      <rect x="3" y="3" width="2" height="24" style="fill: #ECE6D9; opacity: 0.8;"></rect>
+      <rect x="6" y="3" width="1" height="24" style="fill: #ECE6D9; opacity: 0.4;"></rect>
+      <rect x="337" y="3" width="2" height="24" style="fill: #ECE6D9; opacity: 0.8;"></rect>
+      <rect x="335" y="3" width="1" height="24" style="fill: #ECE6D9; opacity: 0.4;"></rect>
+      <rect x="262" y="3" width="1" height="24" style="fill: #000000; opacity: 0.6;"></rect>
+      <rect x="263" y="3" width="0.8" height="24" style="fill: #FFFFFF; opacity: 0.1;"></rect>
+      <text x="18" y="19.4" style="font-family: 'Fraunces', serif; font-size: 10.5px; font-weight: 600; letter-spacing: 2.2px; fill: #F2F2F4; font-variation-settings: 'opsz' 12;">ON THE ORIGIN OF SPECIES</text>
+      <text x="324" y="19.4" style="font-family: 'Fraunces', serif; font-size: 10px; font-style: italic; font-weight: 500; letter-spacing: 0.4px; fill: #C9C9CF; text-anchor: end;">Darwin</text>
+      <path d="M10 26.4 H212" style="stroke: #2DD4BF; stroke-width: 1.4; stroke-dasharray: 4 3; stroke-linecap: round;"></path>
+      <path d="M216 26.4 H332" style="stroke: #4A4A53; stroke-width: 1; stroke-dasharray: 4 3;"></path>
+    </svg>
+    <div style="position: absolute; left: 0; top: 36px; font-size: 12.5px; line-height: 16px; color: #9B9BA3;"><span style="color: #2DD4BF; font-weight: 600;">Binding narration 62%</span> · Ava · ready in about 40 min</div>
+  </a>
+
+  <!-- ============ RECENT HIGHLIGHT: pencil in the margin ============ -->
+  <a href="#notebook-highlight" style="position: absolute; left: 24px; top: 648px; width: 342px; height: 58px; display: block; text-decoration: none; color: #FFFFFF;">
+    <svg viewBox="0 0 8 60" style="position: absolute; left: 0; top: 0; width: 8px; height: 60px; display: block;" aria-hidden="true">
+      <path d="M3.6 2 C3 12, 4.4 20, 3.7 30 S3.2 46, 4 56" style="fill: none; stroke: #9A9384; stroke-width: 1.8; stroke-linecap: round; opacity: 0.95;"></path>
+      <path d="M4.6 5 C4.2 15, 5 24, 4.5 33 S4.2 47, 4.8 53" style="fill: none; stroke: #9A9384; stroke-width: 0.6; stroke-linecap: round; opacity: 0.5;"></path>
+    </svg>
+    <div style="position: absolute; left: 18px; top: 0; width: 322px; font-family: 'Literata', serif; font-style: italic; font-size: 15px; line-height: 21px; color: #E4E4E8;">For we are made for co-operation, like feet, like hands, like eyelids…</div>
+    <div style="position: absolute; left: 18px; top: 45px; font-size: 10.5px; line-height: 13px; font-weight: 700; letter-spacing: 0.14em; color: #9B9BA3;">YOUR HIGHLIGHT · MEDITATIONS II.1</div>
+  </a>
+
+  <!-- ============ NOW-BAR ============ -->
+  <div style="position: absolute; left: 0; top: 716px; width: 390px; height: 58px; background-color: #101012; border-top: 1px solid #2A2A30; box-sizing: border-box;">
+    <svg viewBox="0 0 390 6" style="position: absolute; left: 0; top: -1px; width: 390px; height: 6px; display: block;" aria-hidden="true">
+      <path d="M0 0 H160 L155.5 2 L160 4 H0 Z" style="fill: #4D8BFF;"></path>
+    </svg>
+    <a href="#player" aria-label="Open player: Meditations, Book II section 1" style="position: absolute; left: 0; top: 0; width: 270px; height: 57px; text-decoration: none; color: #FFFFFF;">
+      <svg viewBox="0 0 14 38" style="position: absolute; left: 22px; top: 10px; width: 14px; height: 38px; display: block;" aria-hidden="true">
+        <rect x="0" y="0" width="14" height="38" rx="1.5" style="fill: #19347E;"></rect>
+        <rect x="0" y="0" width="5" height="38" style="fill: #FFFFFF; opacity: 0.1;"></rect>
+        <rect x="1.5" y="2" width="11" height="1.3" style="fill: #ECE6D9; opacity: 0.85;"></rect>
+        <rect x="1.5" y="34.7" width="11" height="1.3" style="fill: #ECE6D9; opacity: 0.85;"></rect>
+        <circle cx="7" cy="25.5" r="1.9" style="fill: #F4F6FC;"></circle>
+      </svg>
+      <div style="position: absolute; left: 50px; top: 9px; font-family: 'Fraunces', serif; font-size: 16px; line-height: 20px; font-weight: 500; font-variation-settings: 'SOFT' 50, 'opsz' 18;">Meditations</div>
+      <div style="position: absolute; left: 50px; top: 30px; font-size: 12.5px; line-height: 16px; color: #9B9BA3;">Book II · §1 · 18 min left · 1.4×</div>
+    </a>
+    <button aria-label="Back 15 seconds" class="dircH-press" style="position: absolute; left: 276px; top: 6px; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+      <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: #D9D9DE; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;">
+        <path d="M4.6 9.2A8 8 0 1 1 4 13"></path>
+        <path d="M4.2 4.6v4.8H9"></path>
+        <text x="12.4" y="15.6" style="font-family: 'Albert Sans', sans-serif; font-size: 7.4px; font-weight: 700; fill: #D9D9DE; stroke: none; text-anchor: middle;">15</text>
+      </svg>
+    </button>
+    <button aria-label="Play" class="dircH-press" style="position: absolute; left: 326px; top: 6px; width: 44px; height: 44px; border: 0; border-radius: 50%; background-color: #ECE6D9; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -2px 0 rgba(0,0,0,0.16);">
+      <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: #0E0E10; stroke: none;">
+        <path d="M8 4.8v14.4L19.4 12z"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ============ TAB BAR ============ -->
+  <nav aria-label="Main" style="position: absolute; left: 0; top: 774px; width: 390px; height: 70px; background-color: #000000; display: flex;">
+    <svg viewBox="0 0 10 18" style="position: absolute; left: 60px; top: 0; width: 10px; height: 18px; display: block;" aria-hidden="true">
+      <path d="M0 0 H10 V18 L5 13.6 L0 18 Z" style="fill: #4D8BFF;"></path>
+    </svg>
+    <a href="#home" aria-current="page" style="width: 130px; height: 62px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; text-decoration: none; color: #FFFFFF; font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;">
+      <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: #FFFFFF; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true">
+        <path d="M3 6.2c3-1.4 6-1.2 9 .8 3-2 6-2.2 9-.8v12.6c-3-1.4-6-1.2-9 .8-3-2-6-2.2-9-.8z"></path>
+        <path d="M12 7v12.6"></path>
+      </svg>
+      Home
+    </a>
+    <a href="#library" style="width: 130px; height: 62px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; text-decoration: none; color: #9B9BA3; font-size: 11.5px; font-weight: 500; letter-spacing: 0.02em;">
+      <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: #9B9BA3; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true">
+        <rect x="3.5" y="5" width="4" height="15" rx="0.6"></rect>
+        <rect x="9" y="3.5" width="4.4" height="16.5" rx="0.6"></rect>
+        <path d="M15.2 6.6l3.7-1 3.6 13.8-3.7 1z"></path>
+      </svg>
+      Library
+    </a>
+    <a href="#notebook" style="width: 130px; height: 62px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; text-decoration: none; color: #9B9BA3; font-size: 11.5px; font-weight: 500; letter-spacing: 0.02em;">
+      <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: #9B9BA3; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true">
+        <rect x="5" y="3" width="14" height="18" rx="1.2"></rect>
+        <path d="M9 3v18"></path>
+        <path d="M12 8h4M12 11.5h4"></path>
+      </svg>
+      Notebook
+    </a>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

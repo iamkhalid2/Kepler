@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shelf Reader</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..800,0..100;1,9..144,300..800,0..100&amp;family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400;1,7..72,500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000000}
+/* Signature motion: the ribbon follows the voice. When sentence 4 begins, the ribbon slides down
+   from sentence 3, swings and settles; the spoken wash then sweeps through the sentence line by line. */
+@keyframes dircR-ribbon{
+  0%{transform:translateY(-150px) rotate(0deg)}
+  9%{transform:translateY(0) rotate(0deg)}
+  14%{transform:translateY(0) rotate(0.9deg)}
+  21%{transform:translateY(0) rotate(-0.6deg)}
+  28%{transform:translateY(0) rotate(0.32deg)}
+  35%{transform:translateY(0) rotate(-0.14deg)}
+  42%,100%{transform:translateY(0) rotate(0deg)}
+}
+@keyframes dircR-sweep{
+  0%,10%{background-size:0% 100%, 100% 100%}
+  92%,100%{background-size:100% 100%, 100% 100%}
+}
+@keyframes dircR-breathe{
+  0%,100%{opacity:1}
+  50%{opacity:.55}
+}
+.dircR-ribbon{transform-origin:50% 0%;animation:dircR-ribbon 7s cubic-bezier(.22,.8,.3,1) infinite}
+.dircR-sweep{animation:dircR-sweep 7s linear infinite}
+.dircR-live{animation:dircR-breathe 2.4s ease-in-out infinite}
+.dircR-press{transition:transform 120ms ease-out}
+.dircR-press:active{transform:translateY(1px) scale(.97)}
+@media (prefers-reduced-motion: reduce){
+  .dircR-ribbon,.dircR-sweep,.dircR-live{animation:none}
+  .dircR-press{transition:none}
+}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background-color: #000000; color: #FFFFFF; font-family: 'Albert Sans', sans-serif;">
+
+  <!-- ============ THE PAGE: a dark sheet lying on black lacquer ============ -->
+  <div style="position: absolute; left: 0; top: 66px; width: 380px; height: 618px; background-color: #111114; border-radius: 0 2px 2px 0; box-shadow: 0 10px 22px -8px rgba(0,0,0,1);">
+    <!-- gutter: the page curving into the spine -->
+    <div style="position: absolute; left: 0; top: 0; width: 22px; height: 618px; background-image: linear-gradient(90deg, rgba(0,0,0,0.55), rgba(0,0,0,0));"></div>
+    <!-- paper grain -->
+    <svg style="position: absolute; left: 0; top: 0; width: 380px; height: 618px; display: block; pointer-events: none;" aria-hidden="true">
+      <defs>
+        <filter id="dircR-grain" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11"></feTurbulence>
+          <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.9  0 0 0 0.8 -0.42"></feColorMatrix>
+        </filter>
+      </defs>
+      <rect x="0" y="0" width="380" height="618" style="filter: url(#dircR-grain); opacity: 0.06;"></rect>
+    </svg>
+  </div>
+  <!-- fore-edge: the pages still to come in Book II -->
+  <svg viewBox="0 0 10 610" style="position: absolute; left: 380px; top: 70px; width: 10px; height: 610px; display: block;" aria-hidden="true">
+    <rect x="0" y="0" width="1" height="610" style="fill: #232328;"></rect>
+    <rect x="2" y="1" width="0.8" height="608" style="fill: #1B1B1F;"></rect>
+    <rect x="3.6" y="2" width="0.8" height="606" style="fill: #19191D;"></rect>
+    <rect x="5.2" y="3" width="0.8" height="604" style="fill: #161619;"></rect>
+    <rect x="6.8" y="4" width="0.8" height="602" style="fill: #131316;"></rect>
+  </svg>
+
+  <!-- ============ TEXT ============ -->
+  <!-- running head + folio -->
+  <div style="position: absolute; left: 26px; top: 80px; width: 324px; display: flex; justify-content: space-between; font-size: 10.5px; line-height: 14px; font-weight: 600; letter-spacing: 0.16em; color: #8A8A92;">
+    <span>THE SECOND BOOK</span>
+    <span style="font-family: 'Fraunces', serif; letter-spacing: 0.04em; font-size: 12px; font-weight: 500;">61</span>
+  </div>
+  <!-- the page window: 18 lines; sentences 1-2 sit on the previous page -->
+  <div style="position: absolute; left: 26px; top: 112px; width: 324px; height: 540px; overflow: hidden;">
+  <article lang="en" style="position: absolute; left: 0; top: -300px; width: 324px; font-family: 'Literata', serif; font-size: 19px; line-height: 30px; color: #D9D9DE; text-align: left; hyphens: manual; -webkit-hyphens: manual; font-kerning: normal;">
+    <p style="margin: 0;"><span id="dircR-s1"><span style="font-variant-caps: all-small-caps; letter-spacing: 0.07em; font-weight: 500; color: #FFFFFF;">Begin the morning</span> by saying to thyself, I shall meet with the busy-body, the ungrateful, arrogant, deceitful, envious, unsocial.</span> <span id="dircR-s2">All these things happen to them by reason of their ignorance of what is good and evil.</span> <span id="dircR-s3" style="color: #ECE3D0;">But I who have seen the nature of the good that it is beautiful, and of the bad that it is ugly, and the nature of him who does wrong, that it is akin to me, not only of the same blood or seed, but that it participates in the same intelligence and the same portion of the divinity, I can neither be injured by any of them, for no one can fix on me what is ugly, nor can I be angry with my kinsman, nor hate him.</span> <span id="dircR-s4" class="dircR-sweep" style="color: #FFFFFF; background-image: linear-gradient(rgba(77,139,255,0.30), rgba(77,139,255,0.30)), linear-gradient(rgba(77,139,255,0.12), rgba(77,139,255,0.12)); background-repeat: no-repeat; background-size: 100% 100%, 100% 100%; background-position: 0 0, 0 0; border-radius: 2px;">For we are made for co-operation, like feet, like hands, like eyelids, like the rows of the upper and lower teeth.</span> <span id="dircR-s5">To act against one another then is contrary to nature; and it is acting against one another to be vexed and to turn away.</span></p>
+    <p style="margin: 0; text-indent: 1.4em;"><span id="dircR-s6">Whatever this is that I am, it is a little flesh and breath, and the ruling part.</span> <span id="dircR-s7">Throw away thy books; no longer distract thyself: it is not allowed; but as if thou wast now dying, despise the flesh; it is blood and bones and a network, a contexture of nerves, veins, and arteries.</span></p>
+  </article>
+  </div>
+
+  <!-- section numeral hung in the margin -->
+  <div style="position: absolute; left: 10px; top: 570px; font-family: 'Fraunces', serif; font-size: 11px; line-height: 14px; font-weight: 600; color: #8A8A92;">2</div>
+
+  <!-- saved highlight (sentence 3): a pencil sideline in the margin -->
+  <svg viewBox="0 0 8 232" style="position: absolute; left: 10px; top: 114px; width: 8px; height: 232px; display: block;" aria-hidden="true">
+    <path d="M4 3 C3.4 40, 4.6 80, 3.9 120 S3.4 180, 4.2 228" style="fill: none; stroke: #A39B8A; stroke-width: 1.8; stroke-linecap: round;"></path>
+    <path d="M4.9 10 C4.5 50, 5.2 100, 4.7 140 S4.4 190, 5 220" style="fill: none; stroke: #A39B8A; stroke-width: 0.6; stroke-linecap: round; opacity: 0.5;"></path>
+  </svg>
+
+  <!-- the ribbon: lies across the page from the head and marks the sentence being spoken -->
+  <div style="position: absolute; left: 356px; top: 0; width: 14px; height: 384px; overflow: hidden; pointer-events: none;">
+    <div class="dircR-ribbon" style="position: absolute; left: 2px; top: 0; width: 10px; height: 377px;">
+      <svg viewBox="0 0 10 377" style="width: 10px; height: 377px; display: block;" aria-hidden="true">
+        <defs>
+          <linearGradient id="dircR-silk" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" style="stop-color: #2F63D8;"></stop>
+            <stop offset="0.45" style="stop-color: #86B2FF;"></stop>
+            <stop offset="1" style="stop-color: #3A6FE4;"></stop>
+          </linearGradient>
+          <linearGradient id="dircR-silkshade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style="stop-color: #000000; stop-opacity: 0.45;"></stop>
+            <stop offset="0.2" style="stop-color: #000000; stop-opacity: 0;"></stop>
+            <stop offset="1" style="stop-color: #000000; stop-opacity: 0;"></stop>
+          </linearGradient>
+        </defs>
+        <path d="M0 0 H10 V377 L5 369.5 L0 377 Z" style="fill: url(#dircR-silk);"></path>
+        <path d="M0 0 H10 V377 L5 369.5 L0 377 Z" style="fill: url(#dircR-silkshade);"></path>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ============ CHROME (on the lacquer, above the page) ============ -->
+  <div style="position: absolute; left: 0; top: 0; width: 390px; height: 66px; background-color: #000000;">
+    <button aria-label="Back to Home" class="dircR-press" style="position: absolute; left: 6px; top: 14px; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+      <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: #FFFFFF; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;">
+        <path d="M15 5l-7 7 7 7"></path>
+      </svg>
+    </button>
+    <div style="position: absolute; left: 52px; top: 17px; width: 120px;">
+      <div style="font-family: 'Fraunces', serif; font-size: 16px; line-height: 20px; font-weight: 500; font-variation-settings: 'SOFT' 50, 'opsz' 18; white-space: nowrap;">Meditations</div>
+      <div style="font-size: 11px; line-height: 15px; font-weight: 600; letter-spacing: 0.12em; color: #9B9BA3; white-space: nowrap;">BOOK II · §1</div>
+    </div>
+    <button aria-label="Text settings" class="dircR-press" style="position: absolute; left: 196px; top: 14px; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #FFFFFF; font-family: 'Fraunces', serif; font-size: 19px; font-weight: 500; font-variation-settings: 'opsz' 24;">A<span style="font-size: 14px;">a</span></button>
+    <button aria-label="Search in book" class="dircR-press" style="position: absolute; left: 240px; top: 14px; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+      <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: none; stroke: #FFFFFF; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;">
+        <circle cx="10.5" cy="10.5" r="6.5"></circle>
+        <path d="M15.5 15.5L20.5 20.5"></path>
+      </svg>
+    </button>
+    <a href="#learn" class="dircR-press" aria-label="Learn: 38 cards from this book" style="position: absolute; left: 288px; top: 14px; width: 88px; height: 44px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+      <span style="height: 36px; box-sizing: border-box; padding: 0 10px 0 8px; display: flex; align-items: center; gap: 6px; border: 1px solid #3A3A42; border-radius: 4px; color: #FFFFFF; font-size: 13.5px; font-weight: 600; box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);">
+        <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: #7AA8FF; stroke-width: 2.4;" aria-hidden="true">
+          <circle cx="12" cy="12" r="6.5"></circle>
+          <circle cx="12" cy="12" r="1.6" style="fill: #7AA8FF; stroke: none;"></circle>
+        </svg>
+        Learn
+      </span>
+    </a>
+  </div>
+
+  <!-- ============ DOCK (on the lacquer, below the page) ============ -->
+  <!-- progress: the book's fore-edge seen from above; the ribbon is where you are -->
+  <div style="position: absolute; left: 24px; top: 694px; width: 342px; height: 44px;">
+    <svg viewBox="0 0 342 30" style="position: absolute; left: 0; top: 0; width: 342px; height: 30px; display: block; overflow: visible;" aria-hidden="true">
+      <defs>
+        <pattern id="dircR-pages-read" x="0" y="0" width="2" height="12" patternUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="2" height="12" style="fill: #CFC6B2;"></rect>
+          <rect x="1.4" y="0" width="0.6" height="12" style="fill: #8F8776;"></rect>
+        </pattern>
+        <pattern id="dircR-pages-ahead" x="0" y="0" width="2" height="12" patternUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="2" height="12" style="fill: #2A2A30;"></rect>
+          <rect x="1.4" y="0" width="0.6" height="12" style="fill: #18181C;"></rect>
+        </pattern>
+      </defs>
+      <rect x="0" y="8" width="140" height="12" style="fill: url(#dircR-pages-read);"></rect>
+      <rect x="140" y="8" width="202" height="12" style="fill: url(#dircR-pages-ahead);"></rect>
+      <!-- chapter ticks: thumb-index cuts on the head edge -->
+      <path d="M109 8 V4 M133 8 V4 M156 8 V4 M174 8 V4 M201 8 V4 M222 8 V4 M244 8 V4 M267 8 V4 M287 8 V4 M302 8 V4 M318 8 V4 M330 8 V4" style="stroke: #6E6E76; stroke-width: 1;"></path>
+      <path d="M133 8 V2.5 M156 8 V2.5" style="stroke: #FFFFFF; stroke-width: 1.2;"></path>
+      <text x="144.5" y="3.6" style="font-family: 'Fraunces', serif; font-size: 7.5px; font-weight: 600; fill: #FFFFFF; text-anchor: middle;">II</text>
+      <!-- ribbon marker -->
+      <path d="M137 2 H143 V28 L140 24.6 L137 28 Z" style="fill: #4D8BFF;"></path>
+      <rect x="137" y="7" width="6" height="1" style="fill: #FFFFFF; opacity: 0.5;"></rect>
+    </svg>
+    <div style="position: absolute; left: 0; top: 30px; width: 342px; display: flex; justify-content: space-between; font-size: 11.5px; line-height: 14px; color: #9B9BA3;">
+      <span><span style="color: #FFFFFF; font-weight: 600;">41%</span> through the book</span>
+      <span><span style="color: #FFFFFF; font-weight: 600;">18 min</span> left in Book II</span>
+    </div>
+  </div>
+
+  <!-- transport -->
+  <a href="#voice" class="dircR-press" aria-label="Narrator: Ava" style="position: absolute; left: 24px; top: 746px; width: 64px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid #2A2A30; border-radius: 4px; text-decoration: none; color: #D9D9DE; font-size: 13px; font-weight: 600;">
+    <svg class="dircR-live" viewBox="0 0 16 16" style="width: 13px; height: 13px; fill: none; stroke: #7AA8FF; stroke-width: 1.7; stroke-linecap: round;" aria-hidden="true">
+      <path d="M2.5 7v2M5.5 4.5v7M8.5 2.5v11M11.5 5.5v5M14 7.2v1.6"></path>
+    </svg>
+    Ava
+  </a>
+  <button aria-label="Previous sentence" class="dircR-press" style="position: absolute; left: 107px; top: 746px; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+    <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: #FFFFFF; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;">
+      <path d="M6 5.5v13"></path>
+      <path d="M18 5.5l-8 6.5 8 6.5"></path>
+    </svg>
+  </button>
+  <button aria-label="Pause" class="dircR-press" style="position: absolute; left: 165px; top: 740px; width: 60px; height: 56px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+    <span style="width: 56px; height: 56px; border-radius: 50%; background-color: #ECE6D9; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -2px 0 rgba(0,0,0,0.18), 0 2px 0 rgba(0,0,0,0.9);">
+      <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: #0E0E10; stroke: none;">
+        <rect x="6.5" y="5" width="3.8" height="14" rx="1"></rect>
+        <rect x="13.7" y="5" width="3.8" height="14" rx="1"></rect>
+      </svg>
+    </span>
+  </button>
+  <button aria-label="Next sentence" class="dircR-press" style="position: absolute; left: 239px; top: 746px; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+    <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: #FFFFFF; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;">
+      <path d="M18 5.5v13"></path>
+      <path d="M6 5.5l8 6.5-8 6.5"></path>
+    </svg>
+  </button>
+  <button aria-label="Playback speed 1.4 times" class="dircR-press" style="position: absolute; left: 302px; top: 746px; width: 64px; height: 44px; box-sizing: border-box; border: 1px solid #2A2A30; border-radius: 4px; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #FFFFFF; font-family: 'Fraunces', serif; font-size: 16px; font-weight: 500; font-variation-settings: 'opsz' 18;">1.4×</button>
+
+  <!-- mode switch: Read / Read + Listen / Listen -->
+  <div role="radiogroup" aria-label="Mode" style="position: absolute; left: 24px; top: 796px; width: 342px; height: 44px; box-sizing: border-box; border: 1px solid #2A2A30; border-radius: 5px; display: flex; padding: 3px; gap: 3px; background-color: #0A0A0B;">
+    <button role="radio" aria-checked="false" class="dircR-press" style="flex: 1; border: 0; border-radius: 3px; background: transparent; color: #9B9BA3; font-family: 'Albert Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; padding: 0;">Read</button>
+    <button role="radio" aria-checked="true" class="dircR-press" style="flex: 1.5; border: 0; border-radius: 3px; background-color: #ECE6D9; color: #0E0E10; font-family: 'Albert Sans', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; padding: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -1px 0 rgba(0,0,0,0.2);">Read + Listen</button>
+    <button role="radio" aria-checked="false" class="dircR-press" style="flex: 1; border: 0; border-radius: 3px; background: transparent; color: #9B9BA3; font-family: 'Albert Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; padding: 0;">Listen</button>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
