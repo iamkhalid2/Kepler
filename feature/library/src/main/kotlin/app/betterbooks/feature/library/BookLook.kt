@@ -32,11 +32,7 @@ fun spineBucketFor(sentenceCount: Int): SpineBucket = when {
 fun spineThicknessUnits(sentenceCount: Int): Float = BOOK_W * spineBucketFor(sentenceCount).fraction
 
 /** A stable material index for a book id: the same book always gets the same cloth. */
-fun materialIndexFor(id: Long, count: Int): Int {
-    var h = id * -0x61c8864680b583ebL
-    h = h xor (h ushr 32)
-    return ((h and 0x7fffffffL) % count).toInt()
-}
+fun materialIndexFor(id: Long, count: Int): Int = app.betterbooks.core.designsystem.bookMaterialIndex(id, count)
 
 fun materialFor(book: Book, materials: List<BookMaterial>): BookMaterial =
     materials[materialIndexFor(book.id, materials.size)]

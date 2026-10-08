@@ -139,4 +139,7 @@
     <string name="export_action">Export</string>
     <string name="export_saved">Saved %1$s</string>
     <string name="export_failed">The file was not saved.</string>
+    <string name="back">Back</string>
+    <string name="send">Send</string>
+    <string name="concept_map">Concept map</string>
 </resources>

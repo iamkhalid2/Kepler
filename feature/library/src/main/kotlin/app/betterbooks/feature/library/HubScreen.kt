@@ -1,7 +1,7 @@
 package app.betterbooks.feature.library
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -32,6 +32,8 @@ import app.betterbooks.core.designsystem.BbPrimaryKey
 import app.betterbooks.core.designsystem.BbRing
 import app.betterbooks.core.designsystem.BbSecondaryKey
 import app.betterbooks.core.designsystem.BbTextLink
+import app.betterbooks.core.designsystem.HapticToken
+import app.betterbooks.core.designsystem.rememberHaptics
 import app.betterbooks.core.designsystem.BbType
 import app.betterbooks.core.designsystem.BookPose
 import app.betterbooks.core.designsystem.BookRibbons
@@ -54,12 +56,16 @@ fun HubRoute(
     onSetup: () -> Unit,
     onBack: () -> Unit,
     deps: LibraryDeps = LocalLibraryDeps.current,
+    onLearnAt: (HubLearnEntry) -> Unit = { onLearn() },
 ) {
     val vm = libraryViewModel(key = "hub-$bookId") { HubViewModel(deps, bookId) }
     val ui by vm.state.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
-    HubScreen(ui, onRead, onListen, onLearn, onSetup, onBack)
+    HubScreen(ui, onRead, onListen, onLearn, onSetup, onBack, onLearnAt)
 }
+
+/** Lines of the hub's Learn contents page. Names match `LearnTab` in :feature:study (map with `LearnTab.valueOf(entry.name)`). */
+enum class HubLearnEntry { ASK, RECAP, CONCEPTS, MAP, TAKEAWAYS }
 
 @Composable
 fun HubScreen(
@@ -69,6 +75,7 @@ fun HubScreen(
     onLearn: () -> Unit,
     onSetup: () -> Unit,
     onBack: () -> Unit,
+    onLearnAt: (HubLearnEntry) -> Unit = { onLearn() },
 ) {
     val p = Bb.palette
     val book = ui.book
@@ -89,28 +96,74 @@ fun HubScreen(
                 val primaryIsListen = ui.primary == HubMode.Listen
                 BbPrimaryKey(if (primaryIsListen) listenLabel else readLabel, if (primaryIsListen) onListen else onRead)
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    BbSecondaryKey(
-                        stringResource(if (primaryIsListen) R.string.read else R.string.listen),
-                        if (primaryIsListen) onRead else onListen, Modifier.weight(1f),
-                    )
-                    BbSecondaryKey(stringResource(R.string.learn), onLearn, Modifier.weight(1f))
-                }
+                BbSecondaryKey(
+                    stringResource(if (primaryIsListen) R.string.read else R.string.listen),
+                    if (primaryIsListen) onRead else onListen, Modifier.fillMaxWidth(),
+                )
             }
             Spacer(Modifier.height(24.dp))
             BbHairline()
             NarrationLine(ui, onSetup)
             BbHairline()
-            Row(
-                Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(R.string.cards), color = p.text, style = BbType.rowTitle, modifier = Modifier.weight(1f))
-                Text(ui.cardCount.toString(), color = p.text, style = BbType.numeral)
-            }
-            BbHairline()
+            Spacer(Modifier.height(32.dp))
+            LearnContents(book, ui.cardCount, onLearnAt)
             Spacer(Modifier.height(32.dp))
         }
+    }
+}
+
+/** Learn as a contents page: entries with dotted leaders and right captions that name the fence. */
+@Composable
+private fun LearnContents(book: Book, cardCount: Int, onLearnAt: (HubLearnEntry) -> Unit) {
+    val p = Bb.palette
+    val haptics = rememberHaptics()
+    val reached = maxOf(book.readFraction, book.listenFraction)
+    val fence = when {
+        book.contentType == ContentType.NONFICTION -> stringResource(R.string.learn_whole_book)
+        reached < 0.005f -> stringResource(R.string.learn_not_started)
+        else -> stringResource(R.string.learn_up_to, percentOf(reached))
+    }
+    val recapCaption = if (reached < 0.005f) stringResource(R.string.learn_not_started) else stringResource(R.string.learn_up_to, percentOf(reached))
+    val entries = listOf(
+        Triple(HubLearnEntry.ASK, R.string.learn_ask, fence),
+        Triple(HubLearnEntry.RECAP, R.string.learn_recap, recapCaption),
+        Triple(HubLearnEntry.CONCEPTS, R.string.learn_concepts, fence),
+        Triple(HubLearnEntry.MAP, R.string.learn_map, fence),
+        Triple(HubLearnEntry.TAKEAWAYS, R.string.learn_takeaways, stringResource(R.string.learn_by_chapter)),
+    )
+    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.Bottom) {
+        BbCaps(stringResource(R.string.learn_caps), Modifier.weight(1f))
+        if (cardCount > 0) {
+            Text(
+                androidx.compose.ui.res.pluralStringResource(R.plurals.learn_cards, cardCount, cardCount),
+                color = p.text2, style = BbType.caption,
+            )
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    entries.forEach { (entry, title, caption) ->
+        Row(
+            Modifier.fillMaxWidth().height(56.dp)
+                .clickable(role = androidx.compose.ui.semantics.Role.Button) { haptics.play(HapticToken.Tap); onLearnAt(entry) }
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(title), color = p.text, style = BbType.title, maxLines = 1)
+            DottedLeader(Modifier.weight(1f).padding(horizontal = 8.dp).padding(top = 10.dp))
+            Text(caption, color = p.text2, style = BbType.caption, maxLines = 1)
+        }
+    }
+}
+
+/** A contents-page leader: 1 dp dots every 5 dp in `hairline`-strength text2. */
+@Composable
+private fun DottedLeader(modifier: Modifier) {
+    val c = Bb.palette.text2.copy(alpha = 0.5f)
+    androidx.compose.foundation.Canvas(modifier.height(2.dp)) {
+        val step = 5.dp.toPx()
+        val r = 0.6.dp.toPx()
+        var x = r
+        while (x < size.width) { drawCircle(c, r, androidx.compose.ui.geometry.Offset(x, size.height / 2f)); x += step }
     }
 }
 

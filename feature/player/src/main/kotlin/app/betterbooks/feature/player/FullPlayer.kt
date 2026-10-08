@@ -152,7 +152,7 @@ fun FullPlayerRoute(
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BbSecondaryKey(
-                        stringResource(R.string.player_speed) + " " + PlayerFormat.speed(speed),
+                        PlayerFormat.speed(speed),
                         { sheet = PlayerSheet.Speed }, Modifier.weight(1f),
                     )
                     BbSecondaryKey(

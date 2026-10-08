@@ -60,9 +60,16 @@ import androidx.compose.ui.unit.sp
 import app.betterbooks.core.designsystem.Bb
 import app.betterbooks.core.designsystem.BbFonts
 import app.betterbooks.core.designsystem.BbPalette
+import app.betterbooks.core.designsystem.BbPrimaryKey
+import app.betterbooks.core.designsystem.BbSecondaryKey
+import app.betterbooks.core.designsystem.BbSegmented
+import app.betterbooks.core.designsystem.BbTextLink
+import app.betterbooks.core.designsystem.BbType
+import app.betterbooks.core.designsystem.HapticToken
+import app.betterbooks.core.designsystem.rememberHaptics
 
 // Shelf design language pieces used by the reader (docs/design/DESIGN-BRIEF.md §1, §2, §4).
-// Kept local until :core:designsystem ships shared components; the design lead may lift them.
+// Keys, links and the segmented control delegate to :core:designsystem so the reader inherits bevels and haptics.
 
 /** Springs from the brief §4. */
 internal object ReaderMotion {
@@ -73,21 +80,11 @@ internal object ReaderMotion {
         if (reduced) tween(120) else spring(dampingRatio = 0.9f, stiffness = 400f)
 }
 
+/** App setting or a system animator scale of 0. */
 @Composable
-internal fun rememberReducedMotion(): Boolean {
-    val context = LocalContext.current
-    return remember {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
-}
-
-/** Interface key colours. The palette has no `key` token yet: the key is the strongest neutral. */
-internal val BbPalette.key: Color get() = text
-internal val BbPalette.onKey: Color get() = bg
+internal fun rememberReducedMotion(): Boolean = app.betterbooks.core.designsystem.rememberReducedMotion()
 
 internal object ReaderType {
-    private val tnum = "tnum"
-
     fun caps(color: Color, size: Float = 11f, tracking: Float = 0.14f) = TextStyle(
         fontFamily = BbFonts.ui, fontWeight = FontWeight.W600, fontSize = size.sp,
         lineHeight = 14.sp, letterSpacing = tracking.em, color = color,
@@ -110,87 +107,31 @@ internal object ReaderType {
         textAlign = TextAlign.Center,
     )
 
-    fun title(color: Color, size: Float = 16f) = TextStyle(
-        fontFamily = BbFonts.displaySmall, fontWeight = FontWeight.W400, fontSize = size.sp,
-        lineHeight = (size + 4).sp, color = color,
-    )
+    fun title(color: Color, size: Float = 16f) = BbType.title.copy(fontSize = size.sp, lineHeight = (size + 4).sp, color = color)
 
     fun headline(color: Color) = TextStyle(
         fontFamily = BbFonts.display, fontWeight = FontWeight(360), fontSize = 26.sp, lineHeight = 30.sp, color = color,
     )
 
-    fun numeral(color: Color, size: Float = 13f) = TextStyle(
-        fontFamily = BbFonts.displaySmall, fontWeight = FontWeight.W400, fontSize = size.sp,
-        fontFeatureSettings = tnum, color = color,
-    )
+    fun numeral(color: Color, size: Float = 13f) = BbType.numeral.copy(fontSize = size.sp, lineHeight = (size + 4).sp, color = color)
 
     fun prose(color: Color) = TextStyle(
         fontFamily = BbFonts.reading, fontWeight = FontWeight.W400, fontSize = 16.sp, lineHeight = 26.sp, color = color,
     )
 }
 
-/** Primary key: `key` fill with the bevel from the brief; pressed inverts the bevel. */
+/** Primary key from :core:designsystem (bevel, haptics, disabled state). */
 @Composable
-internal fun PrimaryKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, height: Dp = 52.dp) {
-    val p = Bb.palette
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val drop = if (p.isDark) 0.9f else 0.25f
-    Box(
-        modifier
-            .heightIn(min = height)
-            .widthIn(min = 120.dp)
-            .drawBehind {
-                val r = CornerRadius(4.dp.toPx())
-                val px = 1.dp.toPx()
-                if (!pressed) drawRoundRect(Color.Black.copy(alpha = drop), Offset(0f, 2.dp.toPx()), size, r)
-                drawRoundRect(p.key, cornerRadius = r)
-                val top = if (pressed) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.7f)
-                val bottom = if (pressed) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.2f)
-                drawRect(top, Offset(r.x, 0f), Size(size.width - 2 * r.x, px))
-                drawRect(bottom, Offset(r.x, size.height - px), Size(size.width - 2 * r.x, px))
-            }
-            .clickable(source, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        BasicText(text, style = ReaderType.keyLabel(p.onKey, 15f), maxLines = 1)
-    }
-}
+internal fun PrimaryKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) =
+    BbPrimaryKey(text, onClick, modifier, enabled = enabled, fullWidth = false)
 
 @Composable
-internal fun SecondaryKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val p = Bb.palette
-    val shape = RoundedCornerShape(4.dp)
-    val lip = if (p.isDark) 0.07f else 0.9f
-    Box(
-        modifier
-            .heightIn(min = 48.dp)
-            .widthIn(min = 84.dp)
-            .clip(shape)
-            .background(p.surface1)
-            .border(1.dp, p.hairline, shape)
-            .drawBehind { drawRect(Color.White.copy(alpha = lip), size = Size(size.width, 1.dp.toPx())) }
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        BasicText(text, style = ReaderType.keyLabel(p.text), maxLines = 1)
-    }
-}
+internal fun SecondaryKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) =
+    BbSecondaryKey(text, onClick, modifier)
 
 @Composable
-internal fun TextLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .heightIn(min = 48.dp)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        BasicText(text, style = ReaderType.keyLabel(Bb.palette.accentText))
-    }
-}
+internal fun TextLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) =
+    BbTextLink(text, onClick, modifier.padding(horizontal = 8.dp))
 
 @Composable
 internal fun Hairline(modifier: Modifier = Modifier) {
@@ -198,57 +139,19 @@ internal fun Hairline(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(1.dp).background(c))
 }
 
-/** Segmented control: `surface1` track with a hairline; the active segment is a small primary key. */
 @Composable
-internal fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val p = Bb.palette
-    val shape = RoundedCornerShape(4.dp)
-    Row(
-        modifier
-            .height(48.dp)
-            .clip(shape)
-            .background(p.surface1)
-            .border(1.dp, p.hairline, shape)
-            .padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        options.forEachIndexed { i, label ->
-            val active = i == selected
-            Box(
-                Modifier
-                    .weight(if (active) 1.5f else 1f)
-                    .fillMaxHeight()
-                    .then(
-                        if (active) {
-                            Modifier.drawBehind {
-                                val r = CornerRadius(3.dp.toPx())
-                                drawRoundRect(p.key, cornerRadius = r)
-                                drawRect(Color.White.copy(alpha = 0.7f), Offset(r.x, 0f), Size(size.width - 2 * r.x, 1.dp.toPx()))
-                            }
-                        } else {
-                            Modifier
-                        },
-                    )
-                    .clickable(role = Role.Tab) { onSelect(i) },
-                contentAlignment = Alignment.Center,
-            ) {
-                BasicText(
-                    label, style = ReaderType.keyLabel(if (active) p.onKey else p.text2, 13f),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
+internal fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) =
+    BbSegmented(options, selected, onSelect, modifier)
 
 /** A 48 dp square target holding a small line glyph drawn in [color]. */
 @Composable
 internal fun GlyphKey(description: String, onClick: () -> Unit, glyph: Glyph, color: Color) {
+    val haptics = rememberHaptics()
     Box(
         Modifier
             .size(48.dp)
             .semantics { contentDescription = description }
-            .clickable(role = Role.Button, onClick = onClick),
+            .clickable(role = Role.Button) { haptics.play(HapticToken.Tap); onClick() },
         contentAlignment = Alignment.Center,
     ) {
         if (glyph == Glyph.Typography) {
@@ -315,12 +218,7 @@ internal fun ReaderSheet(
                     .then(if (tall) Modifier.fillMaxHeight(0.92f) else Modifier.heightIn(max = 640.dp))
                     .clip(shape)
                     .background(p.surface1)
-                    .drawBehind {
-                        drawRect(
-                            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent)),
-                            size = Size(size.width, 1.5.dp.toPx()),
-                        )
-                    }
+                    .drawBehind { sheetLip(p.isDark, p.hairline) }
                     .clickable(remember { MutableInteractionSource() }, indication = null) {}
                     .navigationBarsPadding(),
             ) {
@@ -343,7 +241,8 @@ internal fun ReaderRow(
     separator: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    val haptics = rememberHaptics()
+    Column(modifier.fillMaxWidth().clickable(role = Role.Button) { haptics.play(HapticToken.Tap); onClick() }) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = minHeight).padding(start = indent, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -351,4 +250,14 @@ internal fun ReaderRow(
         )
         if (separator) Hairline(Modifier.padding(start = indent))
     }
+}
+
+/** Plank lip on a sheet's top edge; in light mode it sits over a 0.5 dp seam so it still reads. */
+internal fun androidx.compose.ui.graphics.drawscope.DrawScope.sheetLip(dark: Boolean, seam: Color) {
+    if (!dark) drawRect(seam, size = Size(size.width, 0.5.dp.toPx()))
+    drawRect(
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) 0.10f else 0.6f), Color.Transparent), endY = 6.dp.toPx()),
+        topLeft = Offset(0f, if (dark) 0f else 0.5.dp.toPx()),
+        size = Size(size.width, 6.dp.toPx()),
+    )
 }

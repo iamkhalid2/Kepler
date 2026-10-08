@@ -124,26 +124,22 @@ private fun CapsLine(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun BackKey(onClick: () -> Unit) {
-    val c = Bb.palette.text
-    Box(Modifier.size(48.dp).semantics { contentDescription = "Back" }.clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(20.dp).drawBehind {
-            val w = 1.6.dp.toPx(); val sz = size.minDimension
-            drawLine(c, Offset(sz * .62f, sz * .18f), Offset(sz * .3f, sz * .5f), w, StrokeCap.Round)
-            drawLine(c, Offset(sz * .3f, sz * .5f), Offset(sz * .62f, sz * .82f), w, StrokeCap.Round)
-        })
-    }
-}
+internal fun BackKey(onClick: () -> Unit) =
+    app.betterbooks.core.designsystem.BbIconKey(app.betterbooks.core.designsystem.BbIconKind.Back, stringResource(R.string.back), onClick)
 
 /** Scrolling caps tabs; the active one reads `text` with a 12x2 accent rule above. */
 @Composable
 private fun TabStrip(selected: LearnTab, onSelect: (LearnTab) -> Unit) {
     val p = Bb.palette
+    val haptics = app.betterbooks.core.designsystem.rememberHaptics()
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
         LearnTab.entries.forEach { t ->
             val active = t == selected
             Box(
-                Modifier.heightIn(min = 48.dp).clickable(role = Role.Tab) { onSelect(t) }.padding(horizontal = 12.dp)
+                Modifier.heightIn(min = 48.dp).clickable(role = Role.Tab) {
+                    if (!active) haptics.play(app.betterbooks.core.designsystem.HapticToken.Tap)
+                    onSelect(t)
+                }.padding(horizontal = 12.dp)
                     .drawBehind { if (active) drawRect(p.accent, Offset(0f, 6.dp.toPx()), Size(12.dp.toPx(), 2.dp.toPx())) },
                 contentAlignment = Alignment.Center,
             ) { BasicText(stringResource(t.label).uppercase(), style = StudyType.caps(if (active) p.text else p.text2)) }
@@ -163,6 +159,8 @@ private fun AskTab(s: LearnState, vm: LearnViewModel, onJumpTo: (Int) -> Unit, o
         if (n > 0) listState.animateScrollToItem(n - 1)
     }
     val suggestionTexts = vm.suggestions().map { stringResource(suggestionRes(it)) }
+    val sendLabel = stringResource(R.string.send)
+    val haptics = app.betterbooks.core.designsystem.rememberHaptics()
     Column(Modifier.fillMaxSize().imePadding()) {
         FenceRow(s.fence, Modifier.padding(horizontal = 24.dp))
         Hairline(Modifier.padding(horizontal = 24.dp))
@@ -199,12 +197,15 @@ private fun AskTab(s: LearnState, vm: LearnViewModel, onJumpTo: (Int) -> Unit, o
             Box(
                 Modifier.size(52.dp).drawBehind {
                     drawRoundRect(if (canSend) p.key else p.surface2, cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
+                    if (canSend) drawRect(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), Offset(4.dp.toPx(), 0f), Size(size.width - 8.dp.toPx(), 1.dp.toPx()))
                     val c = if (canSend) p.onKey else p.text2
                     val w = 1.8.dp.toPx(); val cx = size.width / 2; val cy = size.height / 2
                     drawLine(c, Offset(cx, cy + 8.dp.toPx()), Offset(cx, cy - 8.dp.toPx()), w, StrokeCap.Round)
                     drawLine(c, Offset(cx, cy - 8.dp.toPx()), Offset(cx - 6.dp.toPx(), cy - 2.dp.toPx()), w, StrokeCap.Round)
                     drawLine(c, Offset(cx, cy - 8.dp.toPx()), Offset(cx + 6.dp.toPx(), cy - 2.dp.toPx()), w, StrokeCap.Round)
-                }.semantics { contentDescription = "Send" }.clickable(enabled = canSend, role = Role.Button) { vm.ask(draft); draft = "" },
+                }.semantics { contentDescription = sendLabel }.clickable(enabled = canSend, role = Role.Button) {
+                    haptics.play(app.betterbooks.core.designsystem.HapticToken.Confirm); vm.ask(draft); draft = ""
+                },
             )
         }
     }

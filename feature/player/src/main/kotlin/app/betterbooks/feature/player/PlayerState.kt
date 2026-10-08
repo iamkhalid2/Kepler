@@ -61,10 +61,10 @@ internal fun rememberCover(path: String?): ImageBitmap? {
     return image
 }
 
-/** The same material every time for a given book; the shared source of truth for this is the library. */
+/** The same cloth the library shelf gives this book (rule lives in :core:designsystem). */
 internal fun materialFor(bookId: BookId?, palette: BbPalette): BookMaterial {
     val all = bookMaterials(palette)
-    return all[Math.floorMod((bookId ?: 0L).hashCode(), all.size)]
+    return all[app.betterbooks.core.designsystem.bookMaterialIndex(bookId ?: 0L, all.size)]
 }
 
 internal fun bookSpec(

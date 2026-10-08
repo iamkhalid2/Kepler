@@ -74,6 +74,13 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.betterbooks.core.designsystem.Bb
+import app.betterbooks.core.designsystem.HapticToken
+import app.betterbooks.core.designsystem.SilkRibbon
+import app.betterbooks.core.designsystem.rememberHaptics
+import app.betterbooks.core.designsystem.rememberRibbonSwing
+import app.betterbooks.core.designsystem.LocalBbPalette
+import app.betterbooks.core.designsystem.paperPalette
+import androidx.compose.runtime.CompositionLocalProvider
 import app.betterbooks.core.model.BookId
 import app.betterbooks.core.model.ReaderMode
 import app.betterbooks.engine.epub.reader.ReaderEvent
@@ -273,6 +280,9 @@ private fun ReaderScreen(
     val ink = Color(style.inkColor)
     val chapter = ordinal?.let(ready.index::chapterAt)
 
+    // Chrome, sheets and the transport are cut from the page's own paper.
+    val paper = remember(p.seed, page, ink, style.isDark) { paperPalette(p.seed, page, ink, style.isDark) }
+    CompositionLocalProvider(LocalBbPalette provides paper) {
     Box(Modifier.fillMaxSize().background(page)) {
         // Running head and folio sit outside the WebView and are never transformed.
         Row(
@@ -348,7 +358,7 @@ private fun ReaderScreen(
                 }
             }
             if (listening) {
-                Column(Modifier.fillMaxWidth().background(p.bg)) {
+                Column(Modifier.fillMaxWidth().background(page)) {
                     Hairline()
                     transport()
                     if (!chrome) Spacer(Modifier.navigationBarsPadding())
@@ -439,6 +449,7 @@ private fun ReaderScreen(
                 )
             }
         }
+    }
     }
 }
 
@@ -571,6 +582,7 @@ private enum class SelectionAction { Highlight, Explain, Ask, Card, Define }
 @Composable
 private fun SelectionStrip(yPx: Float, onAction: (SelectionAction) -> Unit) {
     val p = Bb.palette
+    val haptics = rememberHaptics()
     val labels = listOf(
         SelectionAction.Highlight to stringResource(R.string.reader_sel_highlight),
         SelectionAction.Explain to stringResource(R.string.reader_sel_explain),
@@ -587,7 +599,8 @@ private fun SelectionStrip(yPx: Float, onAction: (SelectionAction) -> Unit) {
                     drawRect(Color.Black.copy(alpha = if (p.isDark) 0.9f else 0.25f), Offset(0f, 2.dp.toPx()), size)
                 }
                 .clip(RoundedCornerShape(4.dp))
-                .background(p.key),
+                .background(p.key)
+                .drawBehind { drawRect(Color.White.copy(alpha = 0.7f), Offset(4.dp.toPx(), 0f), Size(size.width - 8.dp.toPx(), 1.dp.toPx())) },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             labels.forEachIndexed { i, (action, label) ->
@@ -595,7 +608,10 @@ private fun SelectionStrip(yPx: Float, onAction: (SelectionAction) -> Unit) {
                 Box(
                     Modifier
                         .height(48.dp)
-                        .clickable(role = Role.Button) { onAction(action) }
+                        .clickable(role = Role.Button) {
+                            haptics.play(if (action == SelectionAction.Highlight) HapticToken.Confirm else HapticToken.Tap)
+                            onAction(action)
+                        }
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -610,6 +626,7 @@ private fun SelectionStrip(yPx: Float, onAction: (SelectionAction) -> Unit) {
 @Composable
 private fun Bookmark(marked: Boolean, chrome: Boolean, reduced: Boolean, onToggle: () -> Unit) {
     val p = Bb.palette
+    val haptics = rememberHaptics()
     val drop by animateDpAsState(if (chrome) 56.dp else 0.dp, ReaderMotion.snap(reduced), label = "ribbon")
     if (!marked && !chrome) return
     val label = stringResource(if (marked) R.string.reader_bookmark_remove else R.string.reader_bookmark_add)
@@ -619,22 +636,23 @@ private fun Bookmark(marked: Boolean, chrome: Boolean, reduced: Boolean, onToggl
                 .padding(end = 14.dp)
                 .size(48.dp, 64.dp)
                 .semantics { contentDescription = label }
-                .clickable(role = Role.Button, onClick = onToggle),
+                .clickable(role = Role.Button) { haptics.play(if (marked) HapticToken.Tap else HapticToken.Confirm); onToggle() },
             contentAlignment = Alignment.TopCenter,
         ) {
-            Canvas(Modifier.size(14.dp, 56.dp)) {
-                val notch = size.width * 0.7f / 2
-                val path = Path().apply {
-                    moveTo(0f, 0f)
-                    lineTo(size.width, 0f)
-                    lineTo(size.width, size.height)
-                    lineTo(size.width / 2, size.height - notch)
-                    lineTo(0f, size.height)
-                    close()
-                }
-                if (marked) {
-                    drawPath(path, p.accent)
-                } else {
+            if (marked) {
+                // A silk ribbon that swings once when it is laid in; nothing loops.
+                SilkRibbon(p.materials.silk, rememberRibbonSwing(marked), 14.dp, 56.dp, foldAt = 0.dp)
+            } else {
+                Canvas(Modifier.size(14.dp, 56.dp)) {
+                    val notch = size.width * 0.7f / 2
+                    val path = Path().apply {
+                        moveTo(0f, 0f)
+                        lineTo(size.width, 0f)
+                        lineTo(size.width, size.height)
+                        lineTo(size.width / 2, size.height - notch)
+                        lineTo(0f, size.height)
+                        close()
+                    }
                     drawPath(path, p.text2, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
                 }
             }

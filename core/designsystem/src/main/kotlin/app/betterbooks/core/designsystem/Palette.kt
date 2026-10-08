@@ -177,3 +177,10 @@ fun bookMaterials(p: BbPalette): List<BookMaterial> {
 
 /** Per-book cloth: the same rule used for the accent cloth, usable on any base colour. */
 fun clothFor(base: Color, p: BbPalette): Cloth = clothFor(base, p.isDark)
+
+/** The cloth a book wears: a stable index from its id, shared by every screen that draws the book. */
+fun bookMaterialIndex(id: Long, count: Int): Int {
+    var h = id * -0x61c8864680b583ebL
+    h = h xor (h ushr 32)
+    return ((h and 0x7fffffffL) % count).toInt()
+}

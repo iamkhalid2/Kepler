@@ -159,4 +159,32 @@
     <string name="version_x">Version %1$s</string>
     <string name="about_license">BetterBooks is free software under the GNU General Public License, version 3. You may use, study, share and change it under that licence.</string>
     <string name="about_fonts">Fraunces, Literata and Albert Sans are used under the SIL Open Font License.</string>
+    <string name="learn_caps">Learn</string>
+    <string name="learn_ask">Ask the book</string>
+    <string name="learn_recap">Recap</string>
+    <string name="learn_concepts">Concepts and people</string>
+    <string name="learn_map">Map</string>
+    <string name="learn_takeaways">Takeaways</string>
+    <string name="learn_whole_book">whole book</string>
+    <string name="learn_up_to">up to %1$d%%</string>
+    <string name="learn_not_started">from the first page</string>
+    <string name="learn_by_chapter">by chapter</string>
+    <plurals name="learn_cards">
+        <item quantity="one">%1$d card</item>
+        <item quantity="other">%1$d cards</item>
+    </plurals>
+    <string name="home_morning">Good morning</string>
+    <string name="home_afternoon">Good afternoon</string>
+    <string name="home_evening">Good evening</string>
+    <string name="home_listening">Listening</string>
+    <string name="home_reading">Reading</string>
+    <string name="home_through">%1$d%% through</string>
+    <string name="home_not_started">Not started yet</string>
+    <string name="home_previously_on">Previously on</string>
+    <string name="home_days_away">A short recap after %1$d days away</string>
+    <string name="home_daily_review">Daily review</string>
+    <string name="home_due">%1$d due · about %2$d min</string>
+    <string name="home_start">Start</string>
+    <string name="home_binding">Binding narration %1$d%%</string>
+    <string name="home_empty_title">Add your first book</string>
 </resources>

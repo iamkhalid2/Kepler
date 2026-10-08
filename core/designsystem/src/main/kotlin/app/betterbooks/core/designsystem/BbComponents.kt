@@ -88,9 +88,9 @@ fun BbNumeral(text: String, modifier: Modifier = Modifier, color: Color = Bb.pal
 // ---------------------------------------------------------------- keys
 
 /** Key bevel: inset top/bottom lines and a hard 2 dp drop. Pressed inverts the insets and drops the shadow. */
-private fun Modifier.bevel(fill: Color, pressed: Boolean, topInset: Color, bottomInset: Color, drop: Color?): Modifier =
+private fun Modifier.bevel(fill: Color, pressed: Boolean, topInset: Color, bottomInset: Color, drop: Color?, radius: Dp = 4.dp): Modifier =
     drawBehind {
-        val r = CornerRadius(4.dp.toPx())
+        val r = CornerRadius(radius.toPx())
         if (drop != null && !pressed) drawRoundRect(drop, Offset(0f, 2.dp.toPx()), size, r)
         drawRoundRect(fill, Offset.Zero, size, r)
         val inset = 4.dp.toPx()
@@ -300,7 +300,7 @@ fun BbSegmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, m
             Box(
                 Modifier.weight(if (on) 1.5f else 1f).fillMaxHeight()
                     .then(
-                        if (on) Modifier.bevel(p.key, false, Color.White.copy(alpha = 0.7f), Color.Black.copy(alpha = 0.2f), null) else Modifier,
+                        if (on) Modifier.bevel(p.key, false, Color.White.copy(alpha = 0.7f), Color.Black.copy(alpha = 0.2f), null, radius = 3.dp) else Modifier,
                     )
                     .clickable(role = Role.Tab) { if (!on) { haptics.play(HapticToken.Tap); onSelect(i) } },
                 contentAlignment = Alignment.Center,
@@ -411,8 +411,10 @@ fun BbSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier, content: @Comp
         tonalElevation = 0.dp,
         dragHandle = {
             Box(Modifier.fillMaxWidth().height(24.dp).drawBehind {
+                // Light mode: the lip sits over a 0.5 dp seam, otherwise white on linen vanishes.
+                if (!p.isDark) drawRect(p.hairline, size = Size(size.width, 0.5.dp.toPx()))
                 drawRect(
-                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent), startY = 0f, endY = 6.dp.toPx()),
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = if (p.isDark) 0.10f else 0.6f), Color.Transparent), startY = 0f, endY = 6.dp.toPx()),
                     size = Size(size.width, 6.dp.toPx()),
                 )
             }, contentAlignment = Alignment.TopCenter) {

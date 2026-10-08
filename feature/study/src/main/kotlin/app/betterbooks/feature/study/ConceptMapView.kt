@@ -69,7 +69,8 @@ fun ConceptMapView(
     val selectedEdges = remember(map, selected) {
         if (selected == null) emptySet() else map.edges.filter { it.from == selected || it.to == selected }.map { it.from to it.to }.toSet()
     }
-    Box(modifier.onSizeChanged { size = it }.semantics { contentDescription = "Concept map" }) {
+    val mapLabel = androidx.compose.ui.res.stringResource(R.string.concept_map)
+    Box(modifier.onSizeChanged { size = it }.semantics { contentDescription = mapLabel }) {
         Canvas(Modifier.matchParentSize()) {
             map.edges.forEach { e ->
                 val a = positions[e.from] ?: return@forEach

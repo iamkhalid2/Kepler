@@ -65,11 +65,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.betterbooks.core.designsystem.Bb
+import app.betterbooks.core.designsystem.BbPrimaryKey
+import app.betterbooks.core.designsystem.BbSecondaryKey
+import app.betterbooks.core.designsystem.BbSegmented
+import app.betterbooks.core.designsystem.BbTextLink
+import app.betterbooks.core.designsystem.BbType
+import app.betterbooks.core.designsystem.HapticToken
+import app.betterbooks.core.designsystem.rememberHaptics
 import app.betterbooks.core.designsystem.BbFonts
 import app.betterbooks.core.designsystem.BbPalette
 
 // Shelf design language pieces for the study screens (docs/design/DESIGN-BRIEF.md §1, §2, §4).
-// Mirrors the reader's local components until :core:designsystem ships shared ones.
+// Keys, links and the segmented control delegate to :core:designsystem (bevels, haptics).
 
 internal object StudyMotion {
     fun <T> snap(reduced: Boolean): FiniteAnimationSpec<T> =
@@ -82,13 +89,9 @@ internal object StudyMotion {
         if (reduced) tween(120) else spring(dampingRatio = 0.86f, stiffness = 380f)
 }
 
+/** App setting or a system animator scale of 0. */
 @Composable
-internal fun rememberReducedMotion(): Boolean {
-    val context = LocalContext.current
-    return remember {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
-}
+internal fun rememberReducedMotion(): Boolean = app.betterbooks.core.designsystem.rememberReducedMotion()
 
 internal object StudyType {
     fun caps(color: Color, size: Float = 11f, tracking: Float = 0.14f) = TextStyle(
@@ -102,22 +105,20 @@ internal object StudyType {
     fun keyLabel(color: Color, size: Float = 14f) =
         TextStyle(fontFamily = BbFonts.ui, fontWeight = FontWeight.W600, fontSize = size.sp, color = color, textAlign = TextAlign.Center)
 
-    fun title(color: Color, size: Float = 19f) =
-        TextStyle(fontFamily = BbFonts.displaySmall, fontWeight = FontWeight.W400, fontSize = size.sp, lineHeight = (size + 5).sp, color = color)
+    fun title(color: Color, size: Float = 19f) = BbType.title.copy(fontSize = size.sp, lineHeight = (size + 5).sp, color = color)
 
     fun headline(color: Color) = TextStyle(fontFamily = BbFonts.display, fontWeight = FontWeight(360), fontSize = 26.sp, lineHeight = 30.sp, color = color)
     fun display(color: Color, size: Float = 28f) =
         TextStyle(fontFamily = BbFonts.display, fontWeight = FontWeight(360), fontSize = size.sp, lineHeight = (size + 4).sp, color = color)
 
-    fun numeral(color: Color, size: Float = 13f) =
-        TextStyle(fontFamily = BbFonts.displaySmall, fontWeight = FontWeight.W400, fontSize = size.sp, fontFeatureSettings = "tnum", color = color)
+    fun numeral(color: Color, size: Float = 13f) = BbType.numeral.copy(fontSize = size.sp, lineHeight = (size + 4).sp, color = color)
 
     fun bigNumeral(color: Color) =
         TextStyle(fontFamily = BbFonts.display, fontWeight = FontWeight(360), fontSize = 40.sp, lineHeight = 44.sp, fontFeatureSettings = "tnum", color = color)
 
     /** Book-derived prose: AI answers, recaps, slips. */
     fun prose(color: Color) = TextStyle(fontFamily = BbFonts.reading, fontWeight = FontWeight.W400, fontSize = 16.sp, lineHeight = 26.sp, color = color)
-    fun quote(color: Color) = prose(color).copy(fontStyle = FontStyle.Italic)
+    fun quote(color: Color) = prose(color).copy(fontFamily = BbFonts.readingItalic, fontStyle = FontStyle.Italic)
     fun cardProse(color: Color) = TextStyle(fontFamily = BbFonts.reading, fontWeight = FontWeight.W400, fontSize = 17.sp, lineHeight = 26.sp, color = color)
 }
 
@@ -127,57 +128,38 @@ internal fun Caps(text: String, modifier: Modifier = Modifier, color: Color = Bb
 }
 
 @Composable
-internal fun PrimaryKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    val p = Bb.palette
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val drop = if (p.isDark) 0.9f else 0.25f
-    Box(
-        modifier
-            .heightIn(min = 52.dp)
-            .widthIn(min = 120.dp)
-            .drawBehind {
-                val r = CornerRadius(4.dp.toPx())
-                val px = 1.dp.toPx()
-                if (!enabled) {
-                    drawRoundRect(p.surface2, cornerRadius = r)
-                } else {
-                    if (!pressed) drawRoundRect(Color.Black.copy(alpha = drop), Offset(0f, 2.dp.toPx()), size, r)
-                    drawRoundRect(p.key, cornerRadius = r)
-                    val top = if (pressed) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.7f)
-                    val bottom = if (pressed) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.2f)
-                    drawRect(top, Offset(r.x, 0f), Size(size.width - 2 * r.x, px))
-                    drawRect(bottom, Offset(r.x, size.height - px), Size(size.width - 2 * r.x, px))
-                }
-            }
-            .clickable(source, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        BasicText(text, style = StudyType.keyLabel(if (enabled) p.onKey else p.text2, 15f), maxLines = 1)
-    }
-}
+internal fun PrimaryKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) =
+    BbPrimaryKey(text, onClick, modifier, enabled = enabled, fullWidth = false)
 
+/** Secondary key; with a [caption] (grade intervals) it grows a numeral line under the label. */
 @Composable
 internal fun SecondaryKey(
     text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     edge: Color? = null, caption: String? = null, enabled: Boolean = true,
 ) {
+    if (caption == null) {
+        BbSecondaryKey(text, onClick, modifier, enabled = enabled, topEdge = edge)
+        return
+    }
     val p = Bb.palette
+    val haptics = rememberHaptics()
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
     val shape = RoundedCornerShape(4.dp)
     val lip = if (p.isDark) 0.07f else 0.9f
     Box(
         modifier
-            .heightIn(min = 48.dp)
-            .widthIn(min = 84.dp)
+            .heightIn(min = 56.dp)
+            .widthIn(min = 72.dp)
             .clip(shape)
-            .background(p.surface1)
-            .border(1.dp, p.hairline, shape)
+            .background(if (pressed) p.surface2 else p.surface1)
+            .border(1.dp, p.edge, shape)
             .drawBehind {
-                drawRect(Color.White.copy(alpha = lip), size = Size(size.width, 1.dp.toPx()))
+                val inset = 4.dp.toPx()
+                drawRect(Color.White.copy(alpha = lip), Offset(inset, 1.dp.toPx()), Size(size.width - 2 * inset, 1.dp.toPx()))
                 if (edge != null) drawRect(edge, size = Size(size.width, 2.dp.toPx()))
             }
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(source, null, enabled = enabled, role = Role.Button) { haptics.play(HapticToken.Tap); onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -189,48 +171,16 @@ internal fun SecondaryKey(
 }
 
 @Composable
-internal fun TextLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) { BasicText(text, style = StudyType.keyLabel(Bb.palette.accentText)) }
-}
+internal fun TextLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) = BbTextLink(text, onClick, modifier)
 
 @Composable
 internal fun Hairline(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(1.dp).background(Bb.palette.hairline))
 }
 
-/** Segmented control: `surface1` track with a hairline; the active segment is a small primary key. */
 @Composable
-internal fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val p = Bb.palette
-    val shape = RoundedCornerShape(4.dp)
-    Row(
-        modifier.fillMaxWidth().height(48.dp).clip(shape).background(p.surface1).border(1.dp, p.hairline, shape).padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        options.forEachIndexed { i, label ->
-            val active = i == selected
-            Box(
-                Modifier
-                    .weight(if (active) 1.5f else 1f)
-                    .fillMaxHeight()
-                    .then(
-                        if (active) Modifier.drawBehind {
-                            val r = CornerRadius(3.dp.toPx())
-                            drawRoundRect(p.key, cornerRadius = r)
-                            drawRect(Color.White.copy(alpha = 0.7f), Offset(r.x, 0f), Size(size.width - 2 * r.x, 1.dp.toPx()))
-                        } else Modifier,
-                    )
-                    .clickable(role = Role.Tab) { onSelect(i) },
-                contentAlignment = Alignment.Center,
-            ) {
-                BasicText(label, style = StudyType.keyLabel(if (active) p.onKey else p.text2, 13f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
+internal fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) =
+    BbSegmented(options, selected, onSelect, modifier)
 
 /** Input: 52, r4, `surface1`, 1 hairline; focus 1 `accent` with an accent caret; caps label above. */
 @Composable
@@ -309,9 +259,10 @@ internal fun StudySheet(
                     .clip(shape)
                     .background(p.surface1)
                     .drawBehind {
+                        if (!p.isDark) drawRect(p.hairline, size = Size(size.width, 0.5.dp.toPx()))
                         drawRect(
-                            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent)),
-                            size = Size(size.width, 1.5.dp.toPx()),
+                            Brush.verticalGradient(listOf(Color.White.copy(alpha = if (p.isDark) 0.10f else 0.6f), Color.Transparent), endY = 6.dp.toPx()),
+                            size = Size(size.width, 6.dp.toPx()),
                         )
                     }
                     .clickable(remember { MutableInteractionSource() }, indication = null) {}
@@ -352,7 +303,8 @@ internal fun ListRow(
     separator: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)) {
+    val haptics = rememberHaptics()
+    Column(modifier.fillMaxWidth().clickable(role = Role.Button) { haptics.play(HapticToken.Tap); onClick() }) {
         Row(Modifier.fillMaxWidth().heightIn(min = minHeight).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, content = content)
         if (separator) Hairline()
     }
@@ -379,6 +331,8 @@ internal fun EmptyNote(text: String, modifier: Modifier = Modifier) {
 internal fun ErrorNote(error: UiError, onRetry: (() -> Unit)?, modifier: Modifier = Modifier) {
     val p = Bb.palette
     Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        val haptics = rememberHaptics()
+        LaunchedEffect(error) { haptics.play(HapticToken.Reject) }
         BasicText(stringResource(errorText(error.kind)), style = StudyType.body(p.text))
         if (error.retryable && onRetry != null) TextLink(stringResource(R.string.try_again), onRetry, Modifier.padding(start = 0.dp))
     }

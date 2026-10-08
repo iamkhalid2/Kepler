@@ -1,5 +1,8 @@
 package app.betterbooks.feature.study
 
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -169,6 +172,13 @@ internal fun FlipCard(
     val angle = remember { Animatable(FlipModel.target(flipped)) }
     LaunchedEffect(flipped, reduced) {
         if (reduced) angle.snapTo(FlipModel.target(flipped)) else angle.animateTo(FlipModel.target(flipped), StudyMotion.flip(false))
+    }
+    val haptics = app.betterbooks.core.designsystem.rememberHaptics()
+    // A tick as the card passes edge-on, where the faces swap.
+    LaunchedEffect(angle) {
+        androidx.compose.runtime.snapshotFlow { FlipModel.showsBack(angle.value) }
+            .distinctUntilChanged().drop(1)
+            .collect { haptics.play(app.betterbooks.core.designsystem.HapticToken.Tick) }
     }
     val density = LocalDensity.current.density
     val p = Bb.palette
