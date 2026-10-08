@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "app.betterbooks.core.designsystem"
+    namespace = "app.kepler.core.designsystem"
     compileSdk = 37
     defaultConfig { minSdk = 28 }
     compileOptions {

@@ -1,6 +1,6 @@
 # Third-party notices
 
-BetterBooks is licensed under GPL-3.0 (see LICENSE). It uses the following third-party components. Versions are from `gradle/libs.versions.toml`.
+Kepler is licensed under GPL-3.0 (see LICENSE). It uses the following third-party components. Versions are from `gradle/libs.versions.toml`.
 
 ## Libraries
 

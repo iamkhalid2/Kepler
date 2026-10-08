@@ -1,4 +1,4 @@
-# BetterBooks design
+# Kepler design
 
 **Live prototype:** https://claude.ai/artifact/MwAQh5KMfsi1W8DkPURbnK (a private Artifact; share it from its Share menu)
 

@@ -1,4 +1,4 @@
-# BetterBooks: Architecture & Tech Stack
+# Kepler: Architecture & Tech Stack
 
 > Part of the master plan, [`../PLAN.md`](../PLAN.md). Binding inputs: [`../decisions.md`](../decisions.md) (#1–#95) and the reports in [`../research/`](../research/). Library versions were checked against Google Maven and Maven Central on **2026-10-08**. Re-check them at Phase 0, and pin them exactly in `gradle/libs.versions.toml`.
 
@@ -297,7 +297,7 @@ class RequestBudgeter(/* perMinute = 15 (safety under 20), perDay = 50 | 1000, p
 - **Review queue:** due cards first (most overdue first), then new cards within the daily new-card cap. The queue mixes books.
 
 ### 5.9 Sync & export (#39, #40, #59, #62, #81)
-- **Markdown/Obsidian:** one file per book, with YAML front matter and highlights in TOC order. Each highlight carries a note, a quote, and a deep link (`betterbooks://book/<id>/s/<ordinal>`). The file is written to a SAF tree URI.
+- **Markdown/Obsidian:** one file per book, with YAML front matter and highlights in TOC order. Each highlight carries a note, a quote, and a deep link (`kepler://book/<id>/s/<ordinal>`). The file is written to a SAF tree URI.
 - **W3C Web Annotation JSON:** `TextQuoteSelector` + `TextPositionSelector`, plus an EPUB CFI computed at export.
 - **Readwise:** `POST /api/v2/highlights/` with `highlight_url` set to the deep link, so repeat sends don't duplicate.
 - **AnkiDroid** instant-add API via a JitPack artifact, behind an optional `<queries>` entry; check the artifact's licence (LGPL). Also CSV/TSV export with Anki headers.
@@ -317,7 +317,7 @@ class RequestBudgeter(/* perMinute = 15 (safety under 20), perDay = 50 | 1000, p
 | Embedding indexing, chapter-pack prefetch | WorkManager (expedited for packs) | Battery and idle constraints |
 | User-requested exports (M4B) | WorkManager plus `dataSync` FGS, with a progress notification | |
 
-**ColorOS (the Find X9):** detect OPPO, OnePlus and realme. Onboarding and the generation screen offer a guided "Keep BetterBooks running" sheet, with deep links to the app's battery page and auto-launch setting, and illustrations of each step. The FOSS build may request `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. A Play build would use the settings-list intent instead.
+**ColorOS (the Find X9):** detect OPPO, OnePlus and realme. Onboarding and the generation screen offer a guided "Keep Kepler running" sheet, with deep links to the app's battery page and auto-launch setting, and illustrations of each step. The FOSS build may request `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. A Play build would use the settings-list intent instead.
 
 ---
 
@@ -337,11 +337,11 @@ export PATH=$ANDROID_HOME/platform-tools:$PATH
 ./gradlew lintDebug
 
 adb devices -l                              # Find X9 over USB, or: adb pair <ip:port> && adb connect <ip:port>
-./gradlew :app:installDebug && adb shell am start -n app.betterbooks.debug/app.betterbooks.MainActivity
+./gradlew :app:installDebug && adb shell am start -n app.kepler.debug/app.kepler.MainActivity
 android run                                 # alternative: build + deploy + launch
 adb exec-out screencap -p > /tmp/bb.png     # (scratchpad path in practice) the agent views the PNG
 android layout                              # UI tree for assertions
-adb logcat --pid=$(adb shell pidof -s app.betterbooks.debug) -v color
+adb logcat --pid=$(adb shell pidof -s app.kepler.debug) -v color
 adb shell screenrecord --time-limit 15 /sdcard/bb.mp4 && adb pull /sdcard/bb.mp4
 ```
 

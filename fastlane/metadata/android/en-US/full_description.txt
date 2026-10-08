@@ -1,4 +1,4 @@
-BetterBooks helps you internalize books. Read. Listen. Remember.
+Kepler helps you internalize books. Read. Listen. Remember.
 
 Read: an EPUB reader with adjustable fonts, spacing, margins and themes.
 

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "app.betterbooks.engine.playback"
+    namespace = "app.kepler.engine.playback"
     compileSdk = 37
     defaultConfig { minSdk = 28 }
     compileOptions {

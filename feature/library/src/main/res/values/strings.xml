@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="back">Back</string>
-    <string name="wordmark">BetterBooks</string>
+    <string name="wordmark">Kepler</string>
     <string name="welcome_line">Read. Listen. Remember.</string>
     <string name="welcome_sub">Your books, read aloud and kept in mind.</string>
     <string name="get_started">Get started</string>
@@ -28,11 +28,11 @@
     <string name="key_unreachable">Couldn’t reach the service to check this key.</string>
     <string name="save_without_checking">Save without checking</string>
     <string name="privacy_title">Your books stay yours</string>
-    <string name="privacy_body">When you use narration or the study tools, the text is sent to the voice and AI services you chose. The free tiers of those services may use what you send to train their models. BetterBooks has no analytics and no account, and your library and keys stay on this phone.</string>
+    <string name="privacy_body">When you use narration or the study tools, the text is sent to the voice and AI services you chose. The free tiers of those services may use what you send to train their models. Kepler has no analytics and no account, and your library and keys stay on this phone.</string>
     <string name="battery_title">Keep narration running</string>
-    <string name="battery_sub">Your phone may stop narration when the screen is off. Allow BetterBooks to run in the background.</string>
+    <string name="battery_sub">Your phone may stop narration when the screen is off. Allow Kepler to run in the background.</string>
     <string name="battery_step_1">Open battery settings below.</string>
-    <string name="battery_step_2">Find BetterBooks in the list.</string>
+    <string name="battery_step_2">Find Kepler in the list.</string>
     <string name="battery_step_3">Choose Allow background activity, or turn off battery optimisation.</string>
     <string name="open_battery_settings">Open battery settings</string>
     <string name="library_caps">Library · %1$d</string>
@@ -155,9 +155,9 @@
     <string name="open">Open</string>
     <string name="typeface">Typeface</string>
     <string name="remove_key">Remove key</string>
-    <string name="app_name_row">BetterBooks</string>
+    <string name="app_name_row">Kepler</string>
     <string name="version_x">Version %1$s</string>
-    <string name="about_license">BetterBooks is free software under the GNU General Public License, version 3. You may use, study, share and change it under that licence.</string>
+    <string name="about_license">Kepler is free software under the GNU General Public License, version 3. You may use, study, share and change it under that licence.</string>
     <string name="about_fonts">Fraunces, Literata and Albert Sans are used under the SIL Open Font License.</string>
     <string name="learn_caps">Learn</string>
     <string name="learn_ask">Ask the book</string>

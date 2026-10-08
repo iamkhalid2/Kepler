@@ -13,11 +13,11 @@ val localProps = Properties().apply {
 fun devKey(name: String) = "\"" + localProps.getProperty(name, "") + "\""
 
 android {
-    namespace = "app.betterbooks"
+    namespace = "app.kepler"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.betterbooks"
+        applicationId = "app.kepler"
         minSdk = 28
         targetSdk = 37
         versionCode = 1

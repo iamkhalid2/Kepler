@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "app.betterbooks.feature.player"
+    namespace = "app.kepler.feature.player"
     compileSdk = 37
     defaultConfig { minSdk = 28 }
     compileOptions {

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "app.betterbooks.engine.tts"
+    namespace = "app.kepler.engine.tts"
     compileSdk = 37
     defaultConfig { minSdk = 28 }
     compileOptions {

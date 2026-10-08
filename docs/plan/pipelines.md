@@ -1,4 +1,4 @@
-# BetterBooks: Content, Audio & Intelligence Pipelines
+# Kepler: Content, Audio & Intelligence Pipelines
 
 > Part of the master plan, [`../PLAN.md`](../PLAN.md). The module and interface names below match [`architecture.md`](architecture.md). Binding inputs are [`../decisions.md`](../decisions.md) and [`../research/`](../research/).
 

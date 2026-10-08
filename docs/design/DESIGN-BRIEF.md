@@ -21,13 +21,13 @@ Spacing scale 4/8/12/16/24/32/48; gutter 24; section gap 32; targets ≥48×48. 
 
 ## 2. Type
 
-- Display: `BbFonts.display` 360, 34/38, −0.02em.
+- Display: `KpFonts.display` 360, 34/38, −0.02em.
 - Headline: `display` 360, 26/30.
-- Title: Fraunces 450, opsz 24, SOFT 50, 19/24 (add `BbFonts.title`).
+- Title: Fraunces 450, opsz 24, SOFT 50, 19/24 (add `KpFonts.title`).
 - Spine/cover text: `displaySmall`, 9–14.
 - Author: Literata italic 400, 14/20, `text2` (add italic).
-- UI body: `BbFonts.ui` 400, 15/22. Key labels 600 (never 700). Caption 13/18 `text2`. Caps 600, 11/14, +0.14em, `text2`.
-- Reading: `BbFonts.reading` 400, 19/30 default, user 15–26; small-caps opener, hung numeral.
+- UI body: `KpFonts.ui` 400, 15/22. Key labels 600 (never 700). Caption 13/18 `text2`. Caps 600, 11/14, +0.14em, `text2`.
+- Reading: `KpFonts.reading` 400, 19/30 default, user 15–26; small-caps opener, hung numeral.
 - Book-derived prose (AI answers, recaps, slips): `reading` 16/26.
 - Numerals: Fraunces 500, opsz 18, `tnum`, 13–16. Big numerals: `display` 360 `tnum` 40/44.
 
@@ -35,7 +35,7 @@ Fraunces opsz tracks size.
 
 ## 3. Colour
 
-`Bb.palette` tokens only; no literal colour in feature code. Designsystem must add from `shelf-language.md` §2: `key`, `onKey`, `body`, `page`, `readText`, `pencil`, `edge` (hairline +8% L) and the materials (cloth, silk, bone ribbon, plank).
+`Kp.palette` tokens only; no literal colour in feature code. Designsystem must add from `shelf-language.md` §2: `key`, `onKey`, `body`, `page`, `readText`, `pencil`, `edge` (hairline +8% L) and the materials (cloth, silk, bone ribbon, plank).
 
 - `bg` screens; `surface1` sheets, inputs; `surface2` toasts; `page` + `readText` reader.
 - `accent` fills only: listened ribbon, progress/frontier rule, active tab rule, switch track, focus border, generation ring, read-along marks, logo dot. Never a filled button.

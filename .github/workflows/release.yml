@@ -48,9 +48,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/release/*.apk "$RUNNER_TEMP/BetterBooks-${GITHUB_REF_NAME}.apk"
-          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/BetterBooks-${GITHUB_REF_NAME}.apk" \
-            --title "BetterBooks ${GITHUB_REF_NAME}" --generate-notes
+          cp app/build/outputs/apk/release/*.apk "$RUNNER_TEMP/Kepler-${GITHUB_REF_NAME}.apk"
+          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/Kepler-${GITHUB_REF_NAME}.apk" \
+            --title "Kepler ${GITHUB_REF_NAME}" --generate-notes
       - name: Remove keystore
         if: always()
         run: rm -rf "$RUNNER_TEMP/signing"

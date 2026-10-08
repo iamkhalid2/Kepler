@@ -5,7 +5,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories { google(); mavenCentral() }
 }
-rootProject.name = "BetterBooks"
+rootProject.name = "Kepler"
 include(
     ":app",
     ":core:designsystem", ":core:model", ":core:spine", ":core:database",

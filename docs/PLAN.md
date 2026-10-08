@@ -1,4 +1,4 @@
-# BetterBooks — Master Plan
+# Kepler — Master Plan
 
 *Read. Listen. Remember.* · Plan v1, written 2026-10-08.
 
@@ -15,7 +15,7 @@
 
 ## 1. Executive summary
 
-**What:** BetterBooks is an open-source (GPL-3.0) Android app that helps people **internalize** books. It does three jobs that no current app does together:
+**What:** Kepler is an open-source (GPL-3.0) Android app that helps people **internalize** books. It does three jobs that no current app does together:
 1. **Read.** A first-class ebook reader: EPUB and PDF, beautiful typography, highlights, lookups, search, and a Book Map for non-fiction structure.
 2. **Listen.** Any EPUB becomes a detailed, customizable audiobook through Fish Audio (S2.1 Pro). The listener controls narration style, voices, full cast for fiction, an optional quote voice for non-fiction, and how notes, tables and figures are handled. Playback is pro-level. Imported audiobooks play too.
 3. **Remember.** A study loop built on the evidence:
@@ -70,7 +70,7 @@ Each phase ends with a **user checkpoint**, a short demo with screenshots or rec
   - `./gradlew spotlessCheck lintDebug testDebugUnitTest verifyRoborazziDebug assembleDebug` passes locally and in CI.
   - `installDebug` on the Find X9 works; a screenshot shows the splash, the icon, and Home with tokens applied.
   - Release-build check: no keys appear in the APK.
-- **Checkpoint:** you see BetterBooks on your phone.
+- **Checkpoint:** you see Kepler on your phone.
 
 ### Phase 1: Design prototype & brand ✅ (delivered with this plan)
 - Clickable prototype of the key flows and motion, plus 3 logo concepts (A recommended): https://claude.ai/artifact/MwAQh5KMfsi1W8DkPURbnK. Source and SVGs are in [`design/`](design/).
@@ -238,6 +238,6 @@ The 1.x backlog, in order: MOBI/AZW3 + CBZ → OPDS → WebDAV + kosync → teac
 
 ## 6. Open questions for you (each has a working default; nothing is blocked)
 1. **Logo:** A (Seed b), B (Folio wave) or C (Ribbon play)? *Default: A.* Reply with a letter or a change.
-2. **Domain and GitHub org:** register `betterbooks.dev` and create an org such as `betterbooks-app`? Only you can do this. *Default: the repo stays local until you say where to push.*
+2. **Domain and GitHub org:** register `kepler.dev` and create an org such as `kepler-app`? Only you can do this. *Default: the repo stays local until you say where to push.*
 3. **After 2026-11-30:** should I keep exercising generation on your paid Fish key during development, within a monthly dev cap of, say, $10? *Default: yes, $10 cap.*
 4. **Prototype feedback:** anything in the motion or visual direction to change before Phase 2's UI work?

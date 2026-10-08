@@ -8,7 +8,7 @@
 
     <application>
         <service
-            android:name="app.betterbooks.engine.playback.PlaybackService"
+            android:name="app.kepler.engine.playback.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>

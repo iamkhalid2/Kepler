@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "app.betterbooks.feature.study"
+    namespace = "app.kepler.feature.study"
     compileSdk = 37
     defaultConfig { minSdk = 28 }
     compileOptions {

@@ -1,4 +1,4 @@
-# BetterBooks: Experience, Design System & Motion
+# Kepler: Experience, Design System & Motion
 
 > Part of the master plan, [`../PLAN.md`](../PLAN.md). **Live prototype:** https://claude.ai/artifact/MwAQh5KMfsi1W8DkPURbnK (source in [`../design/prototype/`](../design/prototype/)). The design bar is **Revolut**: fluid, tactile, morph-heavy, obsessive about detail (#42). It is built on Material 3 Expressive, dark mode comes first, and per-book screens take their color from the cover art. The clickable prototype that shows this spec lives in [`../design/prototype/`](../design/prototype/).
 
@@ -172,7 +172,7 @@ Glance widgets use the cover scheme where relevant, and system dynamic colors ot
 ---
 
 ## 8. Brand
-- **Name:** BetterBooks. **Tagline:** *Read. Listen. Remember.*
+- **Name:** Kepler. **Tagline:** *Read. Listen. Remember.*
 - **Logo concepts.** Concept **A** is recommended. All three are drawn in the prototype and saved as SVG in [`../design/brand/`](../design/brand/).
   - **A · Seed b (recommended).** A lowercase *b* made of a rounded stem and a ring-shaped bowl, with a solid **seed dot** at the centre of the bowl. The bowl holds the idea you keep: you internalize the book.
     - Geometry on the adaptive-icon grid (108 units):
@@ -182,7 +182,7 @@ Glance widgets use the cover scheme where relevant, and system dynamic colors ot
     - Colors: flat two-tone, with no gradient. The stem and bowl are Lumen violet `#8B7CFF` and the seed is ember `#FF8F5C`, on ink `#17151F`. The light variant uses `#5B47E8` and `#E8642C` on paper `#F7F3EA`. The monochrome/themed version is a single color.
   - **B · Folio wave.** Two page arcs meeting at a spine, drawn as one continuous stroke that reads both as an open book and as a sound wave, with a seed dot above it.
   - **C · Ribbon play.** A bookmark ribbon whose notched tail is a play triangle cut-out. Read and listen in one glyph.
-- **Wordmark:** "BetterBooks" in Geist SemiBold at −2% tracking. "Books" is set at 70% opacity in UI lockups.
+- **Wordmark:** "Kepler" in Geist SemiBold at −2% tracking. "Books" is set at 70% opacity in UI lockups.
 - **App icon:** an adaptive icon with foreground mark A and an ink background. The themed (monochrome) icon is mark A at 100% in the system tint.
 
 ---
@@ -191,4 +191,4 @@ Glance widgets use the cover scheme where relevant, and system dynamic colors ot
 1. **Roborazzi screenshots** of every state, viewed by the agent. Diffs gate CI.
 2. **On-device screen recordings** (`adb shell screenrecord`) of each signature moment, checked frame by frame for jumps, linear easing, or missing overshoot.
 3. **A haptic checklist** run on the Find X9: each token felt once, and nothing fires twice on one action.
-4. **Jank checks** with `adb shell dumpsys gfxinfo app.betterbooks.debug framestats` on the library, reader and player. Target under 1% janky frames.
+4. **Jank checks** with `adb shell dumpsys gfxinfo app.kepler.debug framestats` on the library, reader and player. Target under 1% janky frames.

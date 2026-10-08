@@ -1,8 +1,8 @@
-# BetterBooks
+# Kepler
 
 **Read. Listen. Remember.**
 
-BetterBooks is an open-source Android app that helps you internalize books. It combines three things:
+Kepler is an open-source Android app that helps you internalize books. It combines three things:
 
 - **Read:** an EPUB reader for reflowable and fixed-layout books.
 - **Listen:** an AI audiobook generator and player (Fish Audio or Android system TTS) with sentence-synced read-along.
@@ -41,7 +41,7 @@ Run the tests:
 
 ## Bring your own keys
 
-BetterBooks does not ship API keys. To use AI and voice features, add your own:
+Kepler does not ship API keys. To use AI and voice features, add your own:
 
 - **Fish Audio** key for high-quality generated voices.
 - **OpenRouter** key for ask, recap, concepts and cards. Free `:free` models work.
@@ -61,4 +61,4 @@ Issues and pull requests are welcome. Please keep dependencies GPL-3.0 compatibl
 
 ## Licence
 
-BetterBooks is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License version 3, as published by the Free Software Foundation. See [LICENSE](LICENSE).
+Kepler is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License version 3, as published by the Free Software Foundation. See [LICENSE](LICENSE).

@@ -1,4 +1,4 @@
-# Releasing BetterBooks
+# Releasing Kepler
 
 ## Versioning
 
@@ -19,7 +19,7 @@
 
 ## GitHub release
 
-- The workflow attaches `BetterBooks-vX.Y.Z.apk` to a GitHub release with auto-generated notes.
+- The workflow attaches `Kepler-vX.Y.Z.apk` to a GitHub release with auto-generated notes.
 - Check that the APK installs on a device with minSdk 28 before publishing.
 
 ## Google Play notes

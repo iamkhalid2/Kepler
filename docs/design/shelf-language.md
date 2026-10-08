@@ -25,18 +25,18 @@ Sources: `prototype/project/DirC-Home.dc.html` and `DirC-Reader.dc.html` (the ba
 All the maths runs in **OKLCH**: about 40 lines of pure Kotlin in `:core:design`, and hue doesn't drift when darkening. Every guard measures WCAG contrast.
 
 ```kotlin
-@Immutable data class BbPalette(val isDark: Boolean, val bg: Color, val surface1: Color,
+@Immutable data class KpPalette(val isDark: Boolean, val bg: Color, val surface1: Color,
   val surface2: Color, val hairline: Color, val text: Color, val text2: Color, val body: Color,
   val page: Color, val key: Color, val onKey: Color, val accent: Color, val accentText: Color,
   val onAccent: Color, val secondary: Color, val positive: Color, val warning: Color, val negative: Color)
 @Immutable data class Cloth(val face: Color, val head: Color, val board: Color, val groove: Color,
   val ink: Color, val inkMuted: Color, val bounce: Color)
 @Immutable data class Silk(val edgeA: Color, val sheen: Color, val edgeB: Color)
-@Immutable data class BbMaterials(val cloth: Cloth, val silk: Silk, val boneRibbon: Silk,
+@Immutable data class KpMaterials(val cloth: Cloth, val silk: Silk, val boneRibbon: Silk,
   val paper: Paper, val env: Env, val marks: Marks)
 // Paper: bone stops + grain α · Env: plank, lip α, contact α, bounce α · Marks: read-along, selection, pencil
-fun bbTheme(seed: Color, dark: Boolean): Pair<BbPalette, BbMaterials>
-fun clothFor(base: Color, p: BbPalette): Cloth      // per-book covers and cover-art seeds (#42)
+fun kpTheme(seed: Color, dark: Boolean): Pair<KpPalette, KpMaterials>
+fun clothFor(base: Color, p: KpPalette): Cloth      // per-book covers and cover-art seeds (#42)
 ```
 
 `LocalBb` provides the theme, and the same values feed the M3 `ColorScheme`. A **System** preset seeds from `dynamicDarkColorScheme(ctx).primary` on API 31+.
