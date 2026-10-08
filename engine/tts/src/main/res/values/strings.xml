@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="narration_channel">Narration</string>
+    <string name="narration_generating">Generating narration</string>
+    <string name="narration_stop">Stop</string>
+</resources>

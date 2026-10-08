@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reader_back">Back</string>
+    <string name="reader_contents">Contents</string>
+    <string name="reader_typography">Text and theme</string>
+    <string name="reader_search">Search in book</string>
+    <string name="reader_bookmark_add">Add bookmark</string>
+    <string name="reader_bookmark_remove">Remove bookmark</string>
+    <string name="reader_learn">Learn</string>
+    <string name="reader_open_failed">This book could not be opened.</string>
+    <string name="reader_loading">Opening book</string>
+
+    <string name="reader_mode_read">Read</string>
+    <string name="reader_mode_read_listen">Read + Listen</string>
+    <string name="reader_play_here">Play from here</string>
+    <string name="reader_return">Return</string>
+    <string name="reader_min_left_chapter">%1$d min left in chapter</string>
+    <string name="reader_less_than_min">Under a minute left in chapter</string>
+    <string name="reader_percent">%1$d%%</string>
+
+    <string name="reader_sel_highlight">Highlight</string>
+    <string name="reader_sel_explain">Explain</string>
+    <string name="reader_sel_ask">Ask</string>
+    <string name="reader_sel_card">Card</string>
+    <string name="reader_sel_define">Define</string>
+
+    <string name="reader_tab_contents">Contents</string>
+    <string name="reader_tab_highlights">Highlights</string>
+    <string name="reader_tab_bookmarks">Bookmarks</string>
+    <string name="reader_empty_highlights">Select text to highlight it.</string>
+    <string name="reader_empty_bookmarks">No bookmarks yet.</string>
+
+    <string name="reader_search_hint">Search this book</string>
+    <string name="reader_search_none">No matches.</string>
+    <string name="reader_search_count">%1$d matches</string>
+
+    <string name="reader_theme">Theme</string>
+    <string name="reader_theme_day">Day</string>
+    <string name="reader_theme_paper">Paper</string>
+    <string name="reader_theme_sepia">Sepia</string>
+    <string name="reader_theme_night">Night</string>
+    <string name="reader_theme_black">Black</string>
+    <string name="reader_theme_custom">Custom</string>
+    <string name="reader_font">Font</string>
+    <string name="reader_font_literata">Literata</string>
+    <string name="reader_font_serif">Serif</string>
+    <string name="reader_font_sans">Sans</string>
+    <string name="reader_font_dyslexic">OpenDyslexic</string>
+    <string name="reader_font_publisher">Original</string>
+    <string name="reader_size">Size</string>
+    <string name="reader_line_height">Line spacing</string>
+    <string name="reader_margins">Margins</string>
+    <string name="reader_publisher_styles">Use publisher styles</string>
+    <string name="reader_scroll">Continuous scroll</string>
+    <string name="reader_justify">Justify text</string>
+    <string name="reader_tap_zones">Tap edges to turn pages</string>
+    <string name="reader_volume_keys">Volume keys turn pages</string>
+    <string name="reader_decrease">Decrease</string>
+    <string name="reader_increase">Increase</string>
+
+    <string name="reader_note_hint">Add a note</string>
+    <string name="reader_delete">Delete</string>
+    <string name="reader_done">Done</string>
+    <string name="reader_colour">Colour %1$d</string>
+</resources>

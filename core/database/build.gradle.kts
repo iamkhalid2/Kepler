@@ -12,7 +12,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-    testOptions { unitTests.isIncludeAndroidResources = true }
+    testOptions { unitTests.isReturnDefaultValues = true }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -24,8 +28,14 @@ dependencies {
     implementation(libs.androidx.sqlite.bundled)
     implementation(libs.androidx.datastore.preferences)
     ksp(libs.room.compiler)
+    // Host JVM tests cannot load the Android .so of the bundled driver; use its desktop build there instead.
+    testImplementation(libs.androidx.sqlite.bundled.jvm)
     testImplementation(libs.robolectric)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
+}
+
+configurations.matching { it.name.startsWith("test") && it.name.endsWith("RuntimeClasspath") }.configureEach {
+    exclude(group = "androidx.sqlite", module = "sqlite-bundled-android")
 }
