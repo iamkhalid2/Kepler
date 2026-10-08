@@ -66,6 +66,7 @@ fsrskt = { module = "one.felsen.fsrskt:fsrskt", version.ref = "fsrskt" }
 junit = { module = "junit:junit", version.ref = "junit" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version = "2.1.5" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

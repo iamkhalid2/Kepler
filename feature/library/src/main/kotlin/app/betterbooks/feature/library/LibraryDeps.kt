@@ -45,6 +45,9 @@ interface LibraryDeps {
     val showsBatteryGuide: () -> Boolean get() = { isOppoFamily(Build.MANUFACTURER, Build.BRAND) }
 
     val appVersion: String get() = ""
+
+    /** Debug builds only: a developer key to put in an empty key field. Release builds return "". */
+    val devKeyPrefill: (KeyKind) -> String get() = { "" }
 }
 
 /** True for OPPO, OnePlus and realme devices (ColorOS / OxygenOS / realme UI). */

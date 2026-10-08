@@ -36,6 +36,7 @@ import app.betterbooks.core.designsystem.BbIconKind
 import app.betterbooks.core.designsystem.BbPrimaryKey
 import app.betterbooks.core.designsystem.BbRing
 import app.betterbooks.core.designsystem.BbRow
+import app.betterbooks.core.designsystem.BbTextLink
 import app.betterbooks.core.designsystem.BbSecondaryKey
 import app.betterbooks.core.designsystem.BbToastHost
 import app.betterbooks.core.designsystem.BbType
@@ -66,6 +67,7 @@ fun HomeRoute(
     onRecap: (bookId: Long) -> Unit,
     onReview: () -> Unit,
     deps: LibraryDeps = LocalLibraryDeps.current,
+    onSettings: (() -> Unit)? = null,
 ) {
     val vm = libraryViewModel { HomeViewModel(deps) }
     val ui by vm.state.collectAsStateWithLifecycle()
@@ -81,6 +83,7 @@ fun HomeRoute(
         onReview = onReview,
         onAdd = { picker.launch(arrayOf("application/epub+zip")) },
         onDismissMessage = vm::dismissMessage,
+        onSettings = onSettings,
     )
 }
 
@@ -94,12 +97,21 @@ fun HomeScreen(
     onReview: () -> Unit,
     onAdd: () -> Unit,
     onDismissMessage: () -> Unit,
+    onSettings: (() -> Unit)? = null,
 ) {
     val p = Bb.palette
     ScreenRoot {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Spacer(Modifier.height(24.dp))
-            BbCaps(remember { todayCaps() }, Modifier.padding(horizontal = 24.dp))
+            if (onSettings == null) {
+                Spacer(Modifier.height(24.dp))
+                BbCaps(remember { todayCaps() }, Modifier.padding(horizontal = 24.dp))
+            } else {
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    BbCaps(remember { todayCaps() }, Modifier.weight(1f))
+                    BbTextLink(stringResource(R.string.settings_caps), onSettings)
+                }
+            }
             val book = ui.current
             when {
                 !ui.loaded -> Unit

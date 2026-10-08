@@ -47,11 +47,29 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
+        isCoreLibraryDesugaringEnabled = true
     }
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:database"))
+    implementation(project(":core:spine"))
+    implementation(project(":engine:epub"))
+    implementation(project(":engine:tts"))
+    implementation(project(":engine:playback"))
+    implementation(project(":engine:ai"))
+    implementation(project(":engine:srs"))
+    implementation(project(":feature:library"))
+    implementation(project(":feature:reader"))
+    implementation(project(":feature:player"))
+    implementation(project(":feature:study"))
+    implementation(libs.androidx.fragment.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

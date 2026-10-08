@@ -65,6 +65,7 @@ fun OnboardingRoute(onDone: () -> Unit, deps: LibraryDeps = LocalLibraryDeps.cur
         onVerify = vm::verify,
         onSaveUnverified = vm::saveUnverified,
         onOpenBatterySettings = { openBatterySettings(context) },
+        prefill = deps.devKeyPrefill,
     )
 }
 
@@ -76,10 +77,11 @@ fun OnboardingScreen(
     onVerify: (KeyKind, String) -> Unit,
     onSaveUnverified: (KeyKind, String) -> Unit,
     onOpenBatterySettings: () -> Unit,
+    prefill: (KeyKind) -> String = { "" },
 ) {
     val p = Bb.palette
-    var fishKey by remember { mutableStateOf("") }
-    var orKey by remember { mutableStateOf("") }
+    var fishKey by remember { mutableStateOf(if (ui.fish == KeyCheck.Connected) "" else prefill(KeyKind.Fish)) }
+    var orKey by remember { mutableStateOf(if (ui.openRouter == KeyCheck.Connected) "" else prefill(KeyKind.OpenRouter)) }
     // Read, Listen, Remember: the book turns 90 -> 24 -> 0 once, as the three lines are read.
     var turn by remember(ui.step) { mutableIntStateOf(0) }
     LaunchedEffect(ui.step) {
