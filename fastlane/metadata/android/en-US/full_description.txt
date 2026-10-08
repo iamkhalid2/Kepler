@@ -1,0 +1,13 @@
+BetterBooks helps you internalize books. Read. Listen. Remember.
+
+Read: an EPUB reader with adjustable fonts, spacing, margins and themes.
+
+Listen: generate an audiobook from an EPUB with Fish Audio speech or your device's built-in text-to-speech. Playback follows the text sentence by sentence, so you can read along.
+
+Remember: ask questions about the book, get recaps, review key concepts, and study with flashcards scheduled by FSRS spaced repetition. AI features only use text you have already reached, so they do not spoil the book.
+
+Bring your own keys: AI and voice features use your own Fish Audio and OpenRouter API keys, stored encrypted on your device.
+
+Works for fiction and non-fiction alike.
+
+Free and open source under the GPL-3.0 licence.

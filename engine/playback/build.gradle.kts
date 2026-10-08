@@ -17,6 +17,7 @@ android {
 dependencies {
     api(project(":core:model"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.ktx)
     implementation(libs.media3.exoplayer)

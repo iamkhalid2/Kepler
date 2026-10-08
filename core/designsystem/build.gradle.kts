@@ -26,3 +26,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.compose.ui.tooling.preview)
 }
+
+dependencies {
+    testImplementation(libs.junit)
+}

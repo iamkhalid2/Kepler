@@ -19,6 +19,7 @@ android {
 dependencies {
     api(project(":core:model"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(project(":core:designsystem"))
     implementation(platform(libs.androidx.compose.bom))

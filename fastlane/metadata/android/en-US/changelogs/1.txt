@@ -1,0 +1,1 @@
+First internal build of BetterBooks: EPUB reader, AI audiobook generation with sentence-synced playback, AI study tools and FSRS spaced review.
