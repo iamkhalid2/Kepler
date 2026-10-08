@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.betterbooks.core.designsystem.Bb
+import app.betterbooks.core.designsystem.BbFonts
 import app.betterbooks.core.designsystem.BbSeed
 import app.betterbooks.core.designsystem.BbTheme
 import app.betterbooks.core.designsystem.BookPose
@@ -58,23 +59,26 @@ fun LibraryDemo() {
         val mats = bookMaterials(p)
         val books = remember(seed, dark) {
             listOf(
-                BookSpec("Meditations", "Marcus Aurelius", 46f, mats[0]),
-                BookSpec("Origin of Species", "Charles Darwin", 58f, mats[1]),
-                BookSpec("Walden", "H. D. Thoreau", 40f, mats[2]),
-                BookSpec("Pride and Prejudice", "Jane Austen", 52f, mats[3]),
-                BookSpec("The Art of War", "Sun Tzu", 36f, mats[4]),
-                BookSpec("Frankenstein", "Mary Shelley", 50f, mats[5]),
+                BookSpec("Meditations", "Marcus Aurelius", 24f, mats[0]),
+                BookSpec("Origin of Species", "Charles Darwin", 30f, mats[1]),
+                BookSpec("Walden", "H. D. Thoreau", 20f, mats[2]),
+                BookSpec("Pride and Prejudice", "Jane Austen", 26f, mats[3]),
+                BookSpec("The Art of War", "Sun Tzu", 18f, mats[4]),
+                BookSpec("Frankenstein", "Mary Shelley", 24f, mats[5]),
+                BookSpec("The Wealth of Nations", "Adam Smith", 32f, mats[0]),
+                BookSpec("Moby-Dick", "Herman Melville", 30f, mats[2]),
+                BookSpec("Common Sense", "Thomas Paine", 16f, mats[1]),
             )
         }
-        val scales = floatArrayOf(0.64f, 0.70f, 0.60f, 0.66f, 0.58f, 0.68f)
-        val k = 1.35f
-        val total = books.indices.sumOf { (books[it].thickness * scales[it] * k).toDouble() }.toFloat() + 5f * (books.size - 1)
+        val scales = floatArrayOf(0.98f, 1.05f, 0.92f, 1.0f, 0.88f, 1.02f, 1.08f, 0.96f, 0.9f)
+        val k = 1f
+        val total = books.indices.sumOf { (books[it].thickness * scales[it] * k).toDouble() }.toFloat() + 4f * (books.size - 1)
         var acc = (390f - total) / 2f
         val targets = books.indices.map { i ->
             val s = scales[i] * k
             val w = books[i].thickness * s
             val cx = acc + w / 2f
-            acc += w + 5f
+            acc += w + 4f
             val shelfCy = 470f - BOOK_H_UNITS * s / 2f
             when {
                 picked == i -> BookPose(195f, 330f, 1.12f, ry = 24f, rx = -4f)
@@ -105,7 +109,7 @@ fun LibraryDemo() {
 
             Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 22.dp, vertical = 14.dp)) {
                 Text(
-                    "Your shelf.", color = p.text, fontSize = 36.sp, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Light,
+                    "Your shelf.", color = p.text, fontSize = 36.sp, fontFamily = BbFonts.display, fontWeight = FontWeight(360),
                 )
                 Text(
                     if (picked < 0) "tap a spine to take it down" else books[picked].title + " · " + books[picked].author,

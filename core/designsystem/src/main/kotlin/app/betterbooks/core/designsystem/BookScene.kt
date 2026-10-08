@@ -17,7 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -172,7 +172,7 @@ private fun DrawScope.drawBook(
     }
 
     // light from upper-left-front
-    val lx = -0.45f; val ly = -0.55f; val lz = 0.70f
+    val lx = -0.35f; val ly = -0.55f; val lz = 0.76f
     val ll = sqrt(lx * lx + ly * ly + lz * lz)
 
     class Face(
@@ -213,8 +213,8 @@ private fun DrawScope.drawBook(
         // lighting from the rotated normal
         val n = rot(f.nx, f.ny, f.nz)
         val dot = ((n.x * lx + n.y * ly + n.z * lz) / ll).coerceIn(-1f, 1f)
-        val bright = 0.30f + 0.70f * dot.coerceAtLeast(0f)
-        val shade = ((1f - bright) * 0.78f).coerceIn(0f, 0.8f)
+        val k = 0.63f + 0.49f * dot.coerceAtLeast(0f)
+        val shade = (1f - k).coerceIn(0f, 0.6f)
 
         src[0] = 0f; src[1] = 0f; src[2] = f.fw; src[3] = 0f; src[4] = f.fw; src[5] = f.fh; src[6] = 0f; src[7] = f.fh
         for (i in 0 until 4) { dst[i * 2] = pts[i].x; dst[i * 2 + 1] = pts[i].y }
@@ -237,11 +237,40 @@ private fun DrawScope.drawBook(
     }
 }
 
-private val serif = FontFamily.Serif
+private val serif = BbFonts.displaySmall
+
+private val grainShader: androidx.compose.ui.graphics.Shader by lazy {
+    val n = 256
+    val rnd = java.util.Random(7)
+    val raw = FloatArray(n * n) { rnd.nextFloat() }
+    val px = IntArray(n * n)
+    for (y in 0 until n) for (x in 0 until n) {
+        // woven look: blur across x so the grain is anisotropic (about 3:1)
+        var a = 0f
+        for (d in -1..1) a += raw[y * n + (x + d + n) % n]
+        a /= 3f
+        val alpha = (1.1f * a - 0.5f).coerceIn(0f, 1f)
+        px[y * n + x] = (((alpha * 255).toInt()) shl 24) or 0x00FFFFFF
+    }
+    val bmp = android.graphics.Bitmap.createBitmap(px, n, n, android.graphics.Bitmap.Config.ARGB_8888)
+    val shader = androidx.compose.ui.graphics.ImageShader(
+        bmp.asImageBitmap(), androidx.compose.ui.graphics.TileMode.Repeated, androidx.compose.ui.graphics.TileMode.Repeated,
+    )
+    (shader as android.graphics.Shader).setLocalMatrix(Matrix().apply { setScale(0.42f, 0.42f) })
+    shader
+}
+
+private fun DrawScope.drawGrain(w: Float, h: Float, alpha: Float) {
+    drawRect(
+        brush = androidx.compose.ui.graphics.ShaderBrush(grainShader), size = Size(w, h),
+        alpha = 0.5f * alpha, blendMode = androidx.compose.ui.graphics.BlendMode.Overlay,
+    )
+}
 
 private fun DrawScope.drawFront(b: BookSpec, tm: TextMeasurer, alpha: Float) {
     val ink = b.material.ink
     drawRect(b.material.cloth.copy(alpha = alpha), size = Size(BOOK_W, BOOK_H))
+    drawGrain(BOOK_W, BOOK_H, alpha)
     // directional light across the cloth
     drawRect(
         Brush.linearGradient(
@@ -282,6 +311,7 @@ private fun DrawScope.drawSpine(b: BookSpec, tm: TextMeasurer, alpha: Float) {
     val ink = b.material.ink
     val tw = b.thickness
     drawRect(b.material.cloth.copy(alpha = alpha), size = Size(tw, BOOK_H))
+    drawGrain(tw, BOOK_H, alpha)
     drawRect(
         Brush.horizontalGradient(
             0f to Color.White.copy(alpha = 0.18f * alpha), 0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.3f * alpha),
@@ -292,7 +322,7 @@ private fun DrawScope.drawSpine(b: BookSpec, tm: TextMeasurer, alpha: Float) {
     drawCircle(ink.copy(alpha = 0.92f * alpha), 3.6f, Offset(tw / 2f, 18f))
     val layout = tm.measure(
         b.title,
-        TextStyle(color = ink.copy(alpha = alpha), fontFamily = serif, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.6.sp),
+        TextStyle(color = ink.copy(alpha = alpha), fontFamily = serif, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, letterSpacing = 0.5.sp),
         overflow = TextOverflow.Ellipsis, maxLines = 1,
         constraints = Constraints(maxWidth = ((BOOK_H - 70f) * density).toInt()),
     )
