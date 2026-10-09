@@ -130,7 +130,7 @@ class ShelfMathTest {
         assertEquals(SpineBucket.Slim, spineBucketFor(500))
         assertEquals(SpineBucket.Regular, spineBucketFor(8_000))
         assertEquals(SpineBucket.Thick, spineBucketFor(40_000))
-        assertEquals(9f, spineThicknessUnits(500), 0.001f)
+        assertEquals(24f, spineThicknessUnits(500), 0.001f)
     }
 
     @Test fun oppoFamilyDetection() {

@@ -172,8 +172,8 @@ private fun DottedLeader(modifier: Modifier) {
 private fun Hero(book: Book, ui: HubUi) {
     val p = Kp.palette
     val materials = rememberBookMaterials()
-    val cover = rememberCover(book.coverPath, 480)
-    val spec = rememberHubSpec(book, materials, cover)
+    val coverLoad = rememberCoverLoad(book.coverPath, 480)
+    val spec = rememberHubSpec(book, materials, coverLoad.image)
     BoxWithConstraints(Modifier.fillMaxWidth().height(HERO_H.dp)) {
         val w = maxWidth.value
         val k = 390f / w
@@ -181,7 +181,14 @@ private fun Hero(book: Book, ui: HubUi) {
         val bookH = HUB_BOOK_W * 1.5f
         val cy = (PLANK_TOP + PlankBaseline.value - bookH / 2f) * k
         ShelfPlank(Modifier.offset(y = PLANK_TOP.dp))
-        BookScene(listOf(spec), listOf(BookPose((24f + 72f) * k, cy, s, ry = 24f, rx = -4f)), Modifier.fillMaxSize())
+        if (coverLoad.ready) {
+            // Spine to cover: the book leaves the shelf edge-on, lifts, and turns to face you (brief 4.1).
+            val pose = BookPose((24f + 72f) * k, cy, s, ry = 24f, rx = -4f)
+            BookScene(
+                listOf(spec), listOf(pose), Modifier.fillMaxSize(),
+                enterFrom = listOf(pose.copy(cx = pose.cx - 18f * k, scale = s * 0.94f, ry = 90f, rx = 0f, alpha = 0f, lift = 1f)),
+            )
+        }
         val ribbonScale = HUB_BOOK_W / 100f
         BookRibbons(
             book.readFraction, book.listenFraction, swingKey = book.id,

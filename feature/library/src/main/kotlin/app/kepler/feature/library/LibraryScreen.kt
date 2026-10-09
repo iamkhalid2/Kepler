@@ -247,7 +247,9 @@ private fun ShelfRow(
     val s = SPINE_DP * k / BOOK_H         // book scale so the spine is 150 dp tall
     val baselineDp = SHELF_ROW_DP - PlankHeight.value + PlankBaseline.value
     val cy = (baselineDp - SPINE_DP / 2f) * k
-    val specs = remember(books, materials) { books.map { bookSpecFor(it, materials) } }
+    // small jackets so each spine can wear its jacket's colour
+    val covers = books.map { rememberCover(it.coverPath, 96) }
+    val specs = remember(books, materials, covers) { books.mapIndexed { i, b -> bookSpecFor(b, materials, covers[i]) } }
     val targets = remember(books, widthDp) {
         var x = GUTTER_DP
         books.map { b ->

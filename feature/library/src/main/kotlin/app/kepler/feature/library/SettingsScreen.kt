@@ -120,7 +120,7 @@ fun SettingsScreen(ui: SettingsUi, onBack: () -> Unit, vm: SettingsViewModel) {
 
             Group(R.string.group_appearance)
             Column(Modifier.padding(horizontal = 24.dp)) {
-                KpCaps(stringResource(R.string.accent), color = p.text2)
+                FieldLabel(R.string.accent)
                 SeedSpines(ui.seed, ui.app.dark, vm::setSeed)
                 Spacer(Modifier.height(16.dp))
                 KpSegmented(
@@ -205,10 +205,16 @@ private fun Status(connected: Boolean) {
 @Composable
 private fun LabeledSegmented(label: Int, options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Column {
-        KpCaps(stringResource(label))
+        FieldLabel(label)
         Spacer(Modifier.height(8.dp))
         KpSegmented(options, selected, onSelect)
     }
+}
+
+/** A setting's own name, in sentence case under the group caps, so the two never stack as caps on caps. */
+@Composable
+private fun FieldLabel(label: Int) {
+    Text(stringResource(label), color = Kp.palette.text, style = KpType.body, modifier = Modifier.padding(top = 4.dp))
 }
 
 private fun money(cents: Int): String = "$" + "%.2f".format(cents / 100.0)

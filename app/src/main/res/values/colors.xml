@@ -1,8 +1,11 @@
 <resources>
     <!-- Kept for themes.xml (windowBackground); not part of the brand. -->
-    <color name="bb_ink">#05070D</color>
+    <color name="bb_ink">#000000</color>
     <!-- Kepler brand: launcher background is Cobalt taken down to ink; bone is shelf-language bone L .926. -->
     <color name="kepler_night">#0F1E40</color>
     <color name="kepler_bone">#ECE6D9</color>
     <color name="kepler_cobalt">#4D8BFF</color>
+    <!-- Text selection handles and cursors (WebView and fields): the shelf-language pencil, so they
+         sit on the page like graphite and never clash with whichever accent the reader chose. -->
+    <color name="kepler_pencil">#787161</color>
 </resources>

@@ -111,6 +111,7 @@
     <string name="nothing_due">Nothing is due today.</string>
     <string name="review_done">That\'s today\'s review. More cards come due tomorrow.</string>
     <string name="week_caption">%1$d of %2$d review days this week · %3$d freezes left</string>
+    <string name="week_caption_plain">%1$d of %2$d review days this week</string>
 
     <!-- Notebook -->
     <string name="notebook_caps">Notebook</string>

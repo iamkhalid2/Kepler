@@ -40,10 +40,14 @@ object KpFonts {
     /** Numerals: Fraunces 500, opsz 18. Pair with `tnum` (see [KpType.numeral]). */
     val numeral = FontFamily(fraunces(500, 18f))
 
-    /** Author lines and quoted sentences. Literata ships roman only here, so the italic is synthesised. */
+    /**
+     * Author lines and quoted sentences. Literata ships roman only here, so the italic is synthesised:
+     * the face is registered as Normal on purpose, because a face declared Italic is trusted as a real
+     * italic and drawn upright.
+     */
     val readingItalic = FontFamily(
         Font(
-            R.font.literata, FontWeight(400), style = FontStyle.Italic,
+            R.font.literata, FontWeight(400), style = FontStyle.Normal,
             variationSettings = FontVariation.Settings(FontVariation.weight(400), FontVariation.Setting("opsz", 14f)),
         ),
     )

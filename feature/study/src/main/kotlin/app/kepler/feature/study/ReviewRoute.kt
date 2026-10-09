@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.kepler.core.designsystem.Kp
 import app.kepler.core.model.Rating
 import kotlin.math.PI
@@ -104,13 +105,15 @@ private fun ReviewCardStage(s: ReviewState, vm: ReviewViewModel, modifier: Modif
     val p = Kp.palette
     val card = s.current ?: return
     Column(modifier.fillMaxWidth()) {
-        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp), contentAlignment = Alignment.Center) {
+            // a 3:4 index card resting on the table, not a pad stretched to the screen
+            Box(Modifier.fillMaxWidth().heightIn(max = maxWidth * 4f / 3f)) {
             FlipCard(
                 flipped = s.flipped, onFlip = vm::flip,
                 onSwipe = { r -> if (s.flipped) vm.grade(r) },
                 front = {
                     Column(Modifier.fillMaxSize()) {
-                        BasicText(card.front, style = StudyType.cardProse(p.readText))
+                        BasicText(card.front, style = StudyType.cardProse(p.readText).copy(fontSize = 21.sp))
                         s.hint?.let {
                             Spacer(Modifier.height(16.dp))
                             BasicText(it, style = StudyType.quote(p.text2))
@@ -131,6 +134,7 @@ private fun ReviewCardStage(s: ReviewState, vm: ReviewViewModel, modifier: Modif
                     }
                 },
             )
+            }
         }
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
             if (!s.flipped) {
@@ -239,7 +243,8 @@ internal fun IndexCard(modifier: Modifier = Modifier, scroll: Boolean = true, co
             Modifier.matchParentSize().clip(shape).background(p.page).border(1.dp, p.hairline, shape).drawBehind {
                 val top = 24.dp.toPx()
                 drawRect(p.accent, Offset(0f, top), Size(size.width, 1.dp.toPx()))
-                var y = top + 26.dp.toPx()
+                // rules sit just under each 26 dp line of card prose (text starts 16 below the accent rule)
+                var y = top + 38.dp.toPx()
                 while (y < size.height - 8.dp.toPx()) { drawRect(p.hairline.copy(alpha = 0.6f), Offset(0f, y), Size(size.width, 1.dp.toPx())); y += 26.dp.toPx() }
             },
         )
@@ -296,7 +301,9 @@ internal fun WeekSquares(w: WeekProgress, modifier: Modifier = Modifier) {
 internal fun WeekCaption(w: WeekProgress) {
     val p = Kp.palette
     BasicText(
-        stringResource(R.string.week_caption, w.reviewedDays, w.goal, w.freezesLeft),
+        // "0 freezes left" reads as a warning; with none left the caption just counts days
+        if (w.freezesLeft > 0) stringResource(R.string.week_caption, w.reviewedDays, w.goal, w.freezesLeft)
+        else stringResource(R.string.week_caption_plain, w.reviewedDays, w.goal),
         style = StudyType.caption(p.text2),
     )
 }

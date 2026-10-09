@@ -18,8 +18,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Spine thickness buckets: 6, 9 or 12 percent of the cover width. */
-enum class SpineBucket(val fraction: Float) { Slim(0.06f), Regular(0.09f), Thick(0.12f) }
+/**
+ * Spine thickness buckets as a share of the cover width. Design lead: the brief's 6/9/12 percent
+ * gave 9 dp spines on a 150 dp shelf, too thin to read a title; 16/20/25 percent reads as real
+ * cloth spines (16 to 25 dp) without turning into bricks.
+ */
+enum class SpineBucket(val fraction: Float) { Slim(0.16f), Regular(0.20f), Thick(0.25f) }
 
 /** Page count is not stored, so the sentence count stands in for it. */
 fun spineBucketFor(sentenceCount: Int): SpineBucket = when {
@@ -50,6 +54,21 @@ fun rememberCover(path: String?, maxWidthPx: Int = 360): ImageBitmap? {
         value = if (path == null) null else withContext(Dispatchers.IO) { decodeCover(path, maxWidthPx) }
     }
     return state.value
+}
+
+/**
+ * Like [rememberCover] but tells "still decoding" apart from "no jacket", so a 3D book can wait for
+ * its jacket instead of showing the typographic cover and swapping a frame later.
+ */
+class CoverLoad(val ready: Boolean, val image: ImageBitmap?)
+
+@Composable
+fun rememberCoverLoad(path: String?, maxWidthPx: Int = 360): CoverLoad {
+    val state = produceState<Pair<String?, ImageBitmap?>?>(null, path, maxWidthPx) {
+        value = path to (if (path == null) null else withContext(Dispatchers.IO) { decodeCover(path, maxWidthPx) })
+    }
+    val v = state.value
+    return if (v != null && v.first == path) CoverLoad(true, v.second) else CoverLoad(false, null)
 }
 
 internal fun decodeCover(path: String, maxWidthPx: Int): ImageBitmap? = runCatching {

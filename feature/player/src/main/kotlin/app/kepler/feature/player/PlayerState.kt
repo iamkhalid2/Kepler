@@ -46,9 +46,13 @@ internal fun <T> PlaybackController.selectInfo(selector: (PlaybackInfo) -> T): S
 
 /** Loads a jacket image off the main thread, small enough for a 220 dp cover. */
 @Composable
-internal fun rememberCover(path: String?): ImageBitmap? {
-    val image by produceState<ImageBitmap?>(null, path) {
-        value = if (path == null) null else withContext(Dispatchers.IO) {
+internal fun rememberCover(path: String?): ImageBitmap? = rememberCoverLoad(path).second
+
+/** (decoded for the current path, image): lets the hero wait for its jacket instead of swapping it in. */
+@Composable
+internal fun rememberCoverLoad(path: String?): Pair<Boolean, ImageBitmap?> {
+    val loaded by produceState<Pair<String?, ImageBitmap?>?>(null, path) {
+        value = path to if (path == null) null else withContext(Dispatchers.IO) {
             runCatching {
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(path, bounds)
@@ -58,7 +62,8 @@ internal fun rememberCover(path: String?): ImageBitmap? {
             }.getOrNull()
         }
     }
-    return image
+    val v = loaded
+    return if (v != null && v.first == path) true to v.second else false to null
 }
 
 /** The same cloth the library shelf gives this book (rule lives in :core:designsystem). */

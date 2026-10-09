@@ -96,7 +96,8 @@ fun FullPlayerRoute(
     val section by controller.selectInfo { it.sectionTitle }
     val voice by controller.selectInfo { it.voiceName }
     val sleepAtSectionEnd by controller.selectInfo { it.sleepAtSectionEnd }
-    val cover = rememberCover(controller.selectInfo { it.coverPath }.value)
+    val coverPath by controller.selectInfo { it.coverPath }
+    val (coverReady, cover) = rememberCoverLoad(coverPath)
 
     var sheet by remember { mutableStateOf<PlayerSheet?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -115,7 +116,7 @@ fun FullPlayerRoute(
                 KpTextLink(stringResource(R.string.player_read_along), { onReadAlong(controller.state.value.ordinal) })
             }
 
-            Hero(bookId = loadedId ?: bookId, title = title, author = author, cover = cover)
+            Hero(bookId = loadedId ?: bookId, title = title, author = author, cover = cover, ready = title != null && coverReady)
 
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
                 if (title == null) LoadingBlocks() else {
@@ -200,22 +201,27 @@ fun FullPlayerRoute(
 
 /** The book standing on a plank. Its width is 220 dp at a 390 dp screen and scales with the screen. */
 @Composable
-private fun Hero(bookId: BookId, title: String?, author: String?, cover: androidx.compose.ui.graphics.ImageBitmap?) {
+private fun Hero(bookId: BookId, title: String?, author: String?, cover: androidx.compose.ui.graphics.ImageBitmap?, ready: Boolean) {
     val p = Kp.palette
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val unit: Dp = maxWidth / 390f
         val scale = HERO_WIDTH / 150f
         val bookHeight = unit * (BOOK_H * scale)
-        val top = 8.dp
+        val top = 16.dp
         val height = top + bookHeight - PlankBaseline + PlankHeight
         val spec = remember(bookId, title, author, cover, p) { bookSpec(bookId, title, author, p, cover, thickness = 26f) }
         Box(Modifier.fillMaxWidth().height(height)) {
             ShelfPlank(Modifier.align(Alignment.BottomCenter))
-            BookScene(
-                books = listOf(spec),
-                targets = listOf(BookPose(cx = 195f, cy = (top + bookHeight / 2f) / unit, scale = scale, ry = 0f, rx = HERO_PITCH)),
-                modifier = Modifier.fillMaxSize(),
-            )
+            if (ready) {
+                // The book turns to face you: it arrives at the hub's three-quarter pose and settles square (brief 4.3).
+                val pose = BookPose(cx = 195f, cy = (top + bookHeight / 2f) / unit, scale = scale, ry = 0f, rx = HERO_PITCH)
+                BookScene(
+                    books = listOf(spec),
+                    targets = listOf(pose),
+                    modifier = Modifier.fillMaxSize(),
+                    enterFrom = listOf(pose.copy(scale = scale / 1.14f, ry = 24f, rx = -2f, alpha = 0f, lift = 1f)),
+                )
+            }
         }
     }
 }

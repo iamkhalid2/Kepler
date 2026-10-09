@@ -124,7 +124,8 @@ fun kpPalette(seed: Color, dark: Boolean): KpPalette {
         pencil = if (dark) hex(0xFFA39B8A) else hex(0xFF787161),
         key = if (dark) hex(0xFFECE6D9) else hex(0xFF201E1A),
         onKey = if (dark) hex(0xFF0E0E10) else hex(0xFFECE6D9),
-        edge = hairline.withLch(l = hairline.toLch().l + 0.08f),
+        // a key's edge must read against its surroundings: lighter than the hairline on black, darker on linen
+        edge = hairline.withLch(l = hairline.toLch().l + if (dark) 0.08f else -0.10f),
         readAlongLine = accent.copy(alpha = if (dark) 0.30f else 0.22f),
         materials = kpMaterials(seed, accent, bg, dark),
     )

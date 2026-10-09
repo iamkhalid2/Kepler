@@ -2,7 +2,7 @@ package app.kepler.core.designsystem
 
 import android.graphics.Matrix
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.State
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -35,6 +36,8 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -49,7 +52,32 @@ class BookSpec(
     val material: BookMaterial,
     /** Optional jacket image. When present it fills the front face instead of the typographic cover. */
     val cover: ImageBitmap? = null,
-)
+) {
+    /** A jacketed book's spine and boards wear the jacket's own colour, not a theme cloth. */
+    val spineMaterial: BookMaterial by lazy { cover?.let(::jacketSpineMaterial) ?: material }
+}
+
+/** Average of the strip beside the hinge: that is the colour a jacket wraps around the spine. */
+private fun jacketSpineMaterial(img: ImageBitmap): BookMaterial? = runCatching {
+    val bmp = img.asAndroidBitmap()
+    val stripW = (bmp.width / 10).coerceAtLeast(1)
+    val stepX = (stripW / 6).coerceAtLeast(1)
+    val stepY = (bmp.height / 64).coerceAtLeast(1)
+    var r = 0f; var g = 0f; var b = 0f; var n = 0
+    var y = 0
+    while (y < bmp.height) {
+        var x = 0
+        while (x < stripW) {
+            val c = bmp.getPixel(x, y)
+            r += (c shr 16 and 0xFF); g += (c shr 8 and 0xFF); b += (c and 0xFF); n++
+            x += stepX
+        }
+        y += stepY
+    }
+    if (n == 0) return null
+    val avg = Color(r / n / 255f, g / n / 255f, b / n / 255f)
+    BookMaterial(avg, inkFor(avg))
+}.getOrNull()
 
 /**
  * Where a book is, in a 390-unit-wide design space (scaled to the real width at draw time).
@@ -69,28 +97,49 @@ const val BOOK_H = 225f
 private const val CAMERA = 1300f
 private const val SPACE_W = 390f
 
-private class PoseState(
-    val cx: State<Float>, val cy: State<Float>, val scale: State<Float>,
-    val ry: State<Float>, val rx: State<Float>, val alpha: State<Float>, val lift: State<Float>,
-)
+private class PoseState(start: BookPose) {
+    val cx = Animatable(start.cx)
+    val cy = Animatable(start.cy)
+    val scale = Animatable(start.scale)
+    val ry = Animatable(start.ry)
+    val rx = Animatable(start.rx)
+    val alpha = Animatable(start.alpha)
+    val lift = Animatable(start.lift)
+    var entered = false
+}
 
+/**
+ * Each channel is its own spring so a retarget mid-flight keeps its velocity (brief section 4):
+ * position and size `move`, yaw `turn` (lands with a small overshoot), pitch `settle`, shadows `lift`.
+ * When the scene enters from [from], lift goes first, yaw follows at +60 ms and position at +90 ms.
+ */
 @Composable
-private fun animatePose(t: BookPose): PoseState {
-    // reduced motion: poses snap
+private fun animatePose(t: BookPose, from: BookPose?): PoseState {
     val reduced = rememberReducedMotion()
-    val spec: androidx.compose.animation.core.AnimationSpec<Float> =
-        if (reduced) androidx.compose.animation.core.snap() else spring(dampingRatio = 0.82f, stiffness = 170f)
-    val rot: androidx.compose.animation.core.AnimationSpec<Float> =
-        if (reduced) androidx.compose.animation.core.snap() else spring(dampingRatio = 0.78f, stiffness = 130f)
-    return PoseState(
-        animateFloatAsState(t.cx, spec, label = "cx"),
-        animateFloatAsState(t.cy, spec, label = "cy"),
-        animateFloatAsState(t.scale, spec, label = "s"),
-        animateFloatAsState(t.ry, rot, label = "ry"),
-        animateFloatAsState(t.rx, rot, label = "rx"),
-        animateFloatAsState(t.alpha, if (reduced) androidx.compose.animation.core.snap() else spring(Spring.DampingRatioNoBouncy, 400f), label = "a"),
-        animateFloatAsState(t.lift, if (reduced) androidx.compose.animation.core.snap() else KpMotion.lift(), label = "lift"),
-    )
+    val state = remember { PoseState(if (from == null || reduced) t else from) }
+    LaunchedEffect(t, reduced) {
+        val entering = !state.entered && from != null
+        state.entered = true
+        if (reduced) {
+            state.cx.snapTo(t.cx); state.cy.snapTo(t.cy); state.scale.snapTo(t.scale)
+            state.ry.snapTo(t.ry); state.rx.snapTo(t.rx); state.alpha.snapTo(t.alpha); state.lift.snapTo(t.lift)
+            return@LaunchedEffect
+        }
+        launch { state.lift.animateTo(t.lift, KpMotion.lift()) }
+        launch { state.alpha.animateTo(t.alpha, spring(Spring.DampingRatioNoBouncy, 400f)) }
+        launch { state.rx.animateTo(t.rx, KpMotion.settle()) }
+        launch {
+            if (entering) delay(KpMotion.STAGGER_MS)
+            state.ry.animateTo(t.ry, KpMotion.turn())
+        }
+        launch {
+            if (entering) delay(90)
+            launch { state.cx.animateTo(t.cx, KpMotion.move()) }
+            launch { state.cy.animateTo(t.cy, KpMotion.move()) }
+            state.scale.animateTo(t.scale, KpMotion.move())
+        }
+    }
+    return state
 }
 
 /**
@@ -107,9 +156,11 @@ fun BookScene(
     onLongPress: (index: Int) -> Unit = {},
     /** Extra touch slop around each book, in design units. Thin shelf spines want more. */
     hitPad: Float = 6f,
+    /** Poses the books start from when the scene first appears (an entrance); null = start at [targets]. */
+    enterFrom: List<BookPose>? = null,
 ) {
     val palette = Kp.palette
-    val poses = books.indices.map { animatePose(targets[it]) }
+    val poses = books.indices.map { animatePose(targets[it], enterFrom?.getOrNull(it)) }
     val measurer = rememberTextMeasurer()
     val matrix = remember { Matrix() }
     val src = remember { FloatArray(8) }
@@ -251,7 +302,7 @@ private fun DrawScope.drawBook(
         nc.concat(m)
         when (f.name) {
             "front" -> drawFront(b, tm, alpha)
-            "back" -> drawRect(b.material.cloth.copy(alpha = alpha), size = Size(f.fw, f.fh))
+            "back" -> drawRect(b.spineMaterial.cloth.copy(alpha = alpha), size = Size(f.fw, f.fh))
             "spine" -> drawSpine(b, tm, alpha)
             "pages" -> drawPages(f.fw, f.fh, vertical = true, alpha = alpha, paper = palette.materials.paper)
             "top" -> drawPages(f.fw, f.fh, vertical = false, alpha = alpha, paper = palette.materials.paper)
@@ -347,9 +398,10 @@ private fun DrawScope.drawFront(b: BookSpec, tm: TextMeasurer, alpha: Float) {
 }
 
 private fun DrawScope.drawSpine(b: BookSpec, tm: TextMeasurer, alpha: Float) {
-    val ink = b.material.ink
+    val mat = b.spineMaterial
+    val ink = mat.ink
     val tw = b.thickness
-    drawRect(b.material.cloth.copy(alpha = alpha), size = Size(tw, BOOK_H))
+    drawRect(mat.cloth.copy(alpha = alpha), size = Size(tw, BOOK_H))
     drawGrain(tw, BOOK_H, alpha)
     drawRect(
         Brush.horizontalGradient(
@@ -358,8 +410,8 @@ private fun DrawScope.drawSpine(b: BookSpec, tm: TextMeasurer, alpha: Float) {
         ),
         size = Size(tw, BOOK_H),
     )
-    // thin spines (6 to 12 percent of the cover width) need smaller type
-    val fs = (tw * 0.55f).coerceIn(5f, 11f)
+    // type follows the spine width so a shelf spine stays legible and a slim one never overflows
+    val fs = (tw * 0.42f).coerceIn(5f, 14f)
     drawCircle(ink.copy(alpha = 0.92f * alpha), (tw * 0.2f).coerceIn(1.6f, 3.6f), Offset(tw / 2f, 18f))
     val layout = tm.measure(
         b.title,

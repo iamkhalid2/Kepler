@@ -637,11 +637,12 @@ private fun Bookmark(marked: Boolean, chrome: Boolean, reduced: Boolean, onToggl
     Box(Modifier.fillMaxWidth().statusBarsPadding().offset(y = drop), contentAlignment = Alignment.TopEnd) {
         Box(
             Modifier
-                .padding(end = 14.dp)
                 .size(48.dp, 64.dp)
                 .semantics { contentDescription = label }
-                .clickable(role = Role.Button) { haptics.play(if (marked) HapticToken.Tap else HapticToken.Confirm); onToggle() },
-            contentAlignment = Alignment.TopCenter,
+                .clickable(role = Role.Button) { haptics.play(if (marked) HapticToken.Tap else HapticToken.Confirm); onToggle() }
+                // the ribbon hangs in the 26 dp outer margin, never over the text column
+                .padding(end = 6.dp),
+            contentAlignment = Alignment.TopEnd,
         ) {
             if (marked) {
                 // A silk ribbon that swings once when it is laid in; nothing loops.

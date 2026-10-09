@@ -87,11 +87,15 @@ fun LearnRoute(
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 12.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 BackKey(onBack)
+                // the budget sits under the caps title so a long book title is never cut to make room for it
                 Column(Modifier.weight(1f).padding(start = 4.dp)) {
                     CapsLine(stringResource(R.string.learn_caps, s.book?.title.orEmpty()))
-                }
-                s.budget?.let {
-                    BasicText(stringResource(R.string.requests_left, it.requestsLeftToday), style = StudyType.numeral(p.text2, 13f))
+                    s.budget?.let {
+                        BasicText(
+                            stringResource(R.string.requests_left, it.requestsLeftToday),
+                            Modifier.padding(top = 2.dp), style = StudyType.numeral(p.text2, 13f), maxLines = 1,
+                        )
+                    }
                 }
             }
             TabStrip(tab) { tab = it }

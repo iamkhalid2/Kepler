@@ -1,6 +1,7 @@
 package app.kepler.core.designsystem
 
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.em
@@ -16,7 +17,7 @@ object KpType {
         fontFamily = KpFonts.displayFor(26f), fontWeight = FontWeight(360), fontSize = 26.sp, lineHeight = 30.sp,
     )
     val title = TextStyle(fontFamily = KpFonts.title, fontWeight = FontWeight(450), fontSize = 19.sp, lineHeight = 24.sp)
-    val author = TextStyle(fontFamily = KpFonts.readingItalic, fontSize = 14.sp, lineHeight = 20.sp)
+    val author = TextStyle(fontFamily = KpFonts.readingItalic, fontStyle = FontStyle.Italic, fontSize = 14.sp, lineHeight = 20.sp)
     val body = TextStyle(fontFamily = KpFonts.ui, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 22.sp)
     val rowTitle = TextStyle(fontFamily = KpFonts.ui, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 22.sp)
     val caption = TextStyle(fontFamily = KpFonts.ui, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 18.sp)
