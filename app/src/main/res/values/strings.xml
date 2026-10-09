@@ -6,4 +6,9 @@
     <string name="toast_cant_open">This file can’t be opened. It may be damaged or encrypted.</string>
     <string name="toast_book_missing">That book isn’t in your library.</string>
     <string name="toast_added">Added %s to your library.</string>
+    <string name="mini_caption">%1$s · %2$s left</string>
+    <string name="mini_preparing">Getting the narration ready</string>
+    <string name="mini_fallback">Listening</string>
+    <string name="duration_minutes">%d min</string>
+    <string name="duration_hours_minutes">%1$dh %2$02dm</string>
 </resources>

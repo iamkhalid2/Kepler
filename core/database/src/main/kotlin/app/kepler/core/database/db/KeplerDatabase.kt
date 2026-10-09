@@ -9,7 +9,7 @@ import androidx.room3.RoomDatabase
         ConsumedIntervalEntity::class, AnnotationEntity::class, BookmarkEntity::class,
         AudioSegmentEntity::class, SyncRowEntity::class, CardEntity::class, AiCacheEntity::class, AiUsageEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 internal abstract class KeplerDatabase : RoomDatabase() {

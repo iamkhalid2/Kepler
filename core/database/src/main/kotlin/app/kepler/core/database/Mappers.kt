@@ -19,7 +19,7 @@ import app.kepler.core.model.VoiceRef
 
 internal fun BookEntity.toModel() = Book(
     id, title, authors, language, enumOr(contentType, ContentType.MIXED), epubPath, coverPath,
-    addedAt, lastOpenedAt, sentenceCount, readFraction, listenFraction,
+    addedAt, lastOpenedAt, sentenceCount, readFraction, listenFraction, positionFraction,
 )
 
 internal fun SectionEntity.toModel() = Section(

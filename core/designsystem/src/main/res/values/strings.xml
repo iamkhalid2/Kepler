@@ -1,0 +1,14 @@
+<resources>
+    <string name="kp_back">Back</string>
+    <string name="kp_show">Show</string>
+    <string name="kp_hide">Hide</string>
+    <string name="kp_send">Send</string>
+    <string name="kp_play">Play</string>
+    <string name="kp_pause">Pause</string>
+    <string name="kp_try_again">Try again</string>
+    <string name="kp_on">On</string>
+    <string name="kp_off">Off</string>
+    <string name="kp_open_player">Open player</string>
+    <string name="kp_skip_back">Back %d seconds</string>
+    <string name="kp_skip_forward">Forward %d seconds</string>
+</resources>

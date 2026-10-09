@@ -10,6 +10,7 @@ import androidx.room3.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import app.kepler.core.database.db.KeplerDatabase
 import app.kepler.core.database.db.Fts
+import app.kepler.core.database.db.KeplerMigrations
 import app.kepler.core.database.repo.AiStoreImpl
 import app.kepler.core.database.repo.AnnotationRepositoryImpl
 import app.kepler.core.database.repo.AudioRepositoryImpl
@@ -57,6 +58,7 @@ class DataLayer internal constructor(
             .setDriver(BundledSQLiteDriver())
             .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
             .setQueryCoroutineContext(Dispatchers.IO)
+            .addMigrations(*KeplerMigrations.ALL)
             .addCallback(Fts.callback)
             .build(),
         booksDir = File(context.filesDir, "books"),

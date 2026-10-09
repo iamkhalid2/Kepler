@@ -48,6 +48,19 @@ data class PlaybackState(
     val sleepRemainingMs: Long? = null,
     val title: String? = null,
     val error: String? = null,
+    /**
+     * Chapter timing. All durations are media milliseconds at 1x (divide by [speed] for wall-clock time).
+     * [currentSectionId] is the id of the current ChapterMark (the scrubber chapter), null before playback.
+     * [sectionElapsedMs] / [sectionDurationMs] cover the whole chapter, not just the audio loaded so far.
+     * [sectionDurationEstimated] is true while part of the chapter has no narration yet and its length is
+     * estimated from the word count. [bookRemainingMs] is the narrated time left in the book.
+     */
+    val currentSectionId: Long? = null,
+    val sectionElapsedMs: Long = 0,
+    val sectionDurationMs: Long = 0,
+    val sectionDurationEstimated: Boolean = false,
+    val bookRemainingMs: Long = 0,
+    val bookRemainingEstimated: Boolean = false,
 )
 
 interface PlaybackController {
@@ -61,6 +74,21 @@ interface PlaybackController {
     fun setSpeed(speed: Float)
     /** `minutes` > 0 = timer, 0 = off, -1 = end of current section. */
     fun setSleepTimer(minutes: Int)
+
+    /**
+     * Seeks to [fraction] (0..1) of the current chapter. Chapters are measured by [PlaybackState.sectionDurationMs]
+     * and may be partly estimated; the default moves by the time difference and engines override it with an
+     * exact, sentence-aware version.
+     */
+    fun seekWithinSection(fraction: Float) {
+        val s = state.value
+        if (s.sectionDurationMs <= 0) return
+        val target = (fraction.coerceIn(0f, 1f) * s.sectionDurationMs).toLong()
+        seekByMs(target - s.sectionElapsedMs)
+    }
+
+    /** Seeks to [fraction] (0..1) of the narrated book. Default is a no-op for controllers without a book clock. */
+    fun seekWithinBook(fraction: Float) {}
 }
 
 // ================= AI (implemented by :engine:ai) =================
@@ -124,4 +152,6 @@ interface CardRepository {
     suspend fun update(card: Card)
     suspend fun delete(id: Long)
     suspend fun reviewedToday(nowMs: Long): Int
+    /** Live version of [reviewedToday]: re-emits when a card is reviewed, so counters never lag a refresh behind. */
+    fun reviewedTodayFlow(nowMs: Long): Flow<Int> = kotlinx.coroutines.flow.flow { emit(reviewedToday(nowMs)) }
 }

@@ -36,6 +36,10 @@ class PlaybackClient(context: Context) : PlaybackController, PlaybackInfoSource 
     override fun seekByMs(deltaMs: Long) = custom(PlaybackCommands.SEEK_BY_MS, deltaMs)
     override fun setSpeed(speed: Float) = withController { it.setPlaybackSpeed(speed) }
     override fun setSleepTimer(minutes: Int) = custom(PlaybackCommands.SLEEP, minutes.toLong())
+    override fun seekWithinSection(fraction: Float) = custom(PlaybackCommands.SEEK_SECTION_FRACTION, fractionArg(fraction))
+    override fun seekWithinBook(fraction: Float) = custom(PlaybackCommands.SEEK_BOOK_FRACTION, fractionArg(fraction))
+
+    private fun fractionArg(fraction: Float): Long = (fraction.coerceIn(0f, 1f) * PlaybackCommands.FRACTION_SCALE).toLong()
 
     /** Disconnects. The service keeps playing if it was playing. */
     fun release() {

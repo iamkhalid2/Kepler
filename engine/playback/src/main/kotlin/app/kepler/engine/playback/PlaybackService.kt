@@ -36,7 +36,12 @@ internal object PlaybackCommands {
     val SKIP_SENTENCES = SessionCommand(PREFIX + "SKIP_SENTENCES", Bundle.EMPTY)
     val SEEK_BY_MS = SessionCommand(PREFIX + "SEEK_BY_MS", Bundle.EMPTY)
     val SLEEP = SessionCommand(PREFIX + "SLEEP", Bundle.EMPTY)
-    val ALL = listOf(PLAY, SEEK_SENTENCE, SKIP_SENTENCES, SEEK_BY_MS, SLEEP)
+    val SEEK_SECTION_FRACTION = SessionCommand(PREFIX + "SEEK_SECTION_FRACTION", Bundle.EMPTY)
+    val SEEK_BOOK_FRACTION = SessionCommand(PREFIX + "SEEK_BOOK_FRACTION", Bundle.EMPTY)
+    val ALL = listOf(PLAY, SEEK_SENTENCE, SKIP_SENTENCES, SEEK_BY_MS, SLEEP, SEEK_SECTION_FRACTION, SEEK_BOOK_FRACTION)
+
+    /** Fractions travel as parts per million in the long argument. */
+    const val FRACTION_SCALE = 1_000_000f
 
     const val ARG_BOOK = "book"
     const val ARG_VALUE = "value"
@@ -120,6 +125,8 @@ class PlaybackService : MediaLibraryService() {
                 PlaybackCommands.SKIP_SENTENCES.customAction -> engine.skipSentences(value.toInt())
                 PlaybackCommands.SEEK_BY_MS.customAction -> engine.seekByMs(value)
                 PlaybackCommands.SLEEP.customAction -> engine.setSleepTimer(value.toInt())
+                PlaybackCommands.SEEK_SECTION_FRACTION.customAction -> engine.seekWithinSection(value / PlaybackCommands.FRACTION_SCALE)
+                PlaybackCommands.SEEK_BOOK_FRACTION.customAction -> engine.seekWithinBook(value / PlaybackCommands.FRACTION_SCALE)
                 else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))

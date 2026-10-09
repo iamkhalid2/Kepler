@@ -98,7 +98,7 @@ internal class ChapterPackService(
             store.get(KIND, k)?.let { decode(it, text)?.let { r -> remember(book, text, it); return@withLock r } }
             val prompt = variant(book)
             val pack = sanitize(
-                runner.json(priority, spec, prompt.system, userMessage(book, text), maxTokens = 3500),
+                runner.json(priority, spec, prompt.system, userMessage(book, text), maxTokens = PACK_MAX_TOKENS),
                 text,
             )
             val json = AiJson.encodeToString(ChapterPack.serializer(), pack)
@@ -140,6 +140,8 @@ internal class ChapterPackService(
     }
 
     private companion object {
+        /** Small enough to finish in seconds on a free model; the prompt asks for compact output to fit. */
+        const val PACK_MAX_TOKENS = 900
         const val KIND = "chapter-pack"
         const val REF_KIND = "chapter-pack-ref"
     }

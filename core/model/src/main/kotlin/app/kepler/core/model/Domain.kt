@@ -24,6 +24,12 @@ data class Book(
     /** 0..1 fraction of sentences consumed by reading / by listening. */
     val readFraction: Float,
     val listenFraction: Float,
+    /**
+     * 0..1 where the reader or listener is now: the most recently saved position (reading or listening)
+     * as ordinal / sentenceCount. This is "where you are" (decision #111) and says nothing about what was
+     * consumed; readFraction / listenFraction stay the consumed measures used by the spoiler fence and stats.
+     */
+    val positionFraction: Float = 0f,
 )
 
 data class Section(

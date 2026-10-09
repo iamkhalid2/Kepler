@@ -56,6 +56,35 @@ class SectionIndex(sections: List<Section>, private val sentenceCount: Int, book
 
     fun isNarrated(ordinal: Int): Boolean = runIndexFor(ordinal) >= 0
 
+    /** The narrated runs that overlap [start]..[end], clipped to it. */
+    fun narratedRuns(start: Int, end: Int): List<IntRange> {
+        val out = ArrayList<IntRange>()
+        for (i in runStarts.indices) {
+            val a = maxOf(runStarts[i], start)
+            val b = minOf(runEnds[i], end)
+            if (a <= b) out += a..b
+        }
+        return out
+    }
+
+    /** How many narrated sentences lie in [start]..[end]. */
+    fun narratedCount(start: Int, end: Int): Int {
+        var n = 0
+        for (i in runStarts.indices) {
+            val a = maxOf(runStarts[i], start)
+            val b = minOf(runEnds[i], end)
+            if (a <= b) n += b - a + 1
+        }
+        return n
+    }
+
+    /** Index into [marks] of the chapter that holds [ordinal], or -1 without chapters. */
+    fun markIndexAt(ordinal: Int): Int {
+        if (marks.isEmpty()) return -1
+        val i = markStarts.binarySearch(ordinal)
+        return if (i >= 0) i else (-i - 2).coerceAtLeast(0)
+    }
+
     /** [ordinal] itself if narrated, otherwise the start of the next narrated run, or null at the end. */
     fun firstNarratedFrom(ordinal: Int): Int? {
         if (runStarts.isEmpty()) return null

@@ -61,6 +61,8 @@ class PlaybackPlan private constructor(val items: List<PlanItem>, private val of
         it is PlanItem.Audio && ordinal in it.segment.startOrdinal..it.segment.endOrdinal
     }
 
+    fun indexOfSegment(segmentId: Long): Int = items.indexOfFirst { it is PlanItem.Audio && it.segment.id == segmentId }
+
     /** The ordinal being spoken at ([index], [positionMs]); inside a silence, the sentence that just ended. */
     fun ordinalAt(index: Int, positionMs: Long, lookup: (AudioSegment) -> SyncLookup): Int {
         if (items.isEmpty()) return 0

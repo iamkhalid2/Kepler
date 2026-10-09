@@ -27,8 +27,19 @@ internal class PositionRepositoryImpl(
     override fun position(bookId: BookId, kind: PositionKind): Flow<Position?> =
         positions.observe(bookId, kind.name).map { it?.toModel() }
 
-    override suspend fun savePosition(bookId: BookId, kind: PositionKind, ordinal: Int) =
-        positions.save(bookId, kind.name, ordinal.coerceAtLeast(0), clock())
+    override suspend fun savePosition(bookId: BookId, kind: PositionKind, ordinal: Int) {
+        db.withWriteTransaction {
+            positions.save(bookId, kind.name, ordinal.coerceAtLeast(0), clock())
+            refreshPositionFraction(bookId, kind)
+        }
+    }
+
+    /** "Where you are": the most recent saved position of either kind over the sentence count (decision #111). */
+    private suspend fun refreshPositionFraction(bookId: BookId, preferKind: PositionKind) {
+        val count = books.get(bookId)?.sentenceCount ?: return
+        val latest = positions.latest(bookId, preferKind.name) ?: return
+        books.setPositionFraction(bookId, positionFraction(latest.ordinal, count))
+    }
 
     override suspend fun markConsumed(bookId: BookId, fromOrdinal: Int, toOrdinal: Int, via: PositionKind) {
         val lo = minOf(fromOrdinal, toOrdinal).coerceAtLeast(0)
@@ -61,6 +72,9 @@ internal class PositionRepositoryImpl(
             ConsumedIntervals.fraction(consumed.all(bookId, kind.name).map { OrdinalRange(it.startOrdinal, it.endOrdinal) }, scope)
         books.setFractions(bookId, fraction(PositionKind.READING), fraction(PositionKind.LISTENING))
     }
+
+    private fun positionFraction(ordinal: Int, sentenceCount: Int): Float =
+        if (sentenceCount <= 0) 0f else (ordinal.toFloat() / sentenceCount).coerceIn(0f, 1f)
 
     private fun frontierStart(secs: List<SectionEntity>): Int =
         secs.filter { it.included && it.kind == SectionKind.BODY.name }.minByOrNull { it.sectionIndex }?.startOrdinal

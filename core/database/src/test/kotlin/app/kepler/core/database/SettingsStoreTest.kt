@@ -52,6 +52,12 @@ class SettingsStoreTest {
         assertNull(store.settings.first().openRouterModel)
     }
 
+    @Test fun scrubberScopeDefaultsToChapterAndRoundTrips() = runBlocking {
+        assertEquals(app.kepler.core.model.ScrubberScope.CHAPTER, store.settings.first().scrubberScope)
+        store.update { it.copy(scrubberScope = app.kepler.core.model.ScrubberScope.BOOK) }
+        assertEquals(app.kepler.core.model.ScrubberScope.BOOK, store.settings.first().scrubberScope)
+    }
+
     @Test fun keysRoundTripAndAreNeverStoredInPlaintext() = runBlocking {
         assertNull(store.fishKey())
         store.setFishKey("fish-secret-123")

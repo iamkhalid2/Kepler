@@ -11,52 +11,63 @@ object PromptRegistry {
         "and never quote long stretches or rewrite the book."
 
     val PACK_NONFICTION = Prompt(
-        "pack.nonfiction", 1,
+        "pack.nonfiction", 2,
         "You analyse one section of a non-fiction book for a reader who wants to internalize it. $COMMON " +
-            "Return JSON only. gist: 2-3 sentences. keyIdeas: 3-8 main claims, each with evidenceOrdinals and a " +
-            "rubric of 2-3 points a good recall would mention. events: always an empty array. entities: key " +
-            "concepts, people, organisations, places and terms, each with kind (CONCEPT, PERSON, ORG, PLACE or " +
-            "TERM), aliases, a one-sentence definition and the ordinal where it first appears in these passages. " +
-            "edges: relations between entity names (causes, contrasts, example_of, part_of, influenced) with one " +
-            "evidence ordinal. cardCandidates: up to 6 good recall questions, each with a hint of the answer " +
-            "(at most 15 words) and sourceOrdinals. takeaways: 3-7 short bullets. checkIn: a one-sentence recall " +
-            "prompt, the reference gist and a rubric of 2-4 points. recapSummary: at most 120 words of plain " +
-            "prose for a 'previously' recap.",
+            "Return compact JSON only, under 450 words in total; every string is short. gist: 1-2 sentences. " +
+            "keyIdeas: 3-5 main claims, each with evidenceOrdinals and a rubric of 2 short points a good recall " +
+            "would mention. events: always an empty array. entities: up to 8 key concepts, people, organisations, " +
+            "places and terms, each with kind (CONCEPT, PERSON, ORG, PLACE or TERM), aliases (usually empty), a " +
+            "definition of at most 15 words and the ordinal where it first appears in these passages. edges: up to " +
+            "6 relations between entity names (causes, contrasts, example_of, part_of, influenced) with one " +
+            "evidence ordinal. cardCandidates: up to 4 good recall questions, each with a hint of at most 8 words " +
+            "and sourceOrdinals. takeaways: 3-5 short bullets. checkIn: a one-sentence recall prompt, gist an " +
+            "empty string, a rubric of 2-3 short points. recapSummary: at most 60 words of plain prose for a " +
+            "'previously' recap.",
     )
 
     val PACK_FICTION = Prompt(
-        "pack.fiction", 1,
+        "pack.fiction", 2,
         "You analyse one section of a novel for a reader who has read exactly this far and no further. $COMMON " +
-            "Describe only what these passages establish; never speculate about later events. Return JSON only. " +
-            "gist: 2-3 sentences. keyIdeas: always an empty array. events: 3-8 key events, each with ordinals. " +
-            "entities: characters, places, objects and terms (kind CHARACTER, PLACE, OBJECT, ORG or TERM) with " +
-            "aliases, a short description and the ordinal of first appearance in these passages. edges: " +
-            "relationships between characters (ally, family, rival, romance, mentor, enemy, employer) with one " +
-            "evidence ordinal. cardCandidates: up to 4 questions about characters or terms, each with a short " +
-            "hint and sourceOrdinals. takeaways: 3-5 bullets of what happened. checkIn: a 'retell what happened' " +
-            "prompt, the reference gist and a rubric of 2-4 points. recapSummary: the story so far for this " +
-            "section, at most 120 words.",
+            "Describe only what these passages establish; never speculate about later events. Return compact JSON " +
+            "only, under 450 words in total; every string is short. gist: 1-2 sentences. keyIdeas: always an " +
+            "empty array. events: 3-6 key events, each with ordinals. entities: up to 8 characters, places, " +
+            "objects and terms (kind CHARACTER, PLACE, OBJECT, ORG or TERM) with aliases (usually empty), a " +
+            "description of at most 15 words and the ordinal of first appearance in these passages. edges: up to " +
+            "6 relationships between characters (ally, family, rival, romance, mentor, enemy, employer) with one " +
+            "evidence ordinal. cardCandidates: up to 3 questions about characters or terms, each with a hint of " +
+            "at most 8 words and sourceOrdinals. takeaways: 3-5 short bullets of what happened. checkIn: a 'retell " +
+            "what happened' prompt, gist an empty string, a rubric of 2-3 short points. recapSummary: the story so " +
+            "far for this section, at most 60 words.",
     )
 
     val ASK = Prompt(
-        "ask", 1,
+        "ask", 2,
         "You answer a reader's question about a book using only the numbered passages below. $COMMON " +
             "Cite the passages that support each statement inline as [123]. If the passages do not answer the " +
             "question, say so briefly. The reader has only read part of the book, so never reveal or hint at " +
-            "anything beyond the passages. Be concise and plain; no headings.",
+            "anything beyond the passages. Answer directly in at most 120 words; plain prose, no headings, no preamble.",
     )
 
     val EXPLAIN = Prompt(
-        "explain", 1,
+        "explain", 2,
         "You help a reader understand a selection from a book. $COMMON Explain what the selection means in " +
-            "its context in at most 120 words, then give one concrete example. Plain text, no headings.",
+            "its context in at most 120 words, then give one concrete example. Plain text, no headings. " +
+            "Do not mention passage numbers.",
     )
 
     val DEFINE = Prompt(
-        "define", 1,
+        "define", 2,
         "You define a term as it is used in a book passage. $COMMON Give a one or two sentence definition for " +
             "this context, then one short example sentence. For a proper name say who or what it is, based only " +
-            "on the passages. Plain text, at most 70 words.",
+            "on the passages. Plain text, at most 70 words. Do not mention passage numbers.",
+    )
+
+    /** The one short generation behind Recap: only the section being read, from the start of it up to the fence. */
+    val RECAP_SECTION = Prompt(
+        "recap.section", 1,
+        "You remind a reader who is returning after a break where they are in a book. $COMMON Summarise in at " +
+            "most 70 words of plain prose what these passages cover so far. Say nothing beyond them, do not cite " +
+            "passage numbers, no headings, no preamble.",
     )
 
     val CHECK_ANSWER = Prompt(

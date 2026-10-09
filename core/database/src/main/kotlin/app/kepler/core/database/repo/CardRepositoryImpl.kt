@@ -26,8 +26,10 @@ internal class CardRepositoryImpl(
     override suspend fun delete(id: Long) = dao.delete(id)
 
     /** Cards reviewed since local midnight of the day containing [nowMs]. */
-    override suspend fun reviewedToday(nowMs: Long): Int {
-        val startOfDay = Instant.ofEpochMilli(nowMs).atZone(zone()).toLocalDate().atStartOfDay(zone()).toInstant().toEpochMilli()
-        return dao.reviewedSince(startOfDay)
-    }
+    override suspend fun reviewedToday(nowMs: Long): Int = dao.reviewedSince(startOfDay(nowMs))
+
+    override fun reviewedTodayFlow(nowMs: Long): Flow<Int> = dao.reviewedSinceFlow(startOfDay(nowMs))
+
+    private fun startOfDay(nowMs: Long): Long =
+        Instant.ofEpochMilli(nowMs).atZone(zone()).toLocalDate().atStartOfDay(zone()).toInstant().toEpochMilli()
 }

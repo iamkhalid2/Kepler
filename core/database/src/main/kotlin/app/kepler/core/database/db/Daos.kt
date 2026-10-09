@@ -24,6 +24,8 @@ internal interface BookDao {
     @Query("UPDATE book SET lastOpenedAt = :at WHERE id = :id") suspend fun setOpened(id: Long, at: Long)
     @Query("UPDATE book SET readFraction = :read, listenFraction = :listen WHERE id = :id")
     suspend fun setFractions(id: Long, read: Float, listen: Float)
+    @Query("UPDATE book SET positionFraction = :fraction WHERE id = :id AND positionFraction != :fraction")
+    suspend fun setPositionFraction(id: Long, fraction: Float)
     @Query("DELETE FROM book WHERE id = :id") suspend fun delete(id: Long)
     @Query("SELECT id, epubPath FROM book WHERE sentenceCount = 0") suspend fun incomplete(): List<IdPath>
     @Query("SELECT sentenceCount FROM book WHERE id = :id") fun sentenceCountFlow(id: Long): Flow<Int?>
@@ -88,6 +90,10 @@ internal interface PositionDao {
 
     @Query("INSERT OR REPLACE INTO position (bookId, kind, ordinal, updatedAt) VALUES (:bookId, :kind, :ordinal, :at)")
     suspend fun save(bookId: Long, kind: String, ordinal: Int, at: Long)
+
+    /** The most recently saved position of either kind; on a tie the one of [preferKind] wins. */
+    @Query("SELECT * FROM position WHERE bookId = :bookId ORDER BY updatedAt DESC, (kind = :preferKind) DESC LIMIT 1")
+    suspend fun latest(bookId: Long, preferKind: String): PositionEntity?
 }
 
 @Dao
@@ -145,6 +151,7 @@ internal interface CardDao {
     @Update suspend fun update(c: CardEntity)
     @Query("DELETE FROM card WHERE id = :id") suspend fun delete(id: Long)
     @Query("SELECT COUNT(*) FROM card WHERE lastReviewAt >= :since") suspend fun reviewedSince(since: Long): Int
+    @Query("SELECT COUNT(*) FROM card WHERE lastReviewAt >= :since") fun reviewedSinceFlow(since: Long): Flow<Int>
 }
 
 @Dao

@@ -48,7 +48,7 @@ class AppContainer(private val app: Application) {
     val data = DataLayer(app, EpubIngestor(app))
     val narration = NarrationEngine(app, data.settings, data.spine, data.audio)
     val ai: OpenRouterAiService by lazy {
-        OpenRouterAiService(data.settings, data.spine, data.positions, data.aiStore, data.library)
+        OpenRouterAiService(data.settings, data.spine, data.positions, data.aiStore, data.library, probeModels = true)
     }
     val scheduler: Scheduler by lazy { FsrsScheduler() }
     val reviewStats: ReviewStatsStore by lazy { PrefsReviewStatsStore(app) }

@@ -66,6 +66,18 @@ class ContextBuilder(private val spine: SpineRepository, private val maxSectionC
         return SectionText(section, kept, complete, render(kept))
     }
 
+    /** The last [maxChars] of a section's text up to the fence: what the reader has just been through. */
+    suspend fun tail(bookId: BookId, section: Section, fence: Int, maxChars: Int): SectionText? {
+        val end = minOf(section.endOrdinal, fence)
+        if (fence < 0 || end < section.startOrdinal) return null
+        val all = spine.sentences(bookId, section.startOrdinal, end)
+            .filter { it.ordinal in section.startOrdinal..end }.sortedBy { it.ordinal }
+        if (all.isEmpty()) return null
+        var chars = 0
+        val kept = all.asReversed().takeWhile { chars += it.text.length + 8; chars <= maxChars }.ifEmpty { all.takeLast(1) }.asReversed()
+        return SectionText(section, kept, false, render(kept))
+    }
+
     suspend fun window(bookId: BookId, center: Int, before: Int, after: Int, fence: Int): List<Sentence> {
         if (fence < 0) return emptyList()
         val from = maxOf(0, center - before)

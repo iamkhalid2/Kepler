@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.kepler.core.model.AppSettings
+import app.kepler.core.model.ScrubberScope
 import app.kepler.core.model.SettingsStore
 import app.kepler.core.model.VoiceRef
 import kotlinx.coroutines.flow.Flow
@@ -43,6 +44,7 @@ class DataStoreSettingsStore(
         monthlyCapCents = p[MONTHLY_CAP] ?: d.monthlyCapCents,
         openRouterModel = p[OR_MODEL],
         haptics = p[HAPTICS] ?: d.haptics,
+        scrubberScope = p[SCRUBBER_SCOPE]?.let { n -> ScrubberScope.entries.firstOrNull { it.name == n } } ?: d.scrubberScope,
     )
 
     private fun write(p: MutablePreferences, s: AppSettings) {
@@ -60,6 +62,7 @@ class DataStoreSettingsStore(
         val model = s.openRouterModel
         if (model != null) p[OR_MODEL] = model else p.remove(OR_MODEL)
         p[HAPTICS] = s.haptics
+        p[SCRUBBER_SCOPE] = s.scrubberScope.name
     }
 
     override suspend fun fishKey(): String? = readSecret(FISH_KEY)
@@ -99,6 +102,7 @@ class DataStoreSettingsStore(
         val MONTHLY_CAP = intPreferencesKey("monthly_cap_cents")
         val OR_MODEL = stringPreferencesKey("openrouter_model")
         val HAPTICS = booleanPreferencesKey("haptics")
+        val SCRUBBER_SCOPE = stringPreferencesKey("scrubber_scope")
         val FISH_KEY = stringPreferencesKey("secret_fish")
         val OR_KEY = stringPreferencesKey("secret_openrouter")
     }

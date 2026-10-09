@@ -302,6 +302,7 @@ internal class Flight(val key: Any, spec: BookSpec, from: StagePose, open: Float
     val alpha = Animatable(1f)
 }
 
+@Deprecated("v2: covers move between screens as shared elements (CoverImage/BookObject with sharedElement = true).")
 @Composable
 fun rememberBookStage(): BookStageState {
     val scope = rememberCoroutineScope()
@@ -314,6 +315,7 @@ fun rememberBookStage(): BookStageState {
  * Draws the book in flight above the navigation host. It never takes touches and is invisible to
  * accessibility: the screens' own anchors own the labels and targets.
  */
+@Deprecated("v2: covers move between screens as shared elements (CoverImage/BookObject with sharedElement = true).")
 @Composable
 fun BookStageOverlay(stage: BookStageState, modifier: Modifier = Modifier) {
     val palette = Kp.palette

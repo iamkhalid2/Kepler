@@ -8,12 +8,21 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -43,9 +52,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -54,32 +63,34 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import app.kepler.AppContainer
 import app.kepler.R
-import app.kepler.core.designsystem.BookStageOverlay
+import app.kepler.core.designsystem.CoverRequest
 import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.KpMiniPlayer
 import app.kepler.core.designsystem.KpMotion
-import app.kepler.core.designsystem.LocalBookStage
-import app.kepler.core.designsystem.LocalStageOwner
-import app.kepler.core.designsystem.rememberBookStage
 import app.kepler.core.designsystem.KpToastHost
+import app.kepler.core.designsystem.LocalKpEntryScope
+import app.kepler.core.designsystem.LocalKpSharedScope
 import app.kepler.core.designsystem.rememberReducedMotion
 import app.kepler.core.model.AppSettings
 import app.kepler.core.model.BookId
 import app.kepler.core.model.ImportResult
+import app.kepler.core.model.PlaybackInfo
+import app.kepler.core.model.PlaybackInfoSource
 import app.kepler.core.model.PositionKind
 import app.kepler.core.model.ReaderMode
-import app.kepler.feature.library.KeplerTheme
 import app.kepler.feature.library.HomeRoute
 import app.kepler.feature.library.HubRoute
+import app.kepler.feature.library.KeplerTheme
 import app.kepler.feature.library.LibraryRoute
 import app.kepler.feature.library.NarrationSetupRoute
 import app.kepler.feature.library.OnboardingRoute
 import app.kepler.feature.library.ProvideLibraryDeps
 import app.kepler.feature.library.SettingsRoute
 import app.kepler.feature.player.FullPlayerRoute
-import app.kepler.feature.player.NowBar
 import app.kepler.feature.player.ReadAlongTransport
 import app.kepler.feature.reader.ReaderRoute
 import app.kepler.feature.study.CardFromSelectionSheet
@@ -92,6 +103,7 @@ import app.kepler.feature.study.ReviewRoute
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -103,12 +115,17 @@ private sealed interface SheetReq {
     data class Card(val bookId: BookId, val ordinal: Int, val text: String) : SheetReq
 }
 
-/** Key of a back-stack entry's state: changing the reader mode or Learn tab keeps the same screen state. */
+/** Key of a back-stack entry's state: changing the reader mode or face, or the Learn tab, keeps the same screen state. */
 private fun Route.stateKey(): String = when (this) {
     is Route.Tabs -> "tabs"
     is Route.Reader -> "reader/$bookId/$nonce"
     is Route.Learn -> "learn/$bookId"
     else -> encode()
+}
+
+/** One composed back-stack entry: [key] owns its saved state and ViewModels, [route] is what it shows now. */
+private data class NavEntry(val key: String, val route: Route) {
+    val index: Int get() = key.substringBefore(':').toInt()
 }
 
 @Composable
@@ -130,6 +147,7 @@ fun AppRoot(container: AppContainer, incoming: Flow<Incoming>, onFinish: () -> U
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow<Incoming>, onFinish: () -> Unit) {
     val context = LocalContext.current
@@ -151,7 +169,7 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow
 
     fun listen(bookId: BookId) {
         askNotificationsOnce()
-        stack.push(Route.Player(bookId))
+        stack.showListen(bookId)
     }
 
     fun read(bookId: BookId, mode: ReaderMode = ReaderMode.READ) = stack.showReader(Route.Reader(bookId, mode))
@@ -202,17 +220,27 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow
         }
     }
 
-    // Pressing back on a non-home tab at the root returns to Home, as on every tabbed Android app.
-    val top = stack.top
-    val canGoHome = stack.entries.size == 1 && top is Route.Tabs && top.tab != Tab.HOME
-    BackHandler(enabled = stack.entries.size > 1 || canGoHome) {
-        if (canGoHome) stack.replaceTop(Route.Tabs(Tab.HOME)) else stack.pop()
-    }
-    if (stack.entries.size == 1 && top is Route.Tabs && top.tab == Tab.HOME) {
-        BackHandler { onFinish() }
-    }
+    val entries = stack.entries.mapIndexed { i, r -> NavEntry("$i:${r.stateKey()}", r) }
+    val topEntry = entries.last()
+    val top = topEntry.route
 
-    // One ViewModelStore per back-stack entry, cleared shortly after the entry leaves (once its exit fade is over).
+    // ---- back: predictive pop for stacked entries; at the root a non-home tab returns home, home finishes.
+    var backProgress by remember { mutableStateOf<Float?>(null) }
+    PredictiveBackHandler(enabled = entries.size > 1) { events ->
+        try {
+            events.collect { backProgress = it.progress }
+            backProgress = null
+            stack.pop()
+        } catch (e: CancellationException) {
+            backProgress = null
+            throw e
+        }
+    }
+    val atRoot = entries.size == 1
+    BackHandler(enabled = atRoot && top is Route.Tabs && top.tab != Tab.HOME) { stack.replaceTop(Route.Tabs(Tab.HOME)) }
+    BackHandler(enabled = atRoot && top is Route.Tabs && top.tab == Tab.HOME) { onFinish() }
+
+    // ---- one ViewModelStore per entry (and per tab inside the tabs entry), cleared once the entry has left.
     val stores = remember { mutableMapOf<String, ViewModelStore>() }
     val holder = rememberSaveableStateHolder()
     LaunchedEffect(stack) {
@@ -221,120 +249,158 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow
             .collect { live ->
                 delay(800)
                 val current = stack.entries.mapIndexed { i, r -> "$i:${r.stateKey()}" }.toSet()
-                stores.keys.filter { it !in live && it !in current }.forEach { k ->
+                stores.keys.filter { k -> k.substringBefore('#').let { it !in live && it !in current } }.forEach { k ->
                     stores.remove(k)?.clear()
-                    holder.removeState(k)
+                    if ('#' !in k) holder.removeState(k)
                 }
             }
     }
+
+    // ---- the entry transition: seekable so predictive back can scrub it.
     val reduced = rememberReducedMotion()
-    val index = stack.entries.lastIndex
-    val entryKey = "$index:${top.stateKey()}"
-    // The shared book layer: screens publish where their book stands; one book flies between entries.
-    val stage = rememberBookStage()
-    SideEffect { stage.setTop(entryKey) }
-
-    CompositionLocalProvider(LocalBookStage provides stage) {
-    Box(Modifier.fillMaxSize().background(Kp.palette.bg)) {
-        AnimatedContent(
-            targetState = entryKey to top,
-            contentKey = { it.first },
-            transitionSpec = {
-                if (reduced) fadeIn(tween(120)) togetherWith fadeOut(tween(120))
-                else fadeIn(KpMotion.settle()) togetherWith fadeOut(KpMotion.snap())
-            },
-            label = "nav",
-        ) { (key, route) ->
-            EntryScope(key, stores, holder) {
-              CompositionLocalProvider(LocalStageOwner provides key) {
-                when (route) {
-                    Route.Onboarding -> OnboardingRoute(onDone = { stack.resetTo(Route.Tabs(Tab.HOME)) })
-                    is Route.Tabs -> TabsHost(
-                        container = container,
-                        tab = route.tab,
-                        onSelect = { stack.replaceTop(Route.Tabs(it)) },
-                        onOpenBook = { stack.push(Route.Hub(it)) },
-                        onRead = { read(it) },
-                        onListen = { listen(it) },
-                        onRecap = { stack.push(Route.Learn(it, LearnTab.RECAP)) },
-                        onReview = { stack.push(Route.Review) },
-                        onSettings = { stack.push(Route.Settings) },
-                        onJumpTo = { b, o -> jumpTo(b, o) },
-                        onOpenPlayer = { stack.push(Route.Player(it)) },
-                    )
-                    is Route.Hub -> HubRoute(
-                        bookId = route.bookId,
-                        onRead = { read(route.bookId) },
-                        onListen = { listen(route.bookId) },
-                        onLearn = { stack.push(Route.Learn(route.bookId)) },
-                        onSetup = { stack.push(Route.Setup(route.bookId)) },
-                        onBack = { stack.pop() },
-                        onLearnAt = { stack.push(Route.Learn(route.bookId, LearnTab.valueOf(it.name))) },
-                    )
-                    is Route.Reader -> ReaderHost(container, route, stack, onListenPermission = ::askNotificationsOnce) { sheet = it }
-                    is Route.Player -> FullPlayerRoute(
-                        controller = playback,
-                        narration = container.narration,
-                        annotations = data.annotations,
-                        bookId = route.bookId,
-                        onReadAlong = { ordinal ->
-                            scope.launch {
-                                data.positions.savePosition(route.bookId, PositionKind.READING, ordinal)
-                                stack.replaceTop(Route.Reader(route.bookId, ReaderMode.READ_LISTEN))
-                            }
-                        },
-                        onClose = { stack.pop() },
-                    )
-                    is Route.Learn -> LearnRoute(
-                        deps = container.studyDeps,
-                        bookId = route.bookId,
-                        onJumpTo = { jumpTo(route.bookId, it) },
-                        onBack = { stack.pop() },
-                        initialTab = route.tab,
-                        onOpenSettings = { stack.push(Route.Settings) },
-                    )
-                    Route.Review -> ReviewRoute(container.studyDeps, onClose = { stack.pop() })
-                    is Route.Setup -> {
-                        // Narration runs as a foreground service with a notification, so this is where we ask.
-                        LaunchedEffect(Unit) { askNotificationsOnce() }
-                        NarrationSetupRoute(
-                            bookId = route.bookId,
-                            onBack = { stack.pop() },
-                            onOpenSettings = { stack.push(Route.Settings) },
-                        )
-                    }
-                    Route.Settings -> SettingsRoute(onBack = { stack.pop() })
+    val transitionState = remember { SeekableTransitionState(topEntry) }
+    val progress = backProgress
+    if (progress != null && entries.size > 1) {
+        val previous = entries[entries.size - 2]
+        LaunchedEffect(progress) { transitionState.seekTo(progress, previous) }
+    } else {
+        LaunchedEffect(topEntry) {
+            if (transitionState.currentState != topEntry) {
+                transitionState.animateTo(topEntry)
+            } else if (transitionState.targetState != topEntry) {
+                // A cancelled back gesture: run the scrubbed fraction back to zero, then settle.
+                val from = transitionState.fraction
+                animate(from, 0f, animationSpec = tween((from * KpMotion.PUSH_IN_MS).toInt().coerceAtLeast(1))) { v, _ ->
+                    launch { transitionState.seekTo(v) }
                 }
-              }
+                transitionState.snapTo(topEntry)
             }
         }
+    }
+    val transition = rememberTransition(transitionState, label = "nav")
+    val density = LocalDensity.current
+    val pushPx = with(density) { 24.dp.roundToPx() }
 
-        // Above every screen, below sheets and toasts.
-        BookStageOverlay(stage)
+    val hasBook by remember(playback) { playback.state.map { it.bookId != null }.distinctUntilChanged() }.collectAsState(false)
 
-        when (val req = sheet) {
-            null -> Unit
-            is SheetReq.Explain -> ExplainSheet(
-                container.studyDeps, req.bookId, req.ordinal, req.text,
-                onDismiss = { sheet = null },
-                onMakeCard = { sheet = SheetReq.Card(req.bookId, req.ordinal, req.text) },
-                onAskMore = { sheet = null; stack.push(Route.Learn(req.bookId, LearnTab.ASK)) },
-            )
-            is SheetReq.Define -> DefineSheet(container.studyDeps, req.bookId, req.ordinal, req.term, onDismiss = { sheet = null })
-            is SheetReq.Card -> CardFromSelectionSheet(
-                container.studyDeps, req.bookId, req.ordinal, req.text,
-                onDismiss = { sheet = null },
-                onSaved = { sheet = null },
+    SharedTransitionLayout(Modifier.fillMaxSize().background(Kp.palette.bg)) {
+        CompositionLocalProvider(LocalKpSharedScope provides this) {
+            Box(Modifier.fillMaxSize()) {
+                transition.AnimatedContent(
+                    contentKey = { it.key },
+                    transitionSpec = {
+                        when {
+                            reduced -> KpMotion.crossfade()
+                            targetState.index >= initialState.index ->
+                                (fadeIn(tween(KpMotion.PUSH_IN_MS)) + slideInHorizontally(tween(KpMotion.PUSH_IN_MS)) { pushPx }) togetherWith
+                                    fadeOut(tween(KpMotion.PUSH_OUT_MS))
+                            else -> (fadeIn(tween(KpMotion.PUSH_IN_MS)) togetherWith
+                                (fadeOut(tween(KpMotion.PUSH_IN_MS)) + scaleOut(tween(KpMotion.PUSH_IN_MS), targetScale = 0.92f) +
+                                    slideOutHorizontally(tween(KpMotion.PUSH_IN_MS)) { pushPx / 2 }))
+                                .apply { targetContentZIndex = -1f }
+                        }
+                    },
+                ) { entry ->
+                    CompositionLocalProvider(LocalKpEntryScope provides this) {
+                        EntryScope(entry.key, stores, holder) {
+                            Destination(
+                                container = container,
+                                entry = entry,
+                                stack = stack,
+                                stores = stores,
+                                onListen = ::listen,
+                                onRead = { read(it) },
+                                onJumpTo = { b, o -> jumpTo(b, o) },
+                                askNotificationsOnce = ::askNotificationsOnce,
+                                openSheet = { sheet = it },
+                            )
+                        }
+                    }
+                }
+
+                when (val req = sheet) {
+                    null -> Unit
+                    is SheetReq.Explain -> ExplainSheet(
+                        container.studyDeps, req.bookId, req.ordinal, req.text,
+                        onDismiss = { sheet = null },
+                        onMakeCard = { sheet = SheetReq.Card(req.bookId, req.ordinal, req.text) },
+                        onAskMore = { sheet = null; stack.push(Route.Learn(req.bookId, LearnTab.ASK)) },
+                    )
+                    is SheetReq.Define -> DefineSheet(container.studyDeps, req.bookId, req.ordinal, req.term, onDismiss = { sheet = null })
+                    is SheetReq.Card -> CardFromSelectionSheet(
+                        container.studyDeps, req.bookId, req.ordinal, req.text,
+                        onDismiss = { sheet = null },
+                        onSaved = { sheet = null },
+                    )
+                }
+
+                val chrome = if (top is Route.Tabs) TabBarHeight + (if (hasBook) 72.dp else 0.dp) else 0.dp
+                KpToastHost(
+                    message = toast,
+                    onDismiss = { toast = null },
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = chrome + 16.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Destination(
+    container: AppContainer,
+    entry: NavEntry,
+    stack: BackStack,
+    stores: MutableMap<String, ViewModelStore>,
+    onListen: (BookId) -> Unit,
+    onRead: (BookId) -> Unit,
+    onJumpTo: (BookId, Int) -> Unit,
+    askNotificationsOnce: () -> Unit,
+    openSheet: (SheetReq) -> Unit,
+) {
+    when (val route = entry.route) {
+        Route.Onboarding -> OnboardingRoute(onDone = { stack.resetTo(Route.Tabs(Tab.HOME)) })
+        is Route.Tabs -> TabsHost(
+            container = container,
+            tab = route.tab,
+            storeFor = { tab -> stores.getOrPut("${entry.key}#${tab.name}") { ViewModelStore() } },
+            onSelect = { if (stack.top == route) stack.replaceTop(Route.Tabs(it)) },
+            onOpenBook = { stack.push(Route.Hub(it)) },
+            onRead = onRead,
+            onListen = onListen,
+            onRecap = { stack.push(Route.Learn(it, LearnTab.RECAP)) },
+            onReview = { stack.push(Route.Review) },
+            onSettings = { stack.push(Route.Settings) },
+            onJumpTo = onJumpTo,
+        )
+        is Route.Hub -> HubRoute(
+            bookId = route.bookId,
+            onRead = { onRead(route.bookId) },
+            onListen = { onListen(route.bookId) },
+            onLearn = { stack.push(Route.Learn(route.bookId)) },
+            onSetup = { stack.push(Route.Setup(route.bookId)) },
+            onBack = { stack.pop() },
+            onLearnAt = { stack.push(Route.Learn(route.bookId, LearnTab.valueOf(it.name))) },
+        )
+        is Route.Reader -> ReadListenHost(container, route, stack, askNotificationsOnce, openSheet)
+        is Route.Learn -> LearnRoute(
+            deps = container.studyDeps,
+            bookId = route.bookId,
+            onJumpTo = { onJumpTo(route.bookId, it) },
+            onBack = { stack.pop() },
+            initialTab = route.tab,
+            onOpenSettings = { stack.push(Route.Settings) },
+        )
+        Route.Review -> ReviewRoute(container.studyDeps, onClose = { stack.pop() })
+        is Route.Setup -> {
+            // Narration runs as a foreground service with a notification, so this is where we ask.
+            LaunchedEffect(Unit) { askNotificationsOnce() }
+            NarrationSetupRoute(
+                bookId = route.bookId,
+                onBack = { stack.pop() },
+                onOpenSettings = { stack.push(Route.Settings) },
             )
         }
-
-        val chrome = if (top is Route.Tabs) TabBarHeight else 0.dp
-        KpToastHost(
-            message = toast,
-            onDismiss = { toast = null },
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = chrome + 16.dp),
-        )
-    }
+        Route.Settings -> SettingsRoute(onBack = { stack.pop() })
     }
 }
 
@@ -366,14 +432,52 @@ private fun EntryScope(
     holder: SaveableStateHolder,
     content: @Composable () -> Unit,
 ) {
-    val owner = remember(key) {
-        val store = stores.getOrPut(key) { ViewModelStore() }
-        object : ViewModelStoreOwner {
-            override val viewModelStore: ViewModelStore = store
-        }
-    }
+    val owner = remember(key) { storeOwner(stores.getOrPut(key) { ViewModelStore() }) }
     CompositionLocalProvider(LocalViewModelStoreOwner provides owner) {
         holder.SaveableStateProvider(key, content)
+    }
+}
+
+private fun storeOwner(store: ViewModelStore): ViewModelStoreOwner = object : ViewModelStoreOwner {
+    override val viewModelStore: ViewModelStore = store
+}
+
+/**
+ * The one read + listen destination (#112). The Listen face is the full player for now and the Read face the
+ * reader with its docked transport; both live in the same back-stack entry and crossfade into each other.
+ * The unified screen replaces both bodies next stage without touching navigation.
+ */
+@Composable
+private fun ReadListenHost(
+    container: AppContainer,
+    route: Route.Reader,
+    stack: BackStack,
+    onListenPermission: () -> Unit,
+    openSheet: (SheetReq) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val reduced = rememberReducedMotion()
+    AnimatedContent(
+        targetState = route.face,
+        transitionSpec = { KpMotion.crossfade(if (reduced) KpMotion.REDUCED_MS else KpMotion.FACE_SWITCH_MS) },
+        label = "face",
+    ) { face ->
+        when (face) {
+            ReaderFace.LISTEN -> FullPlayerRoute(
+                controller = container.playback,
+                narration = container.narration,
+                annotations = container.data.annotations,
+                bookId = route.bookId,
+                onReadAlong = { ordinal ->
+                    scope.launch {
+                        container.data.positions.savePosition(route.bookId, PositionKind.READING, ordinal)
+                        stack.setFace(route.bookId, ReaderFace.READ, ReaderMode.READ_LISTEN)
+                    }
+                },
+                onClose = { stack.pop() },
+            )
+            ReaderFace.READ -> ReaderHost(container, route, stack, onListenPermission, openSheet)
+        }
     }
 }
 
@@ -391,10 +495,7 @@ private fun ReaderHost(
     val readAlong = remember(bookId) {
         playback.state.map { if (it.bookId == bookId) it.ordinal else null }.distinctUntilChanged()
     }
-    fun setMode(mode: ReaderMode) {
-        val top = stack.top
-        if (top is Route.Reader && top.bookId == bookId) stack.replaceTop(top.copy(mode = mode))
-    }
+    fun setMode(mode: ReaderMode) = stack.setFace(bookId, ReaderFace.READ, mode)
     ReaderRoute(
         deps = container.readerDeps,
         bookId = bookId,
@@ -432,10 +533,16 @@ private fun ReaderHost(
     )
 }
 
+/**
+ * Tabs keep their state: each tab has its own saved-state slot and ViewModelStore for as long as the tabs entry
+ * lives, so switching never recreates a ViewModel or loses scroll. The switch is a 180 ms fade-through; the mini
+ * player and tab bar sit outside it and never fade.
+ */
 @Composable
 private fun TabsHost(
     container: AppContainer,
     tab: Tab,
+    storeFor: (Tab) -> ViewModelStore,
     onSelect: (Tab) -> Unit,
     onOpenBook: (BookId) -> Unit,
     onRead: (BookId) -> Unit,
@@ -444,48 +551,97 @@ private fun TabsHost(
     onReview: () -> Unit,
     onSettings: () -> Unit,
     onJumpTo: (BookId, Int) -> Unit,
-    onOpenPlayer: (BookId) -> Unit,
 ) {
     val holder = rememberSaveableStateHolder()
     val density = LocalDensity.current
     var bottomPx by remember { mutableIntStateOf(0) }
     val bottom = with(density) { bottomPx.toDp() }
-    val playback = container.playback
-    val hasBook by remember(playback) { playback.state.map { it.bookId != null }.distinctUntilChanged() }.collectAsState(false)
+    val reduced = rememberReducedMotion()
+    val owners = remember { mutableMapOf<Tab, ViewModelStoreOwner>() }
 
     Box(Modifier.fillMaxSize().background(Kp.palette.bg)) {
-        Box(
-            Modifier
+        AnimatedContent(
+            targetState = tab,
+            transitionSpec = { if (reduced) KpMotion.crossfade() else KpMotion.fadeThrough() },
+            label = "tab",
+            modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(WindowInsets.navigationBars)
                 .padding(bottom = bottom),
-        ) {
-            holder.SaveableStateProvider(tab.name) {
-                when (tab) {
-                    Tab.HOME -> HomeRoute(
-                        onOpenBook = onOpenBook,
-                        onRead = onRead,
-                        onListen = onListen,
-                        onRecap = onRecap,
-                        onReview = onReview,
-                        onSettings = onSettings,
-                    )
-                    Tab.LIBRARY -> LibraryRoute(onOpenBook = onOpenBook)
-                    Tab.NOTEBOOK -> NotebookRoute(container.studyDeps, onJumpTo = onJumpTo, onStartReview = onReview)
+        ) { t ->
+            val owner = owners.getOrPut(t) { storeOwner(storeFor(t)) }
+            CompositionLocalProvider(LocalViewModelStoreOwner provides owner) {
+                holder.SaveableStateProvider(t.name) {
+                    when (t) {
+                        Tab.HOME -> HomeRoute(
+                            onOpenBook = onOpenBook,
+                            onRead = onRead,
+                            onListen = onListen,
+                            onRecap = onRecap,
+                            onReview = onReview,
+                            onSettings = onSettings,
+                        )
+                        Tab.LIBRARY -> LibraryRoute(onOpenBook = onOpenBook)
+                        Tab.NOTEBOOK -> NotebookRoute(container.studyDeps, onJumpTo = onJumpTo, onStartReview = onReview)
+                    }
                 }
             }
         }
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { bottomPx = it.height },
         ) {
-            if (hasBook) {
-                NowBar(
-                    controller = playback,
-                    onOpen = { playback.state.value.bookId?.let(onOpenPlayer) },
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
+            ShellMiniPlayer(container, onOpen = onListen, modifier = Modifier.padding(bottom = 8.dp))
             KpTabBar(tab, onSelect)
         }
     }
+}
+
+/**
+ * Feeds [KpMiniPlayer] from the playback controller. It collects the 10 Hz playback state itself so only the
+ * bar recomposes, never the tab underneath. Swipe down pauses and hides the bar until playback resumes.
+ */
+@Composable
+private fun ShellMiniPlayer(container: AppContainer, onOpen: (BookId) -> Unit, modifier: Modifier = Modifier) {
+    val playback = container.playback
+    val state by playback.state.collectAsStateWithLifecycle()
+    val infoFlow = remember(playback) { (playback as? PlaybackInfoSource)?.info ?: MutableStateFlow(PlaybackInfo()) }
+    val info by infoFlow.collectAsStateWithLifecycle()
+    var hiddenFor by rememberSaveable { mutableStateOf<Long?>(null) }
+    val playing = state.playing
+    LaunchedEffect(playing) { if (playing) hiddenFor = null }
+    val bookId = state.bookId ?: return
+    if (hiddenFor == bookId) return
+
+    val cover = remember(bookId, info.bookId, info.bookTitle, info.author, info.coverPath) {
+        if (info.bookId == bookId) CoverRequest(bookId, info.bookTitle.orEmpty(), info.author.orEmpty(), info.coverPath) else null
+    }
+    val leftMs = ((state.sectionDurationMs - state.sectionElapsedMs).coerceAtLeast(0) / state.speed.coerceAtLeast(0.25f)).toLong()
+    val left = formatDuration(leftMs)
+    val chapter = info.sectionTitle
+    val caption = when {
+        state.error != null -> state.error.orEmpty()
+        state.buffering && !playing -> stringResource(R.string.mini_preparing)
+        chapter != null && state.sectionDurationMs > 0 -> stringResource(R.string.mini_caption, chapter, left)
+        chapter != null -> chapter
+        else -> stringResource(R.string.mini_fallback)
+    }
+    val progress = if (state.sectionDurationMs > 0) state.sectionElapsedMs.toFloat() / state.sectionDurationMs else 0f
+    KpMiniPlayer(
+        cover = cover,
+        title = info.bookTitle ?: state.title.orEmpty(),
+        caption = caption,
+        playing = playing,
+        progress = progress,
+        onPlayPause = { if (playing) playback.pause() else playback.resume() },
+        onOpen = { onOpen(bookId) },
+        onDismiss = { playback.pause(); hiddenFor = bookId },
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun formatDuration(ms: Long): String {
+    val totalMin = ((ms + 59_999) / 60_000).toInt()
+    return if (totalMin < 60) stringResource(R.string.duration_minutes, totalMin)
+    else stringResource(R.string.duration_hours_minutes, totalMin / 60, totalMin % 60)
 }

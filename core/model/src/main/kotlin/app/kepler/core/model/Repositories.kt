@@ -83,6 +83,8 @@ data class AppSettings(
     val monthlyCapCents: Int = 0,
     val openRouterModel: String? = null,
     val haptics: Boolean = true,
+    /** What the player scrubber spans (decision #109). */
+    val scrubberScope: ScrubberScope = ScrubberScope.CHAPTER,
 )
 
 /** Persistent cache + usage counters for the AI layer. Implemented by :core:database. */

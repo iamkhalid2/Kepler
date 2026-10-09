@@ -37,5 +37,6 @@ fun paperPalette(seed: Color, page: Color, ink: Color, dark: Boolean): KpPalette
         edge = mix(page, ink, 0.22f),
         readAlongLine = base.readAlongLine,
         materials = base.materials,
+        surface3 = mix(page, ink, 0.08f),
     )
 }

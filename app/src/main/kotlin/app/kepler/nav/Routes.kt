@@ -9,14 +9,25 @@ import app.kepler.feature.study.LearnTab
 
 enum class Tab { HOME, LIBRARY, NOTEBOOK }
 
+/** The two faces of the one read + listen destination (decision #112). */
+enum class ReaderFace { LISTEN, READ }
+
 /** Destinations of the state-based back stack. Each encodes to one string so the stack survives recreation. */
 sealed interface Route {
     data object Onboarding : Route
     data class Tabs(val tab: Tab) : Route
     data class Hub(val bookId: BookId) : Route
-    /** [nonce] distinguishes a reader opened afresh at a new position from the same reader switching mode. */
-    data class Reader(val bookId: BookId, val mode: ReaderMode = ReaderMode.READ, val nonce: Int = 0) : Route
-    data class Player(val bookId: BookId) : Route
+    /**
+     * Read + listen, one destination (#112). [face] picks the Listen face (the full player) or the Read face;
+     * switching it keeps the same back-stack entry. [nonce] distinguishes a reader opened afresh at a new
+     * position from the same reader switching mode or face.
+     */
+    data class Reader(
+        val bookId: BookId,
+        val mode: ReaderMode = ReaderMode.READ,
+        val nonce: Int = 0,
+        val face: ReaderFace = ReaderFace.READ,
+    ) : Route
     data class Learn(val bookId: BookId, val tab: LearnTab = LearnTab.ASK) : Route
     data object Review : Route
     data class Setup(val bookId: BookId) : Route
@@ -26,8 +37,7 @@ sealed interface Route {
         Onboarding -> "onboarding"
         is Tabs -> "tabs/${tab.name}"
         is Hub -> "hub/$bookId"
-        is Reader -> "reader/$bookId/${mode.name}/$nonce"
-        is Player -> "player/$bookId"
+        is Reader -> "reader/$bookId/${mode.name}/$nonce/${face.name}"
         is Learn -> "learn/$bookId/${tab.name}"
         Review -> "review"
         is Setup -> "setup/$bookId"
@@ -35,14 +45,22 @@ sealed interface Route {
     }
 
     companion object {
+        /** The old player route is the Listen face of the reader now (#112). */
+        @Suppress("FunctionName")
+        fun Player(bookId: BookId): Reader = Reader(bookId, face = ReaderFace.LISTEN)
+
         fun decode(s: String): Route? = runCatching {
             val p = s.split('/')
             when (p[0]) {
                 "onboarding" -> Onboarding
                 "tabs" -> Tabs(Tab.valueOf(p[1]))
                 "hub" -> Hub(p[1].toLong())
-                "reader" -> Reader(p[1].toLong(), ReaderMode.valueOf(p[2]), p.getOrNull(3)?.toInt() ?: 0)
-                "player" -> Player(p[1].toLong())
+                "reader" -> Reader(
+                    p[1].toLong(), ReaderMode.valueOf(p[2]), p.getOrNull(3)?.toInt() ?: 0,
+                    p.getOrNull(4)?.let(ReaderFace::valueOf) ?: ReaderFace.READ,
+                )
+                // Saved by builds that still had a separate player route.
+                "player" -> Reader(p[1].toLong(), face = ReaderFace.LISTEN)
                 "learn" -> Learn(p[1].toLong(), LearnTab.valueOf(p[2]))
                 "review" -> Review
                 "setup" -> Setup(p[1].toLong())
@@ -79,6 +97,27 @@ class BackStack(initial: List<Route>) {
             entries[entries.lastIndex] = route.copy(nonce = top.nonce + 1)
         } else {
             push(route)
+        }
+    }
+
+    /**
+     * Shows the Listen face of a book. If that book's reader is already on top it just turns to the Listen face
+     * (same entry, no navigation); otherwise the Listen face is pushed.
+     */
+    fun showListen(bookId: BookId) {
+        val top = entries.lastOrNull()
+        if (top is Route.Reader && top.bookId == bookId) {
+            entries[entries.lastIndex] = top.copy(face = ReaderFace.LISTEN)
+        } else {
+            push(Route.Reader(bookId, face = ReaderFace.LISTEN))
+        }
+    }
+
+    /** Turns the reader on top to [face] in place (same entry). */
+    fun setFace(bookId: BookId, face: ReaderFace, mode: ReaderMode? = null) {
+        val top = entries.lastOrNull()
+        if (top is Route.Reader && top.bookId == bookId) {
+            entries[entries.lastIndex] = top.copy(face = face, mode = mode ?: top.mode)
         }
     }
 

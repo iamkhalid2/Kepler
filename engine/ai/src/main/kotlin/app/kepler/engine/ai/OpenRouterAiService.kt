@@ -1,11 +1,14 @@
 package app.kepler.engine.ai
 
 import app.kepler.core.model.AiBudget
+import app.kepler.core.model.AiPrefetch
 import app.kepler.core.model.AiCacheKeys
 import app.kepler.core.model.AiService
 import app.kepler.core.model.AiStore
+import app.kepler.core.model.AiStreaming
 import app.kepler.core.model.AnswerCheck
 import app.kepler.core.model.AskAnswer
+import app.kepler.core.model.AskEvent
 import app.kepler.core.model.Book
 import app.kepler.core.model.BookId
 import app.kepler.core.model.CardSuggestion
@@ -22,15 +25,30 @@ import app.kepler.core.model.Sentence
 import app.kepler.core.model.SettingsStore
 import app.kepler.core.model.SpineRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * OpenRouter-backed [AiService]. Every method asks [FenceService] for the highest allowed ordinal first and only
  * then fetches text through [ContextBuilder], so nothing past the fence can reach a prompt. Failures surface as
  * [AiError] subclasses, never raw exceptions.
  *
- * Besides [AiService], the UI/workers use [buildPack] (prefetch), [freeModels] (model picker) and [keyInfo].
+ * Besides [AiService], the UI uses [AiStreaming] (Ask, Explain, Define and Recap stream their text as it is
+ * written), [AiPrefetch] (packs are built in the background while reading), [freeModels] (model picker) and
+ * [keyInfo]. The suspend [AiService] calls are built on the streams.
  */
 class OpenRouterAiService(
     private val settings: SettingsStore,
@@ -45,11 +63,21 @@ class OpenRouterAiService(
     private val strict: Boolean = false,
     private val budgeter: RequestBudgeter = RequestBudgeter(aiStore, clock = clock),
     private val catalog: ModelCatalog = ModelCatalog(client, aiStore, clock),
-) : AiService {
+    /** True in the app: free models are timed once a day and requests go to the fastest. */
+    probeModels: Boolean = false,
+    prober: ModelProber? = if (probeModels) ModelProber(client, aiStore, budgeter, clock) else null,
+    /** Lives as long as the app; background pack building runs here. */
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    streamLimits: StreamLimits = StreamLimits(),
+) : AiService, AiStreaming, AiPrefetch {
     private val fence = FenceService(positions, library, spine, modeFor)
     private val context = ContextBuilder(spine)
-    private val runner = LlmRunner(client, catalog, budgeter, settings)
+    /** Packs read at most this much of a section: a 30k-token prompt makes a free model slow for no gain. */
+    private val packContext = ContextBuilder(spine, maxSectionChars = PACK_INPUT_CHARS)
+    private val runner = LlmRunner(client, catalog, budgeter, settings, prober = prober, limits = streamLimits)
     private val packs = ChapterPackService(runner, aiStore, includeBookMeta = !strict)
+    private val prefetcher = PackPrefetcher(scope) { bookId, ordinal -> prefetchPacks(bookId, ordinal) }
+    private val builtPartial = ConcurrentHashMap<Long, Int>()
 
     // ------------------------------------------------------------------ public extras
 
@@ -74,34 +102,24 @@ class OpenRouterAiService(
     override suspend fun budget(): AiBudget = guard { runner.budget() }
 
     override suspend fun explain(bookId: BookId, ordinal: Int, selection: String): String = guard {
-        val book = book(bookId)
-        val ctx = passageContext(bookId, ordinal, FenceFeature.EXPLAIN, before = 12, after = 3)
-        val sel = selection.trim().take(2000)
-        val prompt = PromptRegistry.EXPLAIN
-        stripOrdinalMarkers(cachedText(bookId, "explain", prompt, ctx.cacheKey, sel) {
-            runner.text(Priority.INTERACTIVE, prompt.system, buildString {
-                bookLine(book)
-                appendLine("Passages:"); appendLine(ctx.rendered)
-                appendLine(); appendLine("Selection to explain: \"$sel\"")
-            })
-        })
+        explainStream(bookId, ordinal, selection).final().text
     }
 
     override suspend fun define(bookId: BookId, ordinal: Int, term: String): String = guard {
-        val book = book(bookId)
-        val ctx = passageContext(bookId, ordinal, FenceFeature.DEFINE, before = 6, after = 1)
-        val t = term.trim().take(200)
-        val prompt = PromptRegistry.DEFINE
-        stripOrdinalMarkers(cachedText(bookId, "define", prompt, ctx.cacheKey, t.lowercase()) {
-            runner.text(Priority.INTERACTIVE, prompt.system, buildString {
-                bookLine(book)
-                appendLine("Passages:"); appendLine(ctx.rendered)
-                appendLine(); appendLine("Term to define: \"$t\"")
-            }, maxTokens = 400)
-        })
+        defineStream(bookId, ordinal, term).final().text
     }
 
     override suspend fun ask(bookId: BookId, question: String): AskAnswer = guard {
+        askStream(bookId, question).final()
+    }
+
+    override suspend fun recap(bookId: BookId): String = guard {
+        recapStream(bookId).toList().joinToString("")
+    }
+
+    // ------------------------------------------------------------------ AiStreaming
+
+    override fun askStream(bookId: BookId, question: String): Flow<AskEvent> = events {
         val book = book(bookId)
         val q = question.trim().take(1000)
         val max = fence.maxOrdinal(bookId, FenceFeature.ASK)
@@ -109,14 +127,19 @@ class OpenRouterAiService(
         val prompt = PromptRegistry.ASK
         val cacheKey = AiCacheKeys.scope(bookId, sha256("ask", prompt.tag, bookId.toString(), q.lowercase(), max.toString()))
         aiStore.get("ask", cacheKey)?.let { raw ->
-            runCatching { AiJson.decodeFromString(StoredAnswer.serializer(), raw) }.getOrNull()?.let { return@guard it.toAnswer() }
+            val hit = runCatching { AiJson.decodeFromString(StoredAnswer.serializer(), raw) }.getOrNull()?.toAnswer()
+            if (hit != null) {
+                emit(AskEvent.Delta(hit.text))
+                if (hit.citations.isNotEmpty()) emit(AskEvent.Citations(hit.citations))
+                emit(AskEvent.Done(hit))
+                return@events
+            }
         }
+        // Retrieval only: Ask never waits for a chapter pack. Pack gists are used when they already exist.
         val hits = retrieve(bookId, q, max)
         val sections = spine.sections(bookId)
-        val sectionsByOrdinal = { o: Int -> sections.firstOrNull { o in it.startOrdinal..it.endOrdinal } }
         val user = buildString {
             bookLine(book)
-            // Cached pack gists of the sections that were hit: free context, already fence-clipped.
             val seen = LinkedHashSet<Long>()
             for (s in hits.map { it.sectionId }.distinct()) {
                 val sec = sections.firstOrNull { it.id == s } ?: continue
@@ -129,14 +152,50 @@ class OpenRouterAiService(
             appendLine(context.render(hits))
             appendLine(); appendLine("Question: $q")
         }
-        val allowed = hits.map { it.ordinal }.toSet()
-        val raw = runner.text(Priority.INTERACTIVE, prompt.system, user, maxTokens = 900)
-        val answer = buildAnswer(raw, allowed, max) { o -> sectionsByOrdinal(o)?.title.orEmpty() }
+        val cites = CitationStream(hits.map { it.ordinal }.toSet(), max) { o ->
+            sections.firstOrNull { o in it.startOrdinal..it.endOrdinal }?.title.orEmpty()
+        }
+        val text = StringBuilder()
+        runner.textStream(Priority.INTERACTIVE, prompt.system, user, maxTokens = ASK_MAX_TOKENS).collect { raw ->
+            val clean = cites.feed(raw)
+            if (clean.isNotEmpty()) { text.append(clean); emit(AskEvent.Delta(clean)) }
+            if (cites.takeChanged()) emit(AskEvent.Citations(cites.citations))
+        }
+        cites.finish().takeIf { it.isNotEmpty() }?.let { text.append(it); emit(AskEvent.Delta(it)) }
+        val answer = AskAnswer(text.toString().trim(), cites.citations)
         aiStore.put("ask", cacheKey, AiJson.encodeToString(StoredAnswer.serializer(), StoredAnswer.of(answer)))
-        answer
+        emit(AskEvent.Done(answer))
     }
 
-    override suspend fun recap(bookId: BookId): String = guard {
+    override fun explainStream(bookId: BookId, ordinal: Int, selection: String): Flow<AskEvent> = events {
+        val book = book(bookId)
+        val ctx = passageContext(bookId, ordinal, FenceFeature.EXPLAIN, before = 12, after = 3)
+        val sel = selection.trim().take(2000)
+        val user = buildString {
+            bookLine(book)
+            appendLine("Passages:"); appendLine(ctx.rendered)
+            appendLine(); appendLine("Selection to explain: \"$sel\"")
+        }
+        proseStream(bookId, "explain", PromptRegistry.EXPLAIN, ctx.cacheKey, sel, user, maxTokens = 400)
+    }
+
+    override fun defineStream(bookId: BookId, ordinal: Int, term: String): Flow<AskEvent> = events {
+        val book = book(bookId)
+        val ctx = passageContext(bookId, ordinal, FenceFeature.DEFINE, before = 6, after = 1)
+        val t = term.trim().take(200)
+        val user = buildString {
+            bookLine(book)
+            appendLine("Passages:"); appendLine(ctx.rendered)
+            appendLine(); appendLine("Term to define: \"$t\"")
+        }
+        proseStream(bookId, "define", PromptRegistry.DEFINE, ctx.cacheKey, t.lowercase(), user, maxTokens = 250)
+    }
+
+    /**
+     * Cached summaries of the sections already read arrive first, in one go; only the section being read is
+     * generated (at most 350 tokens) and cached by its exact text, so a second tap is instant too.
+     */
+    override fun recapStream(bookId: BookId): Flow<String> = flow {
         val book = book(bookId)
         val max = fence.maxOrdinal(bookId, FenceFeature.RECAP)
         if (max < 0) throw AiError.NothingRead()
@@ -145,25 +204,79 @@ class OpenRouterAiService(
             .sortedBy { it.startOrdinal }
         if (body.isEmpty()) throw AiError.NothingRead()
         val recent = body.takeLast(RECAP_SECTIONS)
-        val lines = ArrayList<String>()
-        var builds = 0
-        for (sec in recent) {
-            val end = minOf(sec.endOrdinal, max)
-            var result = packs.cachedFor(book, sec, end)
-            val partial = end < sec.endOrdinal
-            // Missing summaries are built for the current partial section and, sparingly, for finished ones.
-            if (result == null && (partial || builds < MAX_RECAP_BUILDS)) {
-                val text = context.sectionText(bookId, sec, max)
-                if (text != null) {
-                    result = packs.obtain(book, text, Priority.INTERACTIVE)
-                    if (!partial) builds++
-                }
+        var emitted = false
+        for ((i, sec) in recent.withIndex()) {
+            val title = sec.title.ifBlank { "Section ${sec.index + 1}" }
+            val lead = if (emitted) "\n\n" else ""
+            val cached = packs.cachedFor(book, sec, minOf(sec.endOrdinal, max))?.pack?.recapSummary?.trim().orEmpty()
+            if (cached.isNotEmpty()) { emit("$lead$title: $cached"); emitted = true; continue }
+            // Earlier sections without a summary are the prefetcher's job; only the one being read is made now.
+            if (i != recent.lastIndex) continue
+            val text = context.tail(bookId, sec, max, RECAP_TAIL_CHARS) ?: continue
+            val key = AiCacheKeys.scope(bookId, sha256("recap", PromptRegistry.RECAP_SECTION.tag, text.hash))
+            val remembered = aiStore.get("recap", key)
+            if (remembered != null) { emit("$lead$title: $remembered"); emitted = true; continue }
+            val user = buildString {
+                bookLine(book)
+                appendLine("Section: ${sec.title}")
+                appendLine("Passages:"); append(text.rendered)
             }
-            val summary = result?.pack?.recapSummary?.trim().orEmpty()
-            if (summary.isNotEmpty()) lines += "${sec.title.ifBlank { "Section ${sec.index + 1}" }}: $summary"
+            val cites = CitationStream(emptySet(), Int.MAX_VALUE) { "" }
+            val sb = StringBuilder()
+            var first = true
+            runner.textStream(Priority.INTERACTIVE, PromptRegistry.RECAP_SECTION.system, user, maxTokens = RECAP_MAX_TOKENS).collect { raw ->
+                val clean = cites.feed(raw)
+                if (clean.isEmpty()) return@collect
+                emit(if (first) "$lead$title: ${clean.trimStart()}" else clean)
+                first = false
+                sb.append(clean)
+            }
+            cites.finish().takeIf { it.isNotEmpty() }?.let { sb.append(it); emit(it) }
+            val summary = stripOrdinalMarkers(sb.toString())
+            if (summary.isNotBlank()) { aiStore.put("recap", key, summary); emitted = true }
         }
-        if (lines.isEmpty()) throw AiError.InvalidResponse("no summaries available yet")
-        lines.joinToString("\n\n")
+        if (!emitted) throw AiError.InvalidResponse("no summaries available yet")
+    }.catch { e -> throw if (e is AiError || e is CancellationException) e else AiError.Unexpected(e) }
+
+    // ------------------------------------------------------------------ AiPrefetch
+
+    override fun prefetch(bookId: BookId, ordinal: Int) {
+        prefetcher.prefetch(bookId, ordinal)
+        scope.launch { runCatching { runner.warmUp() } }
+    }
+
+    /**
+     * Builds the packs for the section just finished, the one being read and the next one, as far as the fence
+     * allows (a section the reader has not reached stays closed in FRONTIER mode). A pack of a section still
+     * being read is rebuilt only after another [PARTIAL_STEP] sentences. Quietly stops when the budget or the
+     * network says no.
+     */
+    internal suspend fun prefetchPacks(bookId: BookId, ordinal: Int) {
+        try {
+            val book = library.book(bookId).first() ?: return
+            val max = fence.maxOrdinal(bookId, FenceFeature.TAKEAWAYS)
+            if (max < 0) return
+            val body = spine.sections(bookId).filter { it.included && it.kind == SectionKind.BODY }.sortedBy { it.startOrdinal }
+            val i = body.indexOfFirst { ordinal in it.startOrdinal..it.endOrdinal }
+            if (i < 0) return
+            for (sec in listOfNotNull(body.getOrNull(i - 1), body[i], body.getOrNull(i + 1))) {
+                val end = minOf(sec.endOrdinal, max)
+                if (end < sec.startOrdinal) continue
+                val partial = end < sec.endOrdinal
+                if (partial) {
+                    if (end - sec.startOrdinal < MIN_PARTIAL_SENTENCES) continue
+                    builtPartial[sec.id]?.let { if (end - it < PARTIAL_STEP) continue }
+                }
+                if (packs.cachedFor(book, sec, end) != null) continue
+                val text = packContext.sectionText(bookId, sec, max) ?: continue
+                packs.obtain(book, text, Priority.BACKGROUND)
+                if (partial) builtPartial[sec.id] = end
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: AiError) {
+            // Budget spent, offline or a model hiccup: the next section change tries again.
+        }
     }
 
     override suspend fun takeaways(bookId: BookId, sectionId: Long): List<String> = guard {
@@ -256,10 +369,41 @@ class OpenRouterAiService(
         return PassageContext(rendered, sha256(bookId.toString(), ordinal.toString(), rendered))
     }
 
-    private suspend fun cachedText(bookId: BookId, kind: String, prompt: PromptRegistry.Prompt, ctxKey: String, subject: String, produce: suspend () -> String): String {
+    private fun events(block: suspend FlowCollector<AskEvent>.() -> Unit): Flow<AskEvent> =
+        flow(block).catch { e -> emit(AskEvent.Failed(if (e is AiError) e else AiError.Unexpected(e))) }
+
+    /** The last answer of a stream, or its failure thrown. */
+    private suspend fun Flow<AskEvent>.final(): AskAnswer {
+        var done: AskAnswer? = null
+        collect { ev ->
+            when (ev) {
+                is AskEvent.Done -> done = ev.answer
+                is AskEvent.Failed -> throw ev.error
+                else -> {}
+            }
+        }
+        return done ?: throw AiError.InvalidResponse("no answer")
+    }
+
+    /** Explain and Define: prose without passage numbers, cached per context and subject. */
+    private suspend fun FlowCollector<AskEvent>.proseStream(
+        bookId: BookId, kind: String, prompt: PromptRegistry.Prompt, ctxKey: String, subject: String, user: String, maxTokens: Int,
+    ) {
         val key = AiCacheKeys.scope(bookId, sha256(kind, prompt.tag, ctxKey, subject))
-        aiStore.get(kind, key)?.let { return it }
-        return produce().also { aiStore.put(kind, key, it) }
+        aiStore.get(kind, key)?.let {
+            emit(AskEvent.Delta(it)); emit(AskEvent.Done(AskAnswer(it, emptyList())))
+            return
+        }
+        val noMarkers = CitationStream(emptySet(), Int.MAX_VALUE) { "" }
+        val sb = StringBuilder()
+        runner.textStream(Priority.INTERACTIVE, prompt.system, user, maxTokens).collect { raw ->
+            val clean = noMarkers.feed(raw)
+            if (clean.isNotEmpty()) { sb.append(clean); emit(AskEvent.Delta(clean)) }
+        }
+        noMarkers.finish().takeIf { it.isNotEmpty() }?.let { sb.append(it); emit(AskEvent.Delta(it)) }
+        val text = stripOrdinalMarkers(sb.toString())
+        aiStore.put(kind, key, text)
+        emit(AskEvent.Done(AskAnswer(text, emptyList())))
     }
 
     private fun StringBuilder.bookLine(book: Book) {
@@ -278,15 +422,20 @@ class OpenRouterAiService(
                 if (prev == null || prev.second < score) scored[s.ordinal] = s to score
             }
         }
-        if (words.size > 1) add(context.search(bookId, words.joinToString(" "), max, 10), 3)
-        for (w in words.take(6)) add(context.search(bookId, w, max, 10), 0)
+        val queries = buildList {
+            if (words.size > 1) add(words.joinToString(" ") to 3)
+            words.take(6).forEach { add(it to 0) }
+        }
+        val found = coroutineScope {
+            queries.map { (query, bonus) -> async { context.search(bookId, query, max, 10) to bonus } }.awaitAll()
+        }
+        for ((list, bonus) in found) add(list, bonus)
         val top = scored.values.sortedWith(compareByDescending<Pair<Sentence, Int>> { it.second }.thenBy { it.first.ordinal })
             .take(MAX_HITS).map { it.first }
         // Pull one neighbour either side, then re-clamp: the ContextBuilder drops anything past the fence.
         val picked = sortedMapOf<Int, Sentence>()
-        for (h in top) {
-            for (s in context.window(bookId, h.ordinal, 1, 1, max)) picked[s.ordinal] = s
-        }
+        val neighbourhoods = coroutineScope { top.map { h -> async { context.window(bookId, h.ordinal, 1, 1, max) } }.awaitAll() }
+        for (list in neighbourhoods) for (s in list) picked[s.ordinal] = s
         if (picked.isEmpty()) {
             // No keyword hit (e.g. a general question): fall back to the most recent text read.
             for (s in context.window(bookId, max, 14, 0, max)) picked[s.ordinal] = s
@@ -298,18 +447,6 @@ class OpenRouterAiService(
     private fun keywords(q: String): List<String> =
         q.lowercase().split(Regex("[^\\p{L}\\p{N}]+"))
             .filter { it.length >= 3 && it !in STOPWORDS }.distinct()
-
-    private fun buildAnswer(raw: String, allowed: Set<Int>, max: Int, label: (Int) -> String): AskAnswer {
-        val cited = LinkedHashSet<Int>()
-        // Models sometimes write [s123], [123, 124] or [123-125]; normalise, keep only what was really provided.
-        val text = CITATION.replace(raw) { m ->
-            val nums = Regex("\\d+").findAll(m.groupValues[1]).mapNotNull { it.value.toIntOrNull() }.toList()
-            val ok = nums.filter { it in allowed && it <= max }
-            cited += ok
-            ok.joinToString("") { "[$it]" }
-        }.replace(Regex("[ \\t]{2,}"), " ").trim()
-        return AskAnswer(text, cited.map { Citation(it, label(it)) })
-    }
 
     private fun buildConceptMap(packs: List<ChapterPack>, max: Int): ConceptMap {
         val nodes = LinkedHashMap<String, ConceptNode>()
@@ -359,11 +496,15 @@ class OpenRouterAiService(
 
     private companion object {
         const val RECAP_SECTIONS = 6
-        const val MAX_RECAP_BUILDS = 2
+        const val RECAP_MAX_TOKENS = 350
+        const val RECAP_TAIL_CHARS = 9_000
+        const val ASK_MAX_TOKENS = 450
         const val MAX_HITS = 8
-        const val MAX_CONTEXT_CHARS = 14_000
+        const val MAX_CONTEXT_CHARS = 12_000
+        const val PACK_INPUT_CHARS = 40_000
+        const val MIN_PARTIAL_SENTENCES = 20
+        const val PARTIAL_STEP = 40
         val VERDICTS = setOf("correct", "partial", "incorrect")
-        val CITATION = Regex("\\[\\s*s?(\\d+(?:\\s*[,;\\-–]\\s*s?\\d+)*)\\s*]")
         val STOPWORDS = setOf(
             "the", "and", "for", "are", "but", "not", "you", "all", "any", "can", "her", "was", "one", "our", "out",
             "what", "when", "where", "which", "who", "whom", "why", "how", "does", "did", "this", "that", "these",

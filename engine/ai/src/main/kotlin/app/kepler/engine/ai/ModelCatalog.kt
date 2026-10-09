@@ -15,11 +15,14 @@ object ModelHints {
 }
 
 object ModelRanker {
-    private val excluded = Regex("(?i)(guard|embed|image|audio|lyria|tts|moderation|safeguard|ocr)")
+    private val excluded = Regex("(?i)(guard|embed|image|audio|lyria|tts|moderation|safeguard|safety|ocr)")
     const val MIN_CONTEXT = 64_000
 
-    fun eligible(models: List<ModelInfo>): List<ModelInfo> = models.filter {
-        it.free && it.textOutput && it.contextLength >= MIN_CONTEXT && !excluded.containsMatchIn(it.id) &&
+    /** Interactive chat (Ask, Explain, Define, probes) only needs a few thousand tokens of context. */
+    const val MIN_INTERACTIVE_CONTEXT = 32_000
+
+    fun eligible(models: List<ModelInfo>, minContext: Int = MIN_CONTEXT): List<ModelInfo> = models.filter {
+        it.free && it.textOutput && it.contextLength >= minContext && !excluded.containsMatchIn(it.id) &&
             it.id != "openrouter/free"
     }
 
@@ -50,6 +53,19 @@ object ModelRanker {
                 .thenBy { it.id },
         )
     }
+
+    /**
+     * Prior for models nobody has timed yet: not tiny, then the bundled quality hint, then a roomy context, then
+     * recency. Structured-output support is ignored (prose does not need it); measured latency replaces all of
+     * this as soon as the prober has numbers.
+     */
+    fun interactivePrior(models: List<ModelInfo>, hints: List<Pair<String, Int>> = ModelHints.default): List<ModelInfo> {
+        fun tier(m: ModelInfo) = hints.firstOrNull { m.id.contains(it.first, ignoreCase = true) }?.second ?: 0
+        return eligible(models, MIN_INTERACTIVE_CONTEXT).sortedWith(
+            compareBy<ModelInfo> { isSmall(it.id) }.thenByDescending { tier(it) }
+                .thenByDescending { it.contextLength >= 128_000 }.thenByDescending { it.created }.thenBy { it.id },
+        )
+    }
 }
 
 @Serializable
@@ -59,6 +75,7 @@ private class StoredModels(val fetchedAt: Long, val models: List<StoredModel>)
 private class StoredModel(
     val id: String, val name: String, val ctx: Int, val created: Long, val free: Boolean,
     val structured: Boolean, val responseFormat: Boolean, val vision: Boolean, val text: Boolean,
+    val reasoning: Boolean = false, val reasoningMandatory: Boolean = false, val efforts: List<String> = emptyList(),
 )
 
 /** Fetches, filters and caches OpenRouter's model list. The free roster changes often, so nothing is hardcoded. */
@@ -90,13 +107,13 @@ class ModelCatalog(
     }
 
     /** Models to try, best first. A user-selected model overrides the ranking and is used alone. */
-    suspend fun candidates(apiKey: String, override: String?): List<ModelInfo> {
+    suspend fun candidates(apiKey: String, override: String?, interactive: Boolean = false): List<ModelInfo> {
         val all = try { all(apiKey) } catch (e: AiError) { if (override == null) throw e else emptyList() }
         if (!override.isNullOrBlank()) {
             return listOf(all.firstOrNull { it.id == override } ?: unknownModel(override))
         }
         val now = clock()
-        val ranked = ModelRanker.rank(all, hints)
+        val ranked = if (interactive) ModelRanker.interactivePrior(all, hints) else ModelRanker.rank(all, hints)
         val healthy = ranked.filter { (failing[it.id] ?: 0L) < now }
         val list = healthy.ifEmpty { ranked }
         // Last resort: OpenRouter's own free router.
@@ -118,7 +135,8 @@ class ModelCatalog(
     private suspend fun persist(models: List<ModelInfo>, now: Long) {
         val stored = StoredModels(now, models.map {
             StoredModel(it.id, it.name, it.contextLength, it.created, it.free, it.supportsStructured,
-                it.supportsResponseFormat, it.vision, it.textOutput)
+                it.supportsResponseFormat, it.vision, it.textOutput,
+                it.reasoning != null, it.reasoning?.mandatory ?: false, it.reasoning?.efforts.orEmpty())
         })
         runCatching { store.put("models", "openrouter", AiJson.encodeToString(StoredModels.serializer(), stored)) }
     }
@@ -126,7 +144,10 @@ class ModelCatalog(
     private suspend fun loadPersisted(): List<ModelInfo>? = runCatching {
         val raw = store.get("models", "openrouter") ?: return null
         AiJson.decodeFromString(StoredModels.serializer(), raw).models.map {
-            ModelInfo(it.id, it.name, it.ctx, it.created, it.free, it.structured, it.responseFormat, it.vision, it.text)
+            ModelInfo(
+                it.id, it.name, it.ctx, it.created, it.free, it.structured, it.responseFormat, it.vision, it.text,
+                if (it.reasoning) ReasoningSupport(it.reasoningMandatory, it.efforts) else null,
+            )
         }
     }.getOrNull()
 }

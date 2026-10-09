@@ -18,6 +18,8 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.media3.extractor.DefaultExtractorsFactory
 import app.kepler.core.model.AudioSegment
+import app.kepler.core.model.ChapterMark
+import app.kepler.core.model.ScrubberScope
 import app.kepler.core.model.Book
 import app.kepler.core.model.BookId
 import app.kepler.core.model.NarrationConfig
@@ -117,6 +119,16 @@ class PlaybackEngine(
     private var aheadMs = 0L
     private var lastAheadCheck = 0L
 
+    // ---- chapter / book timing ----
+    private var scrubberScope = ScrubberScope.CHAPTER
+    private var timingVersion = 0
+    private var timeline = ChapterTimeline.EMPTY
+    private var timelineKey: Pair<Long, Int>? = null
+    private var bookTiming = BookTiming.EMPTY
+    private val chapterText = LinkedHashMap<Long, List<SentenceInfo>>()
+    private var chapterTextJob: Job? = null
+    private var msPerWord = SpeechRate.DEFAULT_MS_PER_WORD
+
     private val consume = ConsumeTracker()
     private var lastSavedOrdinal = -1
     private var lastSaveAt = 0L
@@ -166,6 +178,16 @@ class PlaybackEngine(
             val s = runCatching { deps.settings.settings.first() }.getOrNull() ?: return@launch
             applySpeed(s.speed)
             publish(false)
+        }
+        scope.launch {
+            runCatching {
+                deps.settings.settings.collect { st ->
+                    if (st.scrubberScope != scrubberScope) {
+                        scrubberScope = st.scrubberScope
+                        publish(true)
+                    }
+                }
+            }
         }
     }
 
@@ -262,6 +284,19 @@ class PlaybackEngine(
         publish(true)
     }
 
+    override fun seekWithinSection(fraction: Float) {
+        if (bookId == null) return
+        val mark = sections.markIndexAt(ordinal).takeIf { it >= 0 }?.let { sections.marks[it] } ?: return
+        val tl = timelineFor(mark)
+        seekChapterMs((fraction.coerceIn(0f, 1f) * tl.durationMs).toLong())
+    }
+
+    override fun seekWithinBook(fraction: Float) {
+        if (bookId == null) return
+        val total = currentTiming(quantize = false).bookTotalMs
+        if (total > 0) seekBookMs((fraction.coerceIn(0f, 1f) * total).toLong())
+    }
+
     // ================= ReadAlongHost =================
 
     override fun externalState(): ExternalState {
@@ -277,14 +312,15 @@ class PlaybackEngine(
                 else -> Player.STATE_BUFFERING
             }
         }
-        val (pos, dur) = sectionPosition()
+        val timing = currentTiming(quantize = false)
+        val book = scrubberScope == ScrubberScope.BOOK
         return ExternalState(
-            mediaId = "book:$id:${chapterId ?: 0}",
+            mediaId = if (book) "book:$id:all" else "book:$id:${chapterId ?: 0}",
             title = b?.title,
             subtitle = chapterTitle,
             artworkUri = b?.coverPath?.let { Uri.fromFile(File(it)) },
-            durationMs = dur,
-            positionMs = pos,
+            durationMs = if (book) timing.bookTotalMs else timing.sectionDurationMs,
+            positionMs = if (book) timing.bookElapsedMs else timing.sectionElapsedMs,
             playWhenReady = intendedPlay && !ended,
             playbackState = playbackState,
             speed = speed,
@@ -294,7 +330,8 @@ class PlaybackEngine(
 
     override fun onPlayWhenReady(play: Boolean) = if (play) resume() else pause()
     override fun onSeekInSection(positionMs: Long) {
-        if (plan.size > 0) seekGlobal(span.first + positionMs)
+        if (bookId == null) return
+        if (scrubberScope == ScrubberScope.BOOK) seekBookMs(positionMs) else seekChapterMs(positionMs)
     }
     override fun onSkipSentences(delta: Int) = skipSentences(delta)
     override fun onSeekByMs(deltaMs: Long) = seekByMs(deltaMs)
@@ -370,6 +407,11 @@ class PlaybackEngine(
         chapterId = null
         chapterTitle = null
         aheadMs = 0
+        chapterTextJob?.cancel()
+        chapterText.clear()
+        timelineKey = null
+        timeline = ChapterTimeline.EMPTY
+        bookTiming = BookTiming.EMPTY
     }
 
     private fun observe(id: BookId) {
@@ -525,6 +567,134 @@ class PlaybackEngine(
     private fun updateAverage(segments: List<AudioSegment>) {
         val covered = segments.sumOf { it.endOrdinal - it.startOrdinal + 1 }
         msPerSentence = BookTimeline.msPerSentence(segments.sumOf { it.durationMs }, covered)
+        activeSegments = segments
+        timingVersion++
+        bookTiming = BookTiming.build(sections.marks, sections::narratedCount, segments, msPerSentence, gaps.paragraphMs)
+    }
+
+    // ================= timing =================
+
+    /** Chapter timeline for the chapter being played; rebuilt when segments or the chapter text change. */
+    private fun timelineFor(mark: ChapterMark): ChapterTimeline {
+        val key = mark.sectionId to timingVersion
+        if (key == timelineKey) return timeline
+        val tl = buildTimeline(mark)
+        if (tl.calibrated) msPerWord = tl.msPerWord
+        timeline = tl
+        timelineKey = key
+        return tl
+    }
+
+    private fun buildTimeline(mark: ChapterMark): ChapterTimeline = ChapterTimeline.build(
+        mark.startOrdinal, mark.endOrdinal, sections.narratedRuns(mark.startOrdinal, mark.endOrdinal),
+        activeSegments, chapterText[mark.sectionId], msPerWord, msPerSentence, gaps.paragraphMs,
+    )
+
+    private fun loadChapterText(mark: ChapterMark) {
+        val id = bookId ?: return
+        if (chapterText.containsKey(mark.sectionId) || mark.endOrdinal - mark.startOrdinal + 1 > MAX_TEXT_SENTENCES) return
+        chapterTextJob?.cancel()
+        chapterTextJob = scope.launch {
+            val rows = runCatching { deps.spine.sentences(id, mark.startOrdinal, mark.endOrdinal) }.getOrNull() ?: return@launch
+            if (id != bookId) return@launch
+            chapterText[mark.sectionId] = rows.map { SentenceInfo(it.ordinal, wordCount(it.text), it.paragraphIndex) }
+            while (chapterText.size > TEXT_CACHE_CHAPTERS) chapterText.remove(chapterText.keys.first())
+            timingVersion++
+            publish(true)
+        }
+    }
+
+    private fun wordCount(text: String): Int {
+        var n = 0
+        var inWord = false
+        for (c in text) {
+            if (c.isWhitespace()) inWord = false else if (!inWord) { inWord = true; n++ }
+        }
+        return n
+    }
+
+    private class Timing(
+        val sectionId: Long? = null,
+        val sectionElapsedMs: Long = 0,
+        val sectionDurationMs: Long = 0,
+        val sectionEstimated: Boolean = false,
+        val bookElapsedMs: Long = 0,
+        val bookTotalMs: Long = 0,
+        val bookRemainingMs: Long = 0,
+        val bookRemainingEstimated: Boolean = false,
+    )
+
+    private fun elapsedInChapter(tl: ChapterTimeline): Long {
+        if (tl.isEmpty) return 0
+        if (plan.size == 0) return tl.elapsedAtOrdinal(ordinal)
+        val index = inner.currentMediaItemIndex.coerceIn(0, plan.size - 1)
+        val pos = inner.currentPosition
+        return when (val item = plan.items[index]) {
+            is PlanItem.Audio -> tl.elapsedInSegment(item.segment.id, pos) ?: tl.elapsedAtOrdinal(ordinal)
+            is PlanItem.Silence -> tl.elapsedInGapAfter(item.afterOrdinal, pos)
+        }
+    }
+
+    /** Timing for the current position. [quantize] rounds the playhead to 250 ms so state changes at about 4 Hz. */
+    private fun currentTiming(quantize: Boolean): Timing {
+        val idx = sections.markIndexAt(ordinal)
+        if (bookId == null || idx < 0) return Timing()
+        val mark = sections.marks[idx]
+        val tl = timelineFor(mark)
+        if (tl.isEmpty) return Timing(sectionId = mark.sectionId.takeIf { it >= 0 })
+        var elapsed = elapsedInChapter(tl).coerceIn(0, tl.durationMs)
+        if (quantize) elapsed = elapsed / STATE_QUANTUM_MS * STATE_QUANTUM_MS
+        val aligned = bookTiming.marks.size == sections.marks.size
+        val before = if (aligned) bookTiming.beforeMs(idx) else 0L
+        val after = if (aligned) bookTiming.afterMs(idx) else 0L
+        return Timing(
+            sectionId = mark.sectionId.takeIf { it >= 0 },
+            sectionElapsedMs = elapsed,
+            sectionDurationMs = tl.durationMs,
+            sectionEstimated = tl.estimated,
+            bookElapsedMs = before + elapsed,
+            bookTotalMs = before + tl.durationMs + after,
+            bookRemainingMs = tl.durationMs - elapsed + after,
+            bookRemainingEstimated = tl.estimated || (aligned && bookTiming.estimatedAfter(idx)),
+        )
+    }
+
+    private fun seekChapterMs(ms: Long) {
+        val mark = sections.markIndexAt(ordinal).takeIf { it >= 0 }?.let { sections.marks[it] } ?: return
+        seekTarget(timelineFor(mark).locate(ms) ?: return)
+    }
+
+    /** Seeks to [ms] on the book clock: chapters before the current one and after it are measured by [bookTiming]. */
+    private fun seekBookMs(ms: Long) {
+        val cur = sections.markIndexAt(ordinal)
+        if (cur < 0 || bookTiming.marks.size != sections.marks.size) return
+        val tl = timelineFor(sections.marks[cur])
+        val before = bookTiming.beforeMs(cur)
+        val target = when {
+            ms < before -> bookTiming.locate(ms)
+            ms < before + tl.durationMs -> cur to (ms - before)
+            else -> bookTiming.locate(ms - tl.durationMs + bookTiming.chapterDurationMs(cur))
+        } ?: return
+        val (index, inChapter) = target
+        if (index == cur) { seekTarget(tl.locate(inChapter) ?: return); return }
+        val other = buildTimeline(sections.marks[index])
+        val modelled = bookTiming.chapterDurationMs(index).coerceAtLeast(1)
+        seekTarget(other.locate(inChapter * other.durationMs / modelled) ?: return)
+    }
+
+    private fun seekTarget(t: ChapterTimeline.Target) {
+        val segmentId = t.segmentId
+        if (segmentId != null) {
+            val index = plan.indexOfSegment(segmentId)
+            if (index >= 0) {
+                val item = plan.items[index]
+                seekGlobal(plan.startMs(index) + t.offsetInSegmentMs.coerceIn(0, (item.durationMs - 1).coerceAtLeast(0)))
+                return
+            }
+            seekTo(lookups[segmentId]?.ordinalAt(t.offsetInSegmentMs) ?: t.ordinal, intendedPlay)
+            return
+        }
+        seekTo(t.ordinal, intendedPlay)
     }
 
     // ================= seeking =================
@@ -600,6 +770,7 @@ class PlaybackEngine(
         if (chapter?.sectionId != chapterId) {
             chapterId = chapter?.sectionId
             chapterTitle = chapter?.title
+            chapter?.let(::loadChapterText)
             discrete = true
         }
         if (index != spanIndex || discrete) {
@@ -717,26 +888,26 @@ class PlaybackEngine(
         inner.playbackParameters = PlaybackParameters(speed, 1f)
     }
 
-    private fun sectionPosition(): Pair<Long, Long> {
-        if (plan.size == 0) return 0L to 0L
-        val global = plan.globalMs(inner.currentMediaItemIndex, inner.currentPosition)
-        return (global - span.first).coerceAtLeast(0) to (span.last - span.first).coerceAtLeast(0)
-    }
-
     private fun publish(refreshPlayer: Boolean) {
         val b = book
-        val (pos, dur) = sectionPosition()
+        val timing = currentTiming(quantize = intendedPlay && !refreshPlayer)
         hub.stateFlow.value = PlaybackState(
             bookId = bookId,
             playing = intendedPlay && !ended && error == null,
             buffering = buffering || (intendedPlay && plan.size > 0 && inner.playbackState == Player.STATE_BUFFERING),
             ordinal = ordinal,
-            positionMs = pos,
-            durationMs = dur,
+            positionMs = timing.sectionElapsedMs,
+            durationMs = timing.sectionDurationMs,
             speed = speed,
             sleepRemainingMs = sleepRemainingMs,
             title = b?.title,
             error = error,
+            currentSectionId = timing.sectionId,
+            sectionElapsedMs = timing.sectionElapsedMs,
+            sectionDurationMs = timing.sectionDurationMs,
+            sectionDurationEstimated = timing.sectionEstimated,
+            bookRemainingMs = timing.bookRemainingMs,
+            bookRemainingEstimated = timing.bookRemainingEstimated,
         )
         val count = sentenceCount
         hub.infoFlow.value = PlaybackInfo(
@@ -750,8 +921,8 @@ class PlaybackEngine(
             marks = sections.marks,
             aheadMs = aheadMs,
             generating = narrationRunning || ensuring,
-            bookElapsedMs = (ordinal * msPerSentence).toLong(),
-            bookTotalMs = (count * msPerSentence).toLong(),
+            bookElapsedMs = timing.bookElapsedMs,
+            bookTotalMs = timing.bookTotalMs,
             sleepAtSectionEnd = sleep.atSectionEnd,
         )
         if (refreshPlayer) onExternalChange()
@@ -759,6 +930,9 @@ class PlaybackEngine(
 
     private companion object {
         const val TICK_MS = 100L
+        const val STATE_QUANTUM_MS = 250L
+        const val MAX_TEXT_SENTENCES = 4_000
+        const val TEXT_CACHE_CHAPTERS = 3
         const val SAVE_EVERY_MS = 5_000L
         const val AHEAD_CHECK_MS = 1_000L
         const val AHEAD_MINUTES = 10

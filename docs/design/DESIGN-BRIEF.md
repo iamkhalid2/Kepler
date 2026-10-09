@@ -1,126 +1,142 @@
-# Design brief (binding)
+# Design brief v2 (binding)
 
-Design lead approves all UI. Overrides `docs/plan/experience.md` §4–5 (no cover glow, blurred covers, filter chips, card grids, cover-art colour outside the book). Units dp/sp.
+Owner: design lead (Opus). Supersedes v1. Decisions #107-#112. Anything not covered: follow the nearest rule and list it under DESIGN ASSUMPTIONS.
 
-## 1. Components
+**Direction.** Production structure first, real objects as accents. Every screen must read as finished with the 3D book removed: dense cards, clear hierarchy, standard controls. Objects appear only where section 7 lists them. References: v1 prototype boards (structure), the ElevenReader-style player (finish), the Dribbble board (postmortem section 6) plus MidnightReads (3D book breaking out of a dashboard card's top edge).
 
-Spacing scale 4/8/12/16/24/32/48; gutter 24; section gap 32; targets ≥48×48. **No elevation anywhere**: depth comes only from the key light (bevels, lips, contact ellipses). Radii: keys, inputs, toasts 4; sheet top 8; slips and cards 2; covers 1.5. Circles only for the play key, rings and 6 dp dots. No pills.
+## 1. Tokens (code: `KpSpace`, `KpRadius`, `KpSize`, `Kp.palette`, `KpType`)
 
-- **Primary key**: `key` fill, `onKey` Albert 15/600, height 52, full width or ≥120. Bevel: inset top 1 white .7, inset bottom 1 black .2, drop 0/2 black .9 (light .25). Pressed inverts bevel; disabled `surface2`, flat.
-- **Secondary key**: `surface1`, 1 `edge` border, inset top 1 white .07 (light .9), Albert 14/600, height 48, min width 84.
-- **Text link**: Albert 14/600 `accentText`, padded to 48.
-- **Hairline**: 1 `hairline`, inset to gutter. Accent rule (1 `accent`) at most once per screen.
-- **Segmented**: `surface1` track, 1 hairline, height 48; active segment is a small primary key (r3, flex 1.5).
-- **Sheet**: `surface1`, top plank lip (white .10→0), handle 32×3 at 12, padding 24, detents 50%/full, scrim black .5 (light .25).
-- **List row**: 56 one-line, 72 two-line; 40 leading slot (28×42 cover or icon); title Albert 16/500, meta 13 `text2`; separator starts at the text.
-- **Input**: 52, r4, `surface1`, 1 hairline; focus 1 `accent` + accent caret; caps label above; error 13 `negative`.
-- **Switch**: track 44×24 r4 `surface2`; thumb 20×20 r3 `key` with bevel; on = `accent` track.
-- **Toast**: `surface2`, r4, min 48, padding 12/16, Albert 14/500, optional link; 16 above now-bar; 4 s.
-- **Badge**: counts are Fraunces numerals inline; unread = 18 ring, 1.5 dashed `accentText`, numeral 9.5/700; status = 6 dot + caps.
-- **Tab bar**: Home, Library, Notebook; 64 + inset; top hairline; active `text` with 12×2 accent rule above icon; inactive `text2`.
+**Spacing (dp):** 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64. Screen gutter 20. Card padding 16 (list cards) or 20 (hero cards). Gap between stacked cards 12. Section header to its content 8; between sections 28. Bottom content padding = mini player + tab bar + 16.
+
+**Radii:** card 20; tile/stat 14; button and chip: full pill; icon button: circle; input 16 (chat input: pill); sheet top 28; mini player 18; cover image 6 (thumbnails under 56 dp: 4); segmented track 14, thumb 11; toast 14.
+
+**Surfaces (elevation by tone, no drop shadows on UI):**
+
+| Token | Dark | Light | Use |
+|---|---|---|---|
+| bg | #0A0A0C | #F4F2EE | screen |
+| surface1 | #16161A | #FFFFFF | cards, tiles, inputs on bg |
+| surface2 | #1F1F24 | #EFEDE8 | pressed state, inputs and buttons inside a card |
+| surface3 | #26262C | #FFFFFF | sheets, menus, mini player, toast |
+| hairline | #2A2A30 | #DEDBD4 | row separators, input focus-less border in light |
+
+Light cards carry a 1 dp hairline border; dark cards none. Shadows only on 3D objects (their own) and the mini player (black 35%, blur 12, y 4).
+
+**Colour roles.** `text`/`text2` for text. `accent` fills progress, the scrubber track, ribbon. `accentText`: links and one caps label per card. `key` (warm off-white dark, ink light) fills primary and play buttons, label `onKey`. No accent-filled buttons. `readAlong` = paragraph band, `readAlongLine` = spoken word. Never hardcode a hue.
 
 ## 2. Type
 
-- Display: `KpFonts.display` 360, 34/38, −0.02em.
-- Headline: `display` 360, 26/30.
-- Title: Fraunces 450, opsz 24, SOFT 50, 19/24 (add `KpFonts.title`).
-- Spine/cover text: `displaySmall`, 9–14.
-- Author: Literata italic 400, 14/20, `text2` (add italic).
-- UI body: `KpFonts.ui` 400, 15/22. Key labels 600 (never 700). Caption 13/18 `text2`. Caps 600, 11/14, +0.14em, `text2`.
-- Reading: `KpFonts.reading` 400, 19/30 default, user 15–26; small-caps opener, hung numeral.
-- Book-derived prose (AI answers, recaps, slips): `reading` 16/26.
-- Numerals: Fraunces 500, opsz 18, `tnum`, 13–16. Big numerals: `display` 360 `tnum` 40/44.
+Albert Sans for chrome and controls. Literata for book text and book-derived prose. Fraunces only for display: hero book titles, onboarding and empty-state headlines. No mono; numbers use tabular figures.
 
-Fraunces opsz tracks size.
+| Role (`KpType.`) | Face | Size/line | Weight | Use |
+|---|---|---|---|---|
+| largeTitle | Albert | 30/36, -0.01em | 650 | tab root titles |
+| title1 | Albert | 22/28 | 600 | detail screen titles |
+| title2 | Albert | 18/24 | 600 | card titles, sheet titles |
+| displayTitle | Fraunces | 26/30 | 400 | hero book title |
+| rowTitle | Albert | 16/22 | 600 | row titles, mini player title |
+| body | Albert | 15/22 | 400 | body copy |
+| subhead | Albert | 14/20 | 500 | meta, secondary labels |
+| caption | Albert | 13/18 | 400 | captions |
+| label | Albert | 11/14, +0.08em, caps | 650 | overlines ("LISTENING · CHAPTER 4") |
+| button | Albert | 15/20 | 600 | buttons, segments |
+| tabLabel | Albert | 12/16 | 600 | tab bar |
+| stat | Albert tnum | 22/26 | 650 | stat tiles |
+| bigStat | Albert tnum | 40/44 | 650 | review count |
+| time | Albert tnum | 12/16 | 500 | scrubber times |
+| prose | Literata | 16/26 | 400 | recaps, answers |
 
-## 3. Colour
+Font scale 1.0-1.5: no fixed-height text containers except tab bar and mini player.
 
-`Kp.palette` tokens only; no literal colour in feature code. Designsystem must add from `shelf-language.md` §2: `key`, `onKey`, `body`, `page`, `readText`, `pencil`, `edge` (hairline +8% L) and the materials (cloth, silk, bone ribbon, plank).
+## 3. Components (code names in brackets)
 
-- `bg` screens; `surface1` sheets, inputs; `surface2` toasts; `page` + `readText` reader.
-- `accent` fills only: listened ribbon, progress/frontier rule, active tab rule, switch track, focus border, generation ring, read-along marks, logo dot. Never a filled button.
-- `accentText`: links, citation numerals, live states.
-- `secondary`: second entity kind in Map, FSRS "learning" only.
-- `positive`/`warning`/`negative`: text, 6 dots, 2 dp key edges; never large fills.
+- **Card** [`KpCard`]: surface1, r20, padding 16/20; press tone surface2, no scale.
+- **List row** [`KpRow`]: min 56 (one line) / 72 (two lines), gutter 20 (16 inside a card), leading slot 40 (book thumbnail 32x48 r4), headline + caption `text2`, trailing chevron 20 or 48 dp icon button. Separators 1 dp hairline from the text start [`KpRowSeparator`].
+- **Section header** [`KpSectionHeader`]: label caps `text2`, optional trailing link (subhead 600, accentText), 40 high.
+- **Buttons** [`KpButton`]: Primary key fill, Secondary surface2 (surface1 on bg), Ghost accentText; h52 or 40 (small); pill; min width 96; icon 20 + 8 gap. One Primary per region. `KpPrimaryKey`/`KpSecondaryKey` now render as these.
+- **Icon button** [`KpIconButton`]: 48 touch, 24 glyph; Plain or Tonal (40 circle surface1). Filled (key circle) only for play/pause and send.
+- **Icons** [`KpIcons`, `KpIconView`]: own vectors, 24 grid, 1.8 stroke, round caps; solid play, pause, bookmark-on. Skip [`KpSkipIcon`]: 300 degree arrow circle with the seconds numeral centred (9 sp 700); -15 / +30.
+- **Segmented control** [`KpSegmented`]: track surface1 r14 h40 padding 3; thumb surface3 (dark) / white with hairline (light), r11, slides on the `snap` spring; labels button style, `text` selected, `text2` otherwise. 2-4 segments.
+- **Chips** [`KpChip`]: h32 pill, surface1; selected key fill. Only: Library filters, Ask citations, Hub genre tag.
+- **Slider** [`KpSlider`]: track 4 r2 surface2, active accent, thumb 18 key circle (24 while dragging). Tick haptic at detents.
+- **Scrubber** [`KpScrubber`]: chapter-scoped (#109). Track 4 (6 while dragging), no thumb at rest, 14 thumb while pressed. Times under it: elapsed left, "3h 10m left in book" centre (`text2`), "-12:40" right, `time` style. Estimated durations prefix "~".
+- **Sheet** [`KpSheet`]: surface3, top r28, handle 36x4 r2 `text2` 40%, padding 20 / bottom 24, title2 heading, scrim black 50% (light 25%).
+- **Input** [`KpInput`]: h52 r16 surface1 (surface2 inside cards), no border in dark, hairline in light, focus 1.5 dp accent border; label caps above (8 gap); error caption `negative` below. Multiline min 112. Chat input [`KpChatInput`]: pill h52, trailing 40 send button (key circle).
+- **Mini player** [`KpMiniPlayer`]: h64, margin 8, 8 above the tab bar, surface3, r18. Cover 32x48; headline + caption ("Chapter 4 · 18 min left"); 44 play/pause key circle; 2 dp accent chapter progress on the bottom edge. Tap or swipe up opens the Listen face; swipe down pauses and hides.
+- **Tab bar** [`KpTabBar`, app/nav]: h64 + inset, top hairline; icon 24 over tabLabel; selected `text` on a 56x32 surface2 pill (fades 120 ms, never slides), else `text2`.
+- **Top bars:** [`KpLargeTopBar`] caption over largeTitle, up to two tonal actions right. [`KpTopBar`] h56, tonal back, optional centred title + caption, actions.
+- **Toast** [`KpToastHost`]: surface3 r14, min 48, 4 s, 16 above bottom chrome.
+- **Stat tile** [`KpStatTile`]: surface1 r14 h72, stat numeral + caption.
+- **Covers** [`CoverImage`, `KpCoverTile`, `BookObject`]: see section 6.
 
-Light mode: linen neutrals, `key` turns ink with bone label, bone ribbon turns graphite, contact α .30, lip over a 0.5 seam; object lighting unchanged. Every seed derives by the same rules; nothing assumes blue.
+## 4. Motion (code: `KpMotion`)
 
-## 4. Motion
-
-Springs only (ζ/stiffness): `snap` 1.0/1600 chrome, segmented; `settle` .90/400 sheets, toasts, pitch; `move` .82/320 position, size; `turn` .72/260 yaw; `lift` 1.0/800 shadows; `open` .85/220 board; `reveal` .90/380 page clip; `flip` .86/380. Stagger 60 ms, max 5.
-
-Signature transformations: one shared book layer (`BookStageState` + `BookStageOverlay` in `:core:designsystem`) above the nav host, below sheets and toasts.
-- **Slots.** Screens never animate between each other. Every `BookScene` given `stageKeys` (book ids) publishes each book's resting pose in root px as a slot, tagged by place (`shelf`, `home`, `hub`, `player`, `nowbar`); the reader publishes its page rect with `Modifier.bookPageSlot`. Slots belong to a back-stack entry (`LocalStageOwner`).
-- **Flight.** When the top entry changes and the same book has a slot on the old and the new screen, the stage flies one book from the touched (or largest) source slot to the target slot. Both screens skip drawing that book while it flies; on landing the target screen's own scene takes over at the identical pose (the claimed scene skips its own entrance). A book returns to the tag it left from (now-bar to now-bar).
-- **Channels.** Each its own spring: position, size, thickness `move`; yaw `turn`; pitch `settle`; shadows `lift` (lifts to 1 in the air, lands to 0); board `open`; page `reveal`; snapshot alpha `snap`. Fresh flights stagger lift 0, yaw +60 ms, position +90 ms. Retargets (system back mid-flight) keep velocity and drop the stagger, so the same book simply turns round.
-1. **Spine → hub cover**: the spine (yaw 90) turns to 24 while it grows to the hub pose.
-2. **Cover → reader**: the book squares up (yaw 0, pitch 0) at 84% of the page width, the board hinges 0→−165° showing the paper liner, past .55 the first page grows from the projected page quad to the page rect in the page's own colour. The snapshot fades as soon as the reader reports its first location, and never holds a ready page back more than 150 ms (ceiling 1.4 s). Readium's WebView is never transformed. Back reverses it: the page shrinks into the book, the board closes, the book flies home.
-3. **Cover/now-bar → player**: the book turns to face you (yaw 0, pitch −6, 220 wide); the player shows the stage's last-known look of the book at once (no empty hero) and fades the jacket in over the typographic cover when it arrives later.
-- **Rules.** No flight when the source has scrolled away or is a list row: the target plays its own short entrance. Nothing loops; the layer is `clearAndSetSemantics {}` and takes no touches. Reduced motion: no flights, 120 ms crossfades. Predictive-back scrubbing is not wired yet (back commits, then the book retargets).
-
-Card flip per `shelf-language.md` §3, `flip` spring, `tick` at 90°.
-
-Ribbons swing only on events (Home appearance per resume, progress change, sentence change at stiffness 40, book acceleration). Peak ≤4°, second ribbon .85·v at +120 ms. Nothing loops.
-
-Reduced motion (scale 0 or app setting): poses snap, transformations and flip become 120 ms crossfades, no ribbons or stagger.
+- Tab switch: fade-through, 60 ms out (linear) then 120 ms in (FastOutSlowIn). No slide, no scale, no entrance replay; each tab keeps its scroll, state and ViewModels.
+- Push: incoming fades in 220 ms from +24 dp; outgoing fades 120 ms. Pop reverses. Predictive back scrubs the pop (outgoing scales to 0.92 and fades).
+- Shared cover: the cover is one shared element `cover/<bookId>` from Library/Home to Hub hero to Listen face, bounds on spring(0.9, 380), corner radius morphs. It always draws the cached image, never a placeholder.
+- In-screen state: `snap` spring (1.0, 1600) for toggles and segments, `settle` (0.9, 400) for values, `move` (0.82, 320) for layout.
+- The 3D turn (flat to yaw 16) plays once per Hub or Listen entry. Lists never stagger; nothing animates on a tab root.
+- Streaming text: tokens append without animation; a 2x16 accent caret blinks at 1 Hz until done.
+- Reduced motion (app or system): every transition is a 120 ms crossfade, no 3D turn, shared elements snap.
 
 ## 5. Haptics
 
-`Haptics.play(token)`: composition primitive if supported, else `HapticFeedbackConstants`. Setting Off / Subtle (×.5) / Full, default Full; silent when system touch feedback is off.
+Tap: buttons, toggles, segments, chips. Tick: scrubber chapter boundaries, slider detents, knob steps. Confirm: committing actions (save card, grade, start narration). Reject: errors. Nothing on tab switch, scroll or page turn.
 
-- `tick` LOW_TICK .4 / CLOCK_TICK: chapter detents, sleep dial per 5 min, flip at 90°, rubric checks.
-- `tap` TICK .7 / KEYBOARD_TAP: tabs, segmented, switches, secondary keys.
-- `confirm` CLICK 1.0 / CONFIRM: primary keys, play/pause, highlight or card saved.
-- `settle` THUD .6 / CONTEXT_CLICK: sheet detent, book landing, map drop.
-- `success` QUICK_RISE .6 → CLICK +40 ms / CONFIRM: key verified, narration done, Good/Easy, review complete.
-- `threshold` GESTURE_THRESHOLD_ACTIVATE: grade swipe crossing, back commit.
-- `reject` REJECT: errors, budget exhausted, unreadable file.
-- `heartbeat` TICK, TICK +120 ms .5: narration buffer ran dry.
+## 6. Covers (pipeline is binding)
 
-## 6. Screens
+Every cover goes through `KpCovers` (process memory cache, IO decode, generated cover rendered once per book). Screens call `KpCovers.preload` when a list arrives and draw with `CoverImage` / `BookObject`; a cached cover shows on the first frame. Never decode covers yourself; never show a generic cover while a real one loads.
 
-States: content, empty, loading (static `surface2` blocks), error, offline. Copy: plain, warm, sentence case, no exclamation marks, no nagging; say what happened and what still works. An unreadable file says only "This file can't be opened. It may be damaged or encrypted."
+## 7. Real-world accents (placement is exhaustive)
 
-**Onboarding.** One book on a plank at y 34%, width 100, changing pose per step; four hairline step segments on top, current in accent. Steps: wordmark + display line; Read, Listen, Remember as three caps lines while the book turns 90→24→0; optional Fish and OpenRouter keys (link "Skip for now"); privacy in three sentences; ColorOS battery steps on OPPO/OnePlus/realme only.
+| Object | Where | Spec |
+|---|---|---|
+| BookObject (3D book) | Home continue card; Hub hero; Listen face | Continue: 88x132, breaks 24 above the card top, yaw 18. Hub: 200 tall. Listen: 260 tall (220 on screens < 700 dp tall). Ambient tint behind Hub and Listen hero: cover colour radial at 24% over bg. |
+| Bookcase | Library, optional view only | the existing shelf (`BookScene`), toggled from the top bar; choice remembered |
+| Silk ribbon | below a BookObject (`ribbon` arg) | length 24 + 80 x position share |
+| Index card | Review card face | paper, 1 red rule, faint blue lines, r6 |
+| Page turn | reader page change | reader agent's curl |
+| Knob / dial | speed and sleep sheets, optional | detent Tick per step |
 
-**Home.** Caps date; display greeting left; current book (width 100) on a plank right, bone and accent ribbons with numerals ("41% listened"). Resume block: caps "LISTENING · AVA · 1.4×", title 22, author, caption, primary "Resume listening". Hairline rows: Previously on (only after ≥3 days away); Daily review ("12 due", "about 6 min", secondary "Start"); Generating (24 ring, "Binding narration 62%"); highlight slip on `page`. Empty: bare plank, "Add your first book", primary "Add a book".
+One 3D object per screen at most (bookcase excepted); below 64 dp covers are flat `CoverImage`.
 
-**Library.** Caps "LIBRARY · 34"; icon keys Search, Shelf/List, Add. Sort link opens a sheet that also holds filters. The shelf is a bookcase: lit planks every 196 fill the viewport whatever the count. Spines stand at natural heights (a stable 88–100% of 150 per book) and are 16/20/25% of the cover width by length; the first book in sort order stands face-out (2:3 cover 150 tall, yaw 20, pitch −3); the last spine leans 9° on its neighbour when the plank has room (one lean per case); a ghost spine (1.5 dashed `text2` α .6, small plus at its foot, 48 touch, "Add a book") stands where the next book goes. Pressed books lift toward the viewer (scale ×1.04, base rises 2, shadow spreads; `lift` spring). Every book keeps its own TalkBack node. List rows 72 stay the accessible alternative. Empty: plank + primary "Add books".
-**Book hub.** Book 128×192 left, yaw 24, ribbons below; right: headline, author, caps "NON-FICTION · 312 PAGES". Primary for the last mode ("Continue reading"/"Resume listening"), secondary for the other. Narration row: ring + "62% bound · Ava" or "No narration yet" + link "Set up". Learn is a contents page: Ask, Recap, Concepts, People, Map, Notes with dotted leaders and right captions ("up to Ch 7").
+## 8. Screens
 
-**Narration setup.** Caps sections: Type (link to change), Voice (rows with 48 preview key reading this book), Style (radio rows), Reading (switches: footnotes, tables, citations, front/back matter), Lexicon (sheet). Cost slip on `page`, numerals right: characters, cost ("$0.00 until 30 Nov"), time, storage. Primary "Bind narration" morphs into the chapter-arc ring. Fish limit hit: "Today's Fish limit is used up. The system voice is ready now, or Fish continues tomorrow." + secondary "Use system voice".
+**Home.** Caption "Wednesday evening" + "Welcome back", settings button. Continue card: BookObject left breaking the top edge; label (LISTENING · chapter), title2, author, 4 dp position bar + "34% · 2h 10m left"; Listen (Primary small) and Read (Secondary small) resume in one tap. Then, when present: "Previously on" card (after 2+ days away, prose 3 lines, "Full recap"); Daily review card (bigStat, "about 6 min", week dots, Start 56 key circle); narration status row card (ring, "Narrating · 62% · Ava"); "Continue" carousel of 104-wide tiles; Recent highlights (3 quote cards, "See all").
 
-**Settings.** Caps groups of rows. Providers: "Connected" + positive dot, or "Not set". Budgets as numerals ("18 requests left today"). Accent: 24×40 spines on a mini plank, chosen one lifted.
+**Library.** "Library"; actions: grid/bookcase toggle, Add. Search (h44 pill). Chips: All, Reading, Listening, Finished, Non-fiction. Label "24 BOOKS". Grid (#110): 3 columns (600 dp+: 5), gaps 12 / 20; `KpCoverTile`: cover 2:3, 3 dp position bar, title 14/18 600, author caption. Headphones badge top-right when narrated, ring while generating. Long-press: actions sheet.
 
-**Reader.** `page`, margins 26; system bar icons follow the page, not the app theme; text selection is `marks.selection` composited over the page with page ink, handles `pencil`; running head caps 10.5 +0.16em and folio numeral 12 at top 24. Chrome hidden; centre tap toggles. Top bar 56: back, title 16, Aa, Search, link "Learn". Bottom: track with 1×6 chapter ticks, accent fill, 2×10 frontier mark; caption "41% through · 18 min left in Book II"; segmented Read / Read + Listen / Listen. Selection strip: `key` r4 h48, words Highlight, Explain, Ask, Card, Define split by 1 rules, no icons. A 14×56 silk bookmark hangs top-right.
-Read + Listen: sentence band `readAlong` α .12; transport 72: narrator caption, −15, 56 play key (`key` circle, r8 square while playing), +30, speed key 64×48. Manual scroll detaches: link "Return" and secondary "Play from here" rise.
+**Hub.** Top bar, genre chip. Hero: tint, BookObject 200, displayTitle, author. Stat tiles: "34%" where you are (#111), "4h 10m" left to listen, "38" cards. Three 88-high r18 action tiles (icon over label): Read, Listen (key), Learn. Narration row, "Learn from this book" cards, chapter rows with position.
 
-**Now-bar.** 64 tall, 8 above tab bar, 12 inset, `surface1` r4 with lip; 32×48 book stands on it, overhanging 8; title 15, caption, 48 play key, 1 accent progress along the bottom. Up opens the player, down dismisses.
-**Player.** Caps "LISTENING · AVA"; book 220 wide, yaw 0, on a plank at y 30%; headline, author. Scrubber: 48 touch, 2 track, accent fill, ticks, 4×20 `key` thumb, numerals both ends. Transport −15, 72 play, +30. Secondary keys: speed, Sleep, Bookmark, Chapters.
+**Listen / Read (#112, one destination, `face` argument).** Top bar: chevron-down, centred segmented Listen | Read (200 wide), more. Face switch crossfades 180 ms; playback continues. Listen face: tint, BookObject, displayTitle + "Chapter 4 · narrated by Ava", chapter chip (h36 pill, list icon + title; opens chapters), scrubber, transport: sleep, -15, play/pause (72 key circle), +30, speed ("1.25x"); bottom row: voice pill (h40, avatar + name), bookmark. Read face: Literata, paragraph band `readAlong` r8, spoken word `readAlongLine` r4, active paragraph kept at 35% height; dock over a 32 dp fade: chapter chip, scrubber, transport (play 56); idle dock = chip + play. Double-tap a paragraph plays from there.
 
-**Ask.** Caps "ASK · MEDITATIONS"; fence row "Up to Book II · §1" + "Change" ("Whole book" for non-fiction). No bubbles: questions `ui` 15 `text2` right-aligned; answers as book prose with accent superscript numerals jumping into the book. Suggestions: italic rows. Composer: input 52 + 48 send `key`. Working: "Reading Book II…" over a growing accent rule. No key: "Add an OpenRouter key in Settings to ask questions." Budget out: "No requests left today. Notes and cards still work."
-**Recap.** Per chapter: caps "BOOK I · 6 DAYS AGO", title, prose collapsed to 3 lines + "More", citations; secondary "Read aloud".
-**Concepts / People.** Back-of-book index: letter heads display 28, 56 rows ("first in Ch 2").
-**Map.** Concepts are paper slips (r2, ui 13/500), people cloth tabs, third kind `secondary`; edges hairline, selected path accent.
+**Learn.** Top bar "Learn" / book, scope chip ("Up to here" / "Whole book"). Segmented Ask, Recap, Map, Concepts. Ask: question bubble right (surface2 r20), answer card (surface1, prose), citation chips, "Make a review card"; chat input docked.
 
-**Sheets.** Explain: quoted sentence italic with `pencil` sideline, prose answer, secondary "Make a card", link "Ask more". Define: word display 28, phonetics caption, numbered senses. Card: front/back inputs, live index-card preview, primary "Save card". Check-in: paper slip rising over the page, prompt Literata 17, answer input, primary "Reveal", link "Skip" always visible; rubric lines check 60 ms apart.
+**Notebook.** "Notebook", search. Review banner card when due. Segmented Highlights, Notes, Cards. Grouped by book (header row: thumbnail, title, count); item cards: 3 dp highlight bar, prose 15/24 max 4 lines, "Chapter 3 · 2 days ago", overflow.
 
-**Review.** Caps "REVIEW · 12 LEFT" + hairline progress. Index card on `page`, r2, accent rule 24 from top, ruled hairlines, two paper edges offset 4 and 8. Tap flips. Four secondary grade keys with 2 dp top edges (Again `negative`, Hard `warning`, Good `positive`, Easy `accent`) showing intervals. Swipe left Again, right Good, up Easy. Done: seven 10 dp week squares, today fills, "That's today's review. More cards come due tomorrow." Empty: "Nothing is due today."
+**Review.** Close, "Daily review" + "card 1 of 12", segment progress (4 high). Index card holds the question (title2) and source. Answer input. Hint (Secondary) + Show answer (Primary). Grades: four 56-high r14 buttons, label + interval.
 
-**Notebook.** Segmented Highlights / Cards / Words; groups by book (12×40 spine, title, count). Highlights are slips: prose 16/24, 2 dp `pencil` sideline, location caption, 16 apart. Link "Export" opens a sheet. Empty: "Highlights you make while reading land here."
+**Settings.** Detail top bar. Grouped cards (r20) with section labels: Reading, Listening, AI, Appearance, Data, About. Rows 56 with switch, value + chevron or chevron.
 
-## 7. Never
+**Onboarding.** Three pages: object in the top 45%, Fraunces 30/36 headline, body 16/24 `text2`, dots (active 18 pill), Primary "Continue", Ghost "Skip". Last: "Add your first book" + optional keys.
 
-Glow blobs, background gradients, glass/blur, pill-chip rows, uniform rounded cards, shadows, FABs, filled accent buttons, emoji, exclamation marks, confetti, looping animation, shimmer, unstyled Material defaults, copyright/DRM messaging, streaks or guilt.
+**Narration setup.** "Narration". Segmented Fish Audio | On this phone. Voice cards (avatar 40, name, descriptor, preview; selected 1.5 accent border). Estimate stat tiles. Docked Primary "Start narration".
 
-## 8. Review checklist
+## 9. States
 
-1. No `Color(0x` in feature code; no elevation.
-2. Targets ≥48; spacing on scale.
-3. Type per §2; tabular numerals.
-4. Accent per §3; one primary key per screen.
-5. Transformations interruptible, back-scrubbed, P95 frame <8.3 ms at 120 Hz.
-6. Idle screens still; haptics per §5; reduced motion per §4.
-7. Screenshots: dark and light, every preset, 1.0 and 1.5 font scale; contrast passes; no clipped titles.
-8. Every state present with §6 tone.
-9. Beside DirC, it reads as the same object world, not a dark-card app.
+- **Loading:** surface1 skeleton blocks at final sizes, alpha 0.5-1.0 over 1.2 s [`KpSkeleton`]; no full-screen spinners.
+- **Empty** [`KpEmptyState`]: column at 30% height, optional object (Home, Library), Fraunces 24 headline, body `text2` max 2 lines, one Primary.
+- **Error** [`KpErrorCard`]: headline, one plain sentence, small Secondary "Try again". No codes.
+- **Streaming (all AI):** first token target 1 s. Before it: label "Reading the book…" with caret. Then tokens append; citations become chips as they resolve; Stop as a Ghost button while streaming.
+
+## 10. Copy
+
+Sentence case, warm, specific ("12 cards, about 6 minutes"). No exclamation marks, no hype, no warnings about the person's files, copyright or DRM. Times: "2h 10m", "18 min".
+
+## 11. Review checklist
+
+1. Remove the 3D object: does the screen still look finished and informative?
+2. Every cover drawn through `KpCovers`; no placeholder frame on revisit.
+3. Tab switch shows no slide, no replay, same scroll position.
+4. Touch targets 48; contrast passes; font scale 1.5 clips nothing.
+5. Dark and light screenshots; every accent preset.

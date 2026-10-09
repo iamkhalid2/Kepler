@@ -141,15 +141,17 @@ class ServiceBehaviourTest {
         assertTrue(map.nodes.all { it.firstOrdinal <= 14 })
     }
 
-    @Test fun recapStitchesCachedSummariesAndBuildsThePartialSection() = runBlocking {
+    @Test fun recapStitchesCachedSummariesAndGeneratesOnlyThePartialSection() = runBlocking {
         val rig = Rig(ContentType.NONFICTION, frontier = 14)
         rig.service.buildPack(1, 1, Priority.INTERACTIVE)
         val before = rig.mock.chatBodies.size
         val recap = rig.service.recap(1)
-        assertEquals(before + 1, rig.mock.chatBodies.size) // only the partial section 2 was built
-        assertTrue(recap.contains("One: Recap 0-9")); assertTrue(recap.contains("Two: Recap 10-14"))
+        assertEquals(before + 1, rig.mock.chatBodies.size) // only the section being read was generated, briefly
+        assertTrue(recap.startsWith("One: Recap 0-9"))
+        assertTrue(recap.contains("Two: A plain text answer."))
+        assertTrue("max_tokens\":350" in rig.mock.chatBodies.last())
         rig.service.recap(1)
-        assertEquals(before + 1, rig.mock.chatBodies.size)
+        assertEquals(before + 1, rig.mock.chatBodies.size) // the generated part is cached too
     }
 
     @Test fun askKeepsOnlyRealCitationsAndCachesTheAnswer() = runBlocking {

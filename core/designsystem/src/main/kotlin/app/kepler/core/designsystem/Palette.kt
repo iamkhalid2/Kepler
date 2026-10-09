@@ -44,6 +44,9 @@ class KpPalette(
     /** Read-along current line (stronger than [readAlong]). */
     val readAlongLine: Color,
     val materials: KpMaterials,
+    // ---- v2 (brief section 1): elevation by tone ----
+    /** Sheets, menus, the mini player and toasts. */
+    val surface3: Color = surface2,
 )
 
 /** Accent presets. Cobalt is the default. The last four are older presets kept for stored settings. */
@@ -70,8 +73,8 @@ private const val LIGHT_BG = 0xFFF4F2EE
 private fun hex(v: Long) = Color(v)
 
 fun kpPalette(seed: Color, dark: Boolean): KpPalette {
-    val bg = if (dark) hex(0xFF000000) else hex(LIGHT_BG)
-    val hairline = if (dark) hex(0xFF2A2A30) else hex(0xFFD6D4CE)
+    val bg = if (dark) hex(0xFF0A0A0C) else hex(LIGHT_BG)
+    val hairline = if (dark) hex(0xFF2A2A30) else hex(0xFFDEDBD4)
     val s = seed.toLch()
 
     // accent: the seed, guarded to 3:1 against bg (lifted in dark, lowered in light)
@@ -105,8 +108,8 @@ fun kpPalette(seed: Color, dark: Boolean): KpPalette {
         isDark = dark,
         seed = seed,
         bg = bg,
-        surface1 = if (dark) hex(0xFF101012) else hex(0xFFFBF9F5),
-        surface2 = if (dark) hex(0xFF1A1A1E) else hex(0xFFFFFEFB),
+        surface1 = if (dark) hex(0xFF16161A) else hex(0xFFFFFFFF),
+        surface2 = if (dark) hex(0xFF1F1F24) else hex(0xFFEFEDE8),
         hairline = hairline,
         text = if (dark) hex(0xFFFFFFFF) else hex(0xFF1A1814),
         text2 = if (dark) hex(0xFF9B9BA3) else hex(0xFF66635C),
@@ -128,6 +131,7 @@ fun kpPalette(seed: Color, dark: Boolean): KpPalette {
         edge = hairline.withLch(l = hairline.toLch().l + if (dark) 0.08f else -0.10f),
         readAlongLine = accent.copy(alpha = if (dark) 0.30f else 0.22f),
         materials = kpMaterials(seed, accent, bg, dark),
+        surface3 = if (dark) hex(0xFF26262C) else hex(0xFFFFFFFF),
     )
 }
 

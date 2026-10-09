@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.fragment.app.FragmentActivity
+import app.kepler.core.designsystem.KpCovers
 import app.kepler.engine.epub.reader.ReaderFragmentFactory
 import app.kepler.feature.reader.ReaderKeys
 import app.kepler.nav.AppRoot
@@ -54,6 +55,11 @@ class MainActivity : FragmentActivity() {
         pendingDocument?.complete(null)
         incoming.close()
         super.onDestroy()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        KpCovers.trim(level)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean = ReaderKeys.dispatch(event) || super.dispatchKeyEvent(event)

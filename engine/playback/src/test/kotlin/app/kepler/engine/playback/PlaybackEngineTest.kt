@@ -37,6 +37,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
+import app.kepler.core.model.ScrubberScope
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -221,6 +223,48 @@ class PlaybackEngineTest {
         idle()
         assertNull(engine.state.value.sleepRemainingMs)
         assertFalse(engine.info.value.sleepAtSectionEnd)
+    }
+
+    @Test fun chapterTimingCoversTheWholeChapterAndTheRestOfTheBook() {
+        // Book I has audio everywhere: 3 segments of 10 s joined by two 450 ms pauses. Book II has none.
+        engine.play(1, 7)
+        val st = engine.state.value
+        assertEquals(1L, st.currentSectionId)
+        assertEquals(30_900L, st.sectionDurationMs)
+        assertFalse(st.sectionDurationEstimated)
+        // sentence 7 starts 4 s into the second segment (10_450 ms in)
+        assertTrue(st.sectionElapsedMs in 14_000..14_500)
+        assertEquals(st.sectionElapsedMs, st.positionMs)
+        // Book II: 20 sentences at the measured 1.5 s per sentence
+        assertTrue(st.bookRemainingEstimated)
+        assertEquals(30_900 - st.sectionElapsedMs + 30_000, st.bookRemainingMs)
+        assertEquals(60_900L, engine.info.value.bookTotalMs)
+        assertEquals(30_900L, engine.externalState().durationMs)
+    }
+
+    @Test fun seekWithinSectionLandsOnTheMatchingSentence() {
+        engine.play(1, 0)
+        idle()
+        engine.seekWithinSection(0.5f) // 15_450 ms: 5 s into the second segment, sentence 7
+        idle()
+        assertEquals(7, engine.state.value.ordinal)
+        engine.seekWithinSection(0f)
+        idle()
+        assertEquals(0, engine.state.value.ordinal)
+    }
+
+    @Test fun bookScopeSeeksAcrossChaptersAndTheNotificationFollowsTheScope() {
+        engine.play(1, 7)
+        idle()
+        fakes.settings.let { s -> runBlocking { s.update { it.copy(scrubberScope = ScrubberScope.BOOK) } } }
+        idle()
+        assertEquals(60_900L, engine.externalState().durationMs)
+        engine.seekWithinBook(0.9f) // inside Book II, which has no audio yet: narration is requested there
+        idle()
+        assertTrue(fakes.ensured.any { it in 30..39 })
+        fakes.settings.let { s -> runBlocking { s.update { it.copy(scrubberScope = ScrubberScope.CHAPTER) } } }
+        idle()
+        assertTrue(engine.externalState().durationMs > 0)
     }
 
     @Test fun pauseSavesTheListeningPosition() {

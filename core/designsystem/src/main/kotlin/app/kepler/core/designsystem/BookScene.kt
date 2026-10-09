@@ -14,6 +14,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -147,10 +150,14 @@ private class PoseState(start: BookPose) {
 @Composable
 private fun animatePose(t: BookPose, from: BookPose?): PoseState {
     val reduced = rememberReducedMotion()
-    val state = remember { PoseState(if (from == null || reduced) t else from) }
+    // Saved with the screen's state: a tab switch, a rotation or coming back from a pushed screen keeps it, so the
+    // entrance never replays. Only a freshly created screen enters again.
+    val enteredBefore = rememberSaveable { mutableStateOf(false) }
+    val state = remember { PoseState(if (from == null || reduced || enteredBefore.value) t else from) }
     LaunchedEffect(t, reduced) {
-        val entering = !state.entered && from != null
+        val entering = !state.entered && from != null && !enteredBefore.value
         state.entered = true
+        enteredBefore.value = true
         if (reduced || state.claimed) {
             state.snap(t)
             return@LaunchedEffect
@@ -200,9 +207,17 @@ fun BookScene(
     stageTag: String = "",
     /** Books lift a few millimetres toward the viewer while pressed. */
     pressLift: Boolean = false,
+    /**
+     * Stable identity per book (the book id). Animation state follows the book, not its list position, so a
+     * re-sort never hands one book another's pose. Falls back to [stageKeys], then to the index.
+     */
+    keys: List<Any>? = null,
 ) {
     val palette = Kp.palette
-    val poses = books.indices.map { animatePose(targets[it], enterFrom?.getOrNull(it)) }
+    val identity: List<Any?>? = keys ?: stageKeys
+    val poses = books.indices.map { i ->
+        key(identity?.getOrNull(i) ?: i) { animatePose(targets[i], enterFrom?.getOrNull(i)) }
+    }
     val measurer = rememberTextMeasurer()
     val matrix = remember { Matrix() }
     val src = remember { FloatArray(8) }

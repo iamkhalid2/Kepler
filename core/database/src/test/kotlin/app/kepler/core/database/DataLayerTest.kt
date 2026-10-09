@@ -8,6 +8,7 @@ import app.kepler.core.database.db.Fts
 import app.kepler.core.database.repo.SourceOpener
 import app.kepler.core.database.settings.DataStoreSettingsStore
 import app.kepler.core.model.*
+import app.cash.turbine.test
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -277,6 +278,37 @@ class DataLayerTest {
         assertEquals(2, layer.cards.cards(b.id).first().size)
         layer.library.delete(b.id)
         assertTrue(layer.cards.cards(null).first().isEmpty())
+    }
+
+    @Test fun positionFractionFollowsTheMostRecentPositionAndIgnoresConsumption() = runBlocking {
+        val b = import() // 12 sentences
+        assertEquals(0f, layer.library.book(b.id).first()!!.positionFraction, 0f)
+        layer.positions.savePosition(b.id, PositionKind.READING, 6)
+        assertEquals(0.5f, layer.library.book(b.id).first()!!.positionFraction, 1e-6f)
+        layer.positions.savePosition(b.id, PositionKind.LISTENING, 3) // listening is now the latest
+        assertEquals(0.25f, layer.library.book(b.id).first()!!.positionFraction, 1e-6f)
+        layer.positions.savePosition(b.id, PositionKind.READING, 9)
+        assertEquals(0.75f, layer.library.book(b.id).first()!!.positionFraction, 1e-6f)
+        layer.positions.savePosition(b.id, PositionKind.READING, 500) // clamped
+        assertEquals(1f, layer.library.book(b.id).first()!!.positionFraction, 0f)
+        // consumed is separate: marking sentences consumed does not move "where you are"
+        layer.positions.savePosition(b.id, PositionKind.READING, 3)
+        layer.positions.markConsumed(b.id, 2, 9, PositionKind.LISTENING)
+        val book = layer.library.book(b.id).first()!!
+        assertEquals(0.25f, book.positionFraction, 1e-6f)
+        assertEquals(1f, book.listenFraction, 1e-6f)
+    }
+
+    @Test fun reviewedTodayFlowReEmitsOnReview() = runBlocking {
+        val b = import()
+        val now = 1_800_000_000_000L
+        val id = layer.cards.add(Card(0, b.id, CardType.QA, 1, 2, "q", "a", null, now - 10, 1.0, 5.0, 0, 0, 0, null, 1))
+        layer.cards.reviewedTodayFlow(now).test {
+            assertEquals(0, awaitItem())
+            layer.cards.update(layer.cards.cards(b.id).first().first { it.id == id }.copy(lastReviewAt = now - 5, reps = 1))
+            assertEquals(1, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test fun aiCacheAndUsageCounters() = runBlocking {

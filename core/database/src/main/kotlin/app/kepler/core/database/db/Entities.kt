@@ -21,6 +21,8 @@ internal data class BookEntity(
     val sentenceCount: Int,
     val readFraction: Float,
     val listenFraction: Float,
+    /** Where the reader/listener is now (most recent saved position / sentenceCount). Added in schema 2. */
+    @ColumnInfo(defaultValue = "0") val positionFraction: Float = 0f,
 )
 
 @Entity(
