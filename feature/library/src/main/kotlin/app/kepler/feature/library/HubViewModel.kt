@@ -73,4 +73,12 @@ class HubViewModel(private val deps: LibraryDeps, val bookId: BookId) : ViewMode
     init {
         viewModelScope.launch { deps.library.markOpened(bookId) }
     }
+
+    /** Stops playback and narration for this book, then deletes it. [done] runs once it is gone. */
+    fun remove(done: () -> Unit = {}) {
+        viewModelScope.launch {
+            deps.removeBook(bookId)
+            done()
+        }
+    }
 }

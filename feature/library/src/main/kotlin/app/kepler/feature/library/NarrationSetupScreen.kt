@@ -60,7 +60,7 @@ fun NarrationSetupRoute(
     BackHandler(onBack = onBack)
     NarrationSetupScreen(
         ui, onBack, onOpenSettings, vm::setProvider, vm::select, vm::setSpeed, vm::preview,
-        vm::start, vm::stop, vm::useSystemVoice,
+        vm::start, vm::stop, vm::useSystemVoice, vm::confirmPaid, vm::resume,
     )
 }
 
@@ -101,6 +101,8 @@ fun NarrationSetupScreen(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onUseSystem: () -> Unit,
+    onConfirmPaid: () -> Unit = {},
+    onResume: () -> Unit = {},
 ) {
     val p = Kp.palette
     ScreenRoot {
@@ -163,12 +165,15 @@ fun NarrationSetupScreen(
 
             Section(R.string.setup_cost) {
                 CostSlip(ui.estimate)
+                if (ui.paid.showsNotice && ui.narration !is NarrationState.Paused) {
+                    PaidNotice(ui.paid, Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp))
+                }
             }
 
             Column(Modifier.padding(horizontal = 24.dp)) {
-                Progress(ui, onStop, onUseSystem)
+                Progress(ui, onStop, onUseSystem, onConfirmPaid, onResume, onOpenSettings)
                 Spacer(Modifier.height(12.dp))
-                if (ui.narration !is NarrationState.Running) {
+                if (ui.narration !is NarrationState.Running && ui.narration !is NarrationState.Paused) {
                     KpPrimaryKey(
                         stringResource(if (ui.narration is NarrationState.Done) R.string.bind_again else R.string.bind_narration),
                         onStart, enabled = ui.canStart,
@@ -229,7 +234,10 @@ private fun SlipLine(label: String, value: String) {
 }
 
 @Composable
-private fun Progress(ui: SetupUi, onStop: () -> Unit, onUseSystem: () -> Unit) {
+private fun Progress(
+    ui: SetupUi, onStop: () -> Unit, onUseSystem: () -> Unit, onConfirmPaid: () -> Unit, onResume: () -> Unit,
+    onOpenSettings: (() -> Unit)?,
+) {
     val p = Kp.palette
     when (val n = ui.narration) {
         is NarrationState.Running -> {
@@ -243,13 +251,11 @@ private fun Progress(ui: SetupUi, onStop: () -> Unit, onUseSystem: () -> Unit) {
                 KpSecondaryKey(stringResource(R.string.stop), onStop)
             }
         }
-        is NarrationState.Paused -> Column {
-            Text(stringResource(pausedReasonRes(n.reason)), color = p.text2, style = KpType.body)
-            if (ui.provider == PROVIDER_FISH) {
-                Spacer(Modifier.height(8.dp))
-                KpSecondaryKey(stringResource(R.string.use_system_voice), onUseSystem)
-            }
-        }
+        is NarrationState.Paused -> PausedPanel(
+            pausedKind(n.reason), ui.paid,
+            (ui.estimate as? EstimateUi.Ready)?.estimate?.takeIf { !it.freeTier }?.costCents,
+            ui.provider == PROVIDER_FISH, onConfirmPaid, onResume, onUseSystem, onOpenSettings,
+        )
         is NarrationState.Failed -> Column {
             Text(stringResource(R.string.narration_stopped_with, n.message), color = p.negative, style = KpType.body)
             if (ui.provider == PROVIDER_FISH) {

@@ -15,7 +15,13 @@ import app.kepler.core.model.NarrationConfig
 import app.kepler.core.model.NarrationEstimate
 import app.kepler.core.model.NarrationService
 import app.kepler.core.model.NarrationState
+import app.kepler.core.model.NarrationControls
+import app.kepler.core.model.NarrationLimits
+import app.kepler.core.model.PaidSwitchStatus
+import app.kepler.core.model.PlaybackController
+import app.kepler.core.model.PlaybackState
 import app.kepler.core.model.SettingsStore
+import kotlinx.coroutines.flow.StateFlow
 import app.kepler.core.model.SyncRow
 import app.kepler.core.model.VoiceOption
 import app.kepler.core.model.VoiceRef
@@ -35,6 +41,7 @@ class FakeLibrary(initial: List<Book> = emptyList()) : LibraryRepository {
     val imported = mutableListOf<String>()
     val deleted = mutableListOf<BookId>()
     val opened = mutableListOf<BookId>()
+    var onDelete: (BookId) -> Unit = {}
     override val books: Flow<List<Book>> = all
     override fun book(id: BookId): Flow<Book?> = all.map { list -> list.firstOrNull { it.id == id } }
     override suspend fun importBook(sourceUri: String): ImportResult {
@@ -42,7 +49,7 @@ class FakeLibrary(initial: List<Book> = emptyList()) : LibraryRepository {
         importThrows?.let { throw it }
         return nextImport
     }
-    override suspend fun delete(id: BookId) { deleted += id; all.value = all.value.filterNot { it.id == id } }
+    override suspend fun delete(id: BookId) { onDelete(id); deleted += id; all.value = all.value.filterNot { it.id == id } }
     override suspend fun markOpened(id: BookId) { opened += id }
 }
 
@@ -87,6 +94,40 @@ class FakeNarration : NarrationService {
     }
 }
 
+class FakeControls : NarrationControls {
+    var status: PaidSwitchStatus = PaidSwitchStatus.FREE_ACTIVE
+    var confirmed = false
+    var monthSpent = 0.0
+    var bookSpent = 0.0
+    var monthlyCap = NarrationLimits.DEFAULT_MONTHLY_CAP_CENTS
+    var onCancel: (BookId) -> Unit = {}
+    val cancelled = mutableListOf<BookId>()
+    var cancelThrows: Exception? = null
+    override fun paidSwitchStatus() = status
+    override fun paidGenerationConfirmed() = confirmed
+    override fun confirmPaidGeneration() { confirmed = true }
+    override fun spentThisMonthCents() = monthSpent
+    override fun spentOnBookCents(bookId: BookId) = bookSpent
+    override suspend fun effectiveMonthlyCapCents() = monthlyCap
+    override fun perBookCapCents() = NarrationLimits.PER_BOOK_CAP_CENTS
+    override fun cancelBook(bookId: BookId) { onCancel(bookId); cancelThrows?.let { throw it }; cancelled += bookId }
+}
+
+class FakePlayback(current: BookId? = null) : PlaybackController {
+    val flow = kotlinx.coroutines.flow.MutableStateFlow(PlaybackState(bookId = current, playing = current != null))
+    var onPause: () -> Unit = {}
+    val pauses = mutableListOf<Unit>()
+    override val state: StateFlow<PlaybackState> = flow
+    override fun play(bookId: BookId, fromOrdinal: Int?) = Unit
+    override fun pause() { onPause(); pauses += Unit }
+    override fun resume() = Unit
+    override fun seekToSentence(ordinal: Int) = Unit
+    override fun skipSentences(delta: Int) = Unit
+    override fun seekByMs(deltaMs: Long) = Unit
+    override fun setSpeed(speed: Float) = Unit
+    override fun setSleepTimer(minutes: Int) = Unit
+}
+
 class FakeAudio : AudioRepository {
     val coverage = MutableStateFlow(0f)
     override fun segments(bookId: BookId): Flow<List<AudioSegment>> = MutableStateFlow(emptyList())
@@ -128,6 +169,10 @@ class FakeDeps(
     override val freeModels: suspend () -> List<String> = { models }
     override val spentThisMonthCents: () -> Int = { spent }
     override val showsBatteryGuide: () -> Boolean = { battery }
+    val fakeControls = FakeControls()
+    var fakePlayback: FakePlayback? = null
+    override val controls: NarrationControls get() = fakeControls
+    override val playback: PlaybackController? get() = fakePlayback
 }
 
 fun voice(provider: String, id: String) = VoiceOption(VoiceRef(provider, id, id.replaceFirstChar { it.uppercase() }), "", "en", null)

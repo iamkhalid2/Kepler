@@ -59,6 +59,7 @@ data class SetupUi(
     /** Voice id whose preview is being rendered. */
     val previewing: String? = null,
     val previewFailed: Boolean = false,
+    val paid: PaidUi = PaidUi(),
 ) {
     val canStart: Boolean get() = selected != null && narration !is NarrationState.Running
 }
@@ -81,7 +82,10 @@ class NarrationSetupViewModel(
 
     init {
         deps.library.book(bookId).onEach { b -> _state.update { it.copy(book = b) } }.launchIn(viewModelScope)
-        deps.narration.state(bookId).onEach { n -> _state.update { it.copy(narration = n) } }.launchIn(viewModelScope)
+        deps.narration.state(bookId).onEach { n ->
+            _state.update { it.copy(narration = n) }
+            refreshPaid()
+        }.launchIn(viewModelScope)
         viewModelScope.launch {
             estimateInput.filterNotNull().debounce(250).collectLatest { (voice, speed) -> computeEstimate(voice, speed) }
         }
@@ -141,6 +145,36 @@ class NarrationSetupViewModel(
     }
 
     fun stop() = deps.narration.stop(bookId)
+
+    /** Re-reads spend, caps and the switch status (they change while a job runs). */
+    fun refreshPaid() {
+        viewModelScope.launch {
+            val paid = try {
+                readPaidUi(deps, bookId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@launch
+            }
+            _state.update { it.copy(paid = paid) }
+        }
+    }
+
+    /** The one-tap "Continue with the paid voice": records the OK, then restarts the paused job. */
+    fun confirmPaid() {
+        deps.controls.confirmPaidGeneration()
+        refreshPaid()
+        resume()
+    }
+
+    /** Starts the job again with the chosen voice, or the saved one when none is chosen on screen. */
+    fun resume() {
+        viewModelScope.launch {
+            val s = _state.value
+            val voice = s.selected ?: deps.settings.settings.first().voice ?: return@launch
+            deps.narration.start(bookId, NarrationConfig(voice, s.speed))
+        }
+    }
 
     /** After a Fish stop or limit: continue with the system voice. */
     fun useSystemVoice() {
@@ -207,11 +241,4 @@ internal fun voicesForLanguage(voices: List<VoiceOption>, language: String?): Li
     val want = language?.substringBefore('-')?.substringBefore('_')?.lowercase()?.takeIf { it.isNotBlank() } ?: return voices
     val matching = voices.filter { it.language?.substringBefore('-')?.substringBefore('_')?.lowercase() == want }
     return matching.ifEmpty { voices }
-}
-
-/** Plain copy for a NarrationState.Paused reason code from the narration engine. */
-internal fun pausedReasonRes(reason: String): Int = when (reason) {
-    "monthly_cap" -> R.string.narration_paused_cap
-    "offline" -> R.string.narration_paused_offline
-    else -> R.string.narration_paused_system
 }

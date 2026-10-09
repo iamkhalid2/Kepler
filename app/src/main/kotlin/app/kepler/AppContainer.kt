@@ -8,7 +8,9 @@ import app.kepler.core.model.AnnotationRepository
 import app.kepler.core.model.AudioRepository
 import app.kepler.core.model.CardRepository
 import app.kepler.core.model.LibraryRepository
+import app.kepler.core.model.NarrationControls
 import app.kepler.core.model.NarrationService
+import app.kepler.core.model.PlaybackController
 import app.kepler.core.model.PositionRepository
 import app.kepler.core.model.ReviewStatsStore
 import app.kepler.core.model.Scheduler
@@ -21,7 +23,9 @@ import app.kepler.engine.epub.ingest.EpubIngestor
 import app.kepler.engine.playback.PlaybackClient
 import app.kepler.engine.playback.PlaybackDependencies
 import app.kepler.engine.srs.FsrsScheduler
+import app.kepler.engine.tts.Estimator
 import app.kepler.engine.tts.FishProvider
+import app.kepler.engine.tts.ModelPolicy
 import app.kepler.engine.tts.NarrationEngine
 import app.kepler.engine.tts.TtsException
 import app.kepler.feature.library.KeyKind
@@ -73,10 +77,20 @@ class AppContainer(private val app: Application) {
         }
     }
 
+    /** One hour of paid Fish audio, from the narration estimator's pace and the model's price per byte. */
+    private fun paidCentsPerHour(): Double {
+        val sample = "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness."
+        val bytesPerSecond = sample.toByteArray(Charsets.UTF_8).size / Estimator.audioSeconds(sample, 1f)
+        return bytesPerSecond * 3600 * ModelPolicy.PAID_CENTS_PER_BYTE
+    }
+
     private fun libraryDepsImpl(): LibraryDeps = object : LibraryDeps {
         override val library: LibraryRepository = data.library
         override val settings: SettingsStore = data.settings
         override val narration: NarrationService = this@AppContainer.narration
+        override val controls: NarrationControls = this@AppContainer.narration
+        override val playback: PlaybackController by lazy { this@AppContainer.playback }
+        override val paidCentsPerHour: () -> Double = ::paidCentsPerHour
         override val audio: AudioRepository = data.audio
         override val cards: CardRepository = data.cards
         override val verifyFishKey: suspend (String) -> Boolean = { key ->

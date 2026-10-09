@@ -178,17 +178,7 @@ fun LibraryScreen(
             }
         }
     }
-    ui.pendingDelete?.let { b ->
-        KpSheet(onDismiss = onCancelDelete) {
-            Text(stringResource(R.string.remove_title, b.title), color = p.text, style = KpType.title)
-            Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.remove_body), color = p.text2, style = KpType.body)
-            Spacer(Modifier.height(24.dp))
-            KpSecondaryKey(stringResource(R.string.remove), onConfirmDelete, Modifier.fillMaxWidth(), topEdge = p.negative)
-            Spacer(Modifier.height(8.dp))
-            KpTextLink(stringResource(R.string.keep), onCancelDelete)
-        }
-    }
+    ui.pendingDelete?.let { b -> RemoveBookSheet(b.title, onConfirmDelete, onCancelDelete) }
 }
 
 private fun LibrarySort.label(): Int = when (this) {

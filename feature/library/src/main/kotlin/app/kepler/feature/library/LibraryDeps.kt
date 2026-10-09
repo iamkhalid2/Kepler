@@ -14,7 +14,11 @@ import app.kepler.core.model.AiBudget
 import app.kepler.core.model.AppSettings
 import app.kepler.core.model.AudioRepository
 import app.kepler.core.model.CardRepository
+import app.kepler.core.model.BookId
 import app.kepler.core.model.LibraryRepository
+import app.kepler.core.model.NarrationControls
+import app.kepler.core.model.PaidSwitchStatus
+import app.kepler.core.model.PlaybackController
 import app.kepler.core.model.NarrationService
 import app.kepler.core.model.SettingsStore
 
@@ -40,6 +44,15 @@ interface LibraryDeps {
 
     /** Fish spend so far this month, in USD cents. */
     val spentThisMonthCents: () -> Int get() = { 0 }
+
+    /** Spend, caps, the free-to-paid switch and per-book cancel. The default does nothing, for previews and tests. */
+    val controls: NarrationControls get() = NoNarrationControls
+
+    /** The player, so deleting the book that is playing can stop it first. Null = nothing to stop. */
+    val playback: PlaybackController? get() = null
+
+    /** Cost of one hour of audio on the paid Fish model, in US cents (from the narration estimator). */
+    val paidCentsPerHour: () -> Double get() = { DEFAULT_PAID_CENTS_PER_HOUR }
 
     /** Whether to show the ColorOS battery step in onboarding. */
     val showsBatteryGuide: () -> Boolean get() = { isOppoFamily(Build.MANUFACTURER, Build.BRAND) }
@@ -76,4 +89,33 @@ fun KeplerTheme(settings: SettingsStore, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalHapticsEnabled provides s.haptics) {
         KpTheme(palette, content)
     }
+}
+
+/** About 9,400 words an hour at 6 bytes a word and 0.0015 cents a byte. Only used when the app supplies nothing better. */
+const val DEFAULT_PAID_CENTS_PER_HOUR = 84.0
+
+internal object NoNarrationControls : NarrationControls {
+    override fun paidSwitchStatus(): PaidSwitchStatus = PaidSwitchStatus.FREE_ACTIVE
+    override fun paidGenerationConfirmed() = false
+    override fun confirmPaidGeneration() = Unit
+    override fun spentThisMonthCents() = 0.0
+    override fun spentOnBookCents(bookId: BookId) = 0.0
+    override suspend fun effectiveMonthlyCapCents() = app.kepler.core.model.NarrationLimits.DEFAULT_MONTHLY_CAP_CENTS
+    override fun perBookCapCents() = app.kepler.core.model.NarrationLimits.PER_BOOK_CAP_CENTS
+    override fun cancelBook(bookId: BookId) = Unit
+}
+
+/**
+ * Removes a book safely: stops playback if it is the current book, cancels its narration job (so nothing
+ * writes audio for a book that no longer exists), then deletes it. A failing cancel never blocks the delete.
+ */
+suspend fun LibraryDeps.removeBook(id: BookId) {
+    try {
+        playback?.let { if (it.state.value.bookId == id) it.pause() }
+        controls.cancelBook(id)
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (_: Exception) {
+    }
+    library.delete(id)
 }

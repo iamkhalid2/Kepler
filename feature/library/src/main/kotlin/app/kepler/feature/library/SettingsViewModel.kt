@@ -24,6 +24,7 @@ data class SettingsUi(
     val spentCents: Int = 0,
     val models: List<String> = emptyList(),
     val version: String = "",
+    val paid: PaidUi = PaidUi(),
 ) {
     val seed: KpSeed get() = KpSeed.fromName(app.seed)
 }
@@ -43,6 +44,14 @@ class SettingsViewModel(private val deps: LibraryDeps) : ViewModel() {
             val fish = deps.settings.fishKey() != null
             val or = deps.settings.openRouterKey() != null
             _state.update { it.copy(fishSet = fish, openRouterSet = or, spentCents = deps.spentThisMonthCents()) }
+            val paid = try {
+                readPaidUi(deps, null)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            if (paid != null) _state.update { it.copy(paid = paid) }
             if (or) {
                 val budget = runCatching { deps.aiBudget() }.getOrNull()
                 val models = runCatching { deps.freeModels() }.getOrDefault(emptyList())
@@ -93,7 +102,19 @@ class SettingsViewModel(private val deps: LibraryDeps) : ViewModel() {
     fun setSeed(seed: KpSeed) = edit { it.copy(seed = seed.name) }
     fun setDark(dark: Boolean) = edit { it.copy(dark = dark) }
     fun setHaptics(on: Boolean) = edit { it.copy(haptics = on) }
-    fun setMonthlyCapCents(cents: Int) = edit { it.copy(monthlyCapCents = cents.coerceAtLeast(0)) }
+    fun setMonthlyCapCents(cents: Int) {
+        viewModelScope.launch {
+            deps.settings.update { it.copy(monthlyCapCents = cents.coerceAtLeast(0)) }
+            refresh()
+        }
+    }
+
+    /** Saves the cap typed as dollars. Blank = default. Returns false when the text is not an amount. */
+    fun setMonthlyCapText(text: String): Boolean {
+        val cents = parseCents(text) ?: return false
+        setMonthlyCapCents(cents)
+        return true
+    }
     fun setOpenRouterModel(model: String?) = edit { it.copy(openRouterModel = model) }
     fun setFontScale(scale: Float) = edit { it.copy(fontScale = scale) }
     fun setLineHeight(h: Float) = edit { it.copy(lineHeight = h) }

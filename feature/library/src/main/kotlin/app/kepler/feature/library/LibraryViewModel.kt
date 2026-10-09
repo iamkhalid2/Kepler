@@ -107,7 +107,7 @@ class LibraryViewModel(private val deps: LibraryDeps) : ViewModel() {
     fun confirmDelete() {
         val book = prefs.value.pendingDelete ?: return
         prefs.update { it.copy(pendingDelete = null) }
-        viewModelScope.launch { deps.library.delete(book.id) }
+        viewModelScope.launch { deps.removeBook(book.id) }
     }
 }
 

@@ -83,7 +83,9 @@
     <string name="narration_partial_voice">%1$d%% bound · %2$s</string>
     <string name="narration_ready">Narration ready</string>
     <string name="narration_ready_voice">Narration ready · %1$s</string>
-    <string name="narration_paused_cap">Paused. This month’s narration cap is reached.</string>
+    <string name="narration_paused_cap">Paused. This month’s narration limit is reached.</string>
+    <string name="narration_paused_book_cap">Paused. This book reached its narration limit.</string>
+    <string name="narration_paused_paid">Paused. The free voice has ended, and the paid voice needs your OK.</string>
     <string name="narration_paused_offline">Paused until you’re back online. It continues on its own.</string>
     <string name="narration_paused_system">Paused by Android for now. It continues on its own.</string>
     <string name="narration_failed">Narration stopped. Set it up to continue.</string>
@@ -189,4 +191,26 @@
     <string name="home_start">Start</string>
     <string name="home_binding">Binding narration %1$d%%</string>
     <string name="home_empty_title">Add your first book</string>
+    <string name="paid_continue">Continue with the paid voice</string>
+    <string name="paid_confirm_body">The free Fish voice has ended. The paid voice costs about %1$s per hour of audio, billed to your Fish account.</string>
+    <string name="paid_this_book">This book: about %1$s.</string>
+    <string name="paid_limits">Limits: %1$s a book, %2$s a month. Spent this month: %3$s.</string>
+    <string name="paid_spent_book">Spent on this book: %1$s of %2$s.</string>
+    <string name="paid_spent_month">Spent this month: %1$s of %2$s.</string>
+    <plurals name="paid_notice_soon">
+        <item quantity="one">The free Fish voice ends on 30 Nov, in %1$d day. After that the paid voice costs about %2$s per hour of audio, billed to your Fish account. You will be asked before anything is charged.</item>
+        <item quantity="other">The free Fish voice ends on 30 Nov, in %1$d days. After that the paid voice costs about %2$s per hour of audio, billed to your Fish account. You will be asked before anything is charged.</item>
+    </plurals>
+    <string name="paid_notice_ended">The free Fish voice has ended. The paid voice costs about %1$s per hour of audio, billed to your Fish account. You will be asked before anything is charged.</string>
+    <string name="resume">Resume</string>
+    <string name="change_limit">Change the limit</string>
+    <string name="book_cap">Limit for one book</string>
+    <string name="book_cap_body">Narration for one book stops before it passes this amount. Free voices don’t count.</string>
+    <string name="cap_default">Default %1$s</string>
+    <string name="cap_field_label">Monthly limit in dollars</string>
+    <string name="cap_field_hint">Leave empty for the default</string>
+    <string name="cap_invalid">Enter an amount like 5 or 7.50.</string>
+    <string name="cap_save">Save</string>
+    <string name="cap_use_default">Use the default</string>
+    <string name="remove_from_library">Remove from library</string>
 </resources>

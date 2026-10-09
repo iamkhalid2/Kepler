@@ -197,7 +197,7 @@ internal fun KeyField(
 ) {
     val p = Kp.palette
     KpInput(
-        value = value, onValueChange = onValue, label = label, secret = true,
+        value = value, onValueChange = onValue, label = label, secret = true, keyboardOptions = SecretKeyboard,
         placeholder = if (check == KeyCheck.Connected && value.isEmpty()) stringResource(R.string.key_saved_placeholder) else null,
         error = when (check) {
             KeyCheck.Rejected -> stringResource(R.string.key_rejected)

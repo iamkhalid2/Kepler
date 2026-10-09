@@ -37,7 +37,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.KpCaps
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import app.kepler.core.designsystem.KpDot
+import app.kepler.core.designsystem.KpInput
+import app.kepler.core.designsystem.KpSecondaryKey
 import app.kepler.core.designsystem.KpRow
 import app.kepler.core.designsystem.KpRowSeparator
 import app.kepler.core.designsystem.KpSeed
@@ -51,7 +56,6 @@ import app.kepler.core.designsystem.clothFor
 import app.kepler.core.designsystem.drawShelfPlank
 import app.kepler.core.designsystem.rememberHaptics
 
-private val CAP_CHOICES = listOf(0, 500, 1000, 2000)
 private val FONT_SCALES = listOf(0.9f, 1.0f, 1.15f)
 private val LINE_HEIGHTS = listOf(1.4f, 1.6f, 1.8f)
 private val FONT_FAMILIES = listOf("Literata", "Albert Sans")
@@ -112,11 +116,17 @@ fun SettingsScreen(ui: SettingsUi, onBack: () -> Unit, vm: SettingsViewModel) {
                 stringResource(R.string.monthly_cap), onClick = { sheet = Sheet.Cap },
                 trailing = {
                     Text(
-                        if (ui.app.monthlyCapCents == 0) stringResource(R.string.no_cap) else money(ui.app.monthlyCapCents),
+                        if (ui.app.monthlyCapCents == 0) stringResource(R.string.cap_default, money(ui.paid.monthlyCapCents)) else money(ui.app.monthlyCapCents),
                         color = p.text, style = KpType.numeral,
                     )
                 },
             )
+            KpRowSeparator()
+            KpRow(
+                stringResource(R.string.book_cap), meta = stringResource(R.string.book_cap_body),
+                trailing = { Text(money(ui.paid.bookCapCents), color = p.text, style = KpType.numeral) },
+            )
+            if (ui.paid.showsNotice) PaidNotice(ui.paid, Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
 
             Group(R.string.group_appearance)
             Column(Modifier.padding(horizontal = 24.dp)) {
@@ -172,17 +182,7 @@ fun SettingsScreen(ui: SettingsUi, onBack: () -> Unit, vm: SettingsViewModel) {
                 SelectableRow(m, ui.app.openRouterModel == m) { vm.setOpenRouterModel(m); sheet = null }
             }
         }
-        Sheet.Cap -> KpSheet(onDismiss = { sheet = null }) {
-            KpCaps(stringResource(R.string.monthly_cap))
-            Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.cap_body), color = p.text2, style = KpType.caption)
-            Spacer(Modifier.height(8.dp))
-            CAP_CHOICES.forEach { c ->
-                SelectableRow(if (c == 0) stringResource(R.string.no_cap) else money(c), ui.app.monthlyCapCents == c) {
-                    vm.setMonthlyCapCents(c); sheet = null
-                }
-            }
-        }
+        Sheet.Cap -> CapSheet(ui.app.monthlyCapCents, ui.paid.monthlyCapCents, vm) { sheet = null }
         null -> Unit
     }
 }
@@ -217,7 +217,7 @@ private fun FieldLabel(label: Int) {
     Text(stringResource(label), color = Kp.palette.text, style = KpType.body, modifier = Modifier.padding(top = 4.dp))
 }
 
-private fun money(cents: Int): String = "$" + "%.2f".format(cents / 100.0)
+private fun money(cents: Int): String = moneyText(cents)
 
 @Composable
 private fun KeySheet(kind: KeyKind, name: String, isSet: Boolean, check: KeyCheck, vm: SettingsViewModel, onClose: () -> Unit) {
@@ -271,5 +271,29 @@ private fun SeedSpines(selected: KpSeed, dark: Boolean, onSelect: (KpSeed) -> Un
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CapSheet(current: Int, effective: Int, vm: SettingsViewModel, onClose: () -> Unit) {
+    val p = Kp.palette
+    var text by remember { mutableStateOf(if (current == 0) "" else "%.2f".format(java.util.Locale.US, current / 100.0).removeSuffix(".00")) }
+    var invalid by remember { mutableStateOf(false) }
+    KpSheet(onDismiss = onClose) {
+        KpCaps(stringResource(R.string.monthly_cap))
+        Spacer(Modifier.height(8.dp))
+        Text(stringResource(R.string.cap_body), color = p.text2, style = KpType.caption)
+        Spacer(Modifier.height(16.dp))
+        KpInput(
+            value = text, onValueChange = { text = it; invalid = false },
+            label = stringResource(R.string.cap_field_label),
+            placeholder = stringResource(R.string.cap_default, money(effective)),
+            error = if (invalid) stringResource(R.string.cap_invalid) else null,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+        )
+        Spacer(Modifier.height(16.dp))
+        KpSecondaryKey(stringResource(R.string.cap_save), { if (vm.setMonthlyCapText(text)) onClose() else invalid = true }, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        KpTextLink(stringResource(R.string.cap_use_default), { vm.setMonthlyCapCents(0); onClose() })
     }
 }

@@ -18,6 +18,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -62,7 +65,7 @@ fun HubRoute(
     val vm = libraryViewModel(key = "hub-$bookId") { HubViewModel(deps, bookId) }
     val ui by vm.state.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
-    HubScreen(ui, onRead, onListen, onLearn, onSetup, onBack, onLearnAt)
+    HubScreen(ui, onRead, onListen, onLearn, onSetup, onBack, onLearnAt, onRemove = { vm.remove(onBack) })
 }
 
 /** Lines of the hub's Learn contents page. Names match `LearnTab` in :feature:study (map with `LearnTab.valueOf(entry.name)`). */
@@ -77,9 +80,11 @@ fun HubScreen(
     onSetup: () -> Unit,
     onBack: () -> Unit,
     onLearnAt: (HubLearnEntry) -> Unit = { onLearn() },
+    onRemove: (() -> Unit)? = null,
 ) {
     val p = Kp.palette
     val book = ui.book
+    var confirmRemove by remember { mutableStateOf(false) }
     ScreenRoot {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             TopBar(onBack, null)
@@ -108,8 +113,17 @@ fun HubScreen(
             KpHairline()
             Spacer(Modifier.height(32.dp))
             LearnContents(book, ui.cardCount, onLearnAt)
+            if (onRemove != null) {
+                Spacer(Modifier.height(24.dp))
+                Box(Modifier.padding(horizontal = 24.dp)) {
+                    KpTextLink(stringResource(R.string.remove_from_library), { confirmRemove = true }, color = p.negative)
+                }
+            }
             Spacer(Modifier.height(32.dp))
         }
+    }
+    if (confirmRemove && book != null && onRemove != null) {
+        RemoveBookSheet(book.title, { confirmRemove = false; onRemove() }, { confirmRemove = false })
     }
 }
 
