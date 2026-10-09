@@ -8,9 +8,12 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.writeFully
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -128,5 +131,57 @@ class FishProviderTest {
         } catch (e: TtsException.MissingKey) {
             assertTrue(seen.isEmpty())
         }
+    }
+
+    // ---- billing accounting (F6)
+
+    /** A 200 response whose body breaks after the first event. */
+    private fun MockRequestHandleScope.brokenStream(): io.ktor.client.request.HttpResponseData {
+        val channel = io.ktor.utils.io.ByteChannel()
+        kotlinx.coroutines.GlobalScope.launch {
+            channel.writeFully(sse("""{"audio_base64":"AQID","chunk_seq":0}""").toByteArray())
+            channel.flush()
+            channel.cancel(java.io.IOException("connection reset"))
+        }
+        return respond(channel, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+    }
+
+    @Test fun midStreamFailureOnThePaidModelIsNeverRepeated() = runTest {
+        val accepted = java.util.concurrent.atomic.AtomicInteger()
+        val p = provider(now = "2026-12-05T00:00:00Z") { brokenStream() }
+        try {
+            p.synthesize(SynthesisRequest(listOf("x"), "v", onAccepted = { accepted.incrementAndGet() }))
+            fail()
+        } catch (e: TtsException.Network) {
+            assertTrue(e.billed)
+            assertFalse(e.retryable)
+        }
+        assertEquals(1, seen.size)
+        assertEquals("s2.1-pro", seen.single().headers["model"])
+        assertEquals(1, accepted.get())
+    }
+
+    @Test fun midStreamFailureOnTheFreeModelRetriesAtMostTwice() = runTest {
+        val accepted = java.util.concurrent.atomic.AtomicInteger()
+        val p = provider(now = "2026-10-08T00:00:00Z") { brokenStream() }
+        try {
+            p.synthesize(SynthesisRequest(listOf("x"), "v", onAccepted = { accepted.incrementAndGet() }))
+            fail()
+        } catch (e: TtsException.Network) {
+            assertFalse(e.billed)
+        }
+        assertEquals(3, seen.size) // the request and two retries
+        assertEquals(3, accepted.get())
+    }
+
+    @Test fun notAcceptedRequestsAreNotCountedAndConnectionErrorsBeforeResponseStillRetry() = runTest {
+        val accepted = java.util.concurrent.atomic.AtomicInteger()
+        var n = 0
+        val p = provider(now = "2026-12-05T00:00:00Z") {
+            if (n++ < 2) throw java.io.IOException("no route") else ok(stream)
+        }
+        p.synthesize(SynthesisRequest(listOf("x"), "v", onAccepted = { accepted.incrementAndGet() }))
+        assertEquals(3, seen.size)
+        assertEquals(1, accepted.get())
     }
 }

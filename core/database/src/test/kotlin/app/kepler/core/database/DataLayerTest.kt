@@ -124,6 +124,32 @@ class DataLayerTest {
         assertTrue(layer.library.importBook(source("one")) is ImportResult.Imported)
     }
 
+    @Test fun deleteLeavesNothingBehind() = runBlocking {
+        val b = import("gone")
+        val keep = import("keep")
+        val audioDir = File(root, "audio")
+        // A registered segment, plus an orphan render and a sidecar the repository never heard of.
+        val registered = File(audioDir, "${b.id}/k1.m4a").also { it.parentFile.mkdirs(); it.writeText("x") }
+        File(audioDir, "${b.id}/k1.json").writeText("{}")
+        File(audioDir, "${b.id}/orphan.m4a").writeText("x")
+        val other = File(audioDir, "${keep.id}/k2.m4a").also { it.parentFile.mkdirs(); it.writeText("x") }
+        layer.audio.addSegment(AudioSegment(0, b.id, 0, 3, registered.absolutePath, 1000, VoiceRef("fish", "v", "V"), 1), emptyList())
+        layer.aiStore.put("ask", AiCacheKeys.scope(b.id, "abc"), "1")
+        layer.aiStore.put("pack", AiCacheKeys.scope(b.id, "def"), "2")
+        layer.aiStore.put("ask", AiCacheKeys.scope(keep.id, "abc"), "3")
+        layer.aiStore.put("models", "openrouter", "4")
+
+        layer.library.delete(b.id)
+
+        assertFalse(File(audioDir, b.id.toString()).exists())
+        assertFalse(File(b.epubPath).parentFile.exists())
+        assertNull(layer.aiStore.get("ask", AiCacheKeys.scope(b.id, "abc")))
+        assertNull(layer.aiStore.get("pack", AiCacheKeys.scope(b.id, "def")))
+        assertEquals("3", layer.aiStore.get("ask", AiCacheKeys.scope(keep.id, "abc")))
+        assertEquals("4", layer.aiStore.get("models", "openrouter"))
+        assertTrue(other.exists())
+    }
+
     @Test fun ftsSearchHonoursSpoilerFenceAndBook() = runBlocking {
         val b = import("a")
         val other = import("b")

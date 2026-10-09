@@ -70,6 +70,27 @@ class RequestBudgeterTest {
         assertEquals(50, budgeter(store, perMinute = 1000).remainingToday())
     }
 
+    @Test fun dayRollsOverAtUtcMidnightWhateverTheDeviceZone() = runBlocking {
+        val saved = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Pacific/Auckland"))
+        try {
+            val store = FakeAiStore()
+            // 23:59:50 UTC; in Auckland it is already the next morning, which must not matter.
+            now = java.time.Instant.parse("2026-03-10T23:59:50Z").toEpochMilli()
+            val b = RequestBudgeter(store, perMinute = 1000, dailyLimit = 3, clock = { now }, sleeper = { now += it })
+            repeat(3) { b.acquire(Priority.INTERACTIVE) }
+            assertEquals(0, b.remainingToday())
+            assertEquals(3, store.requestsOn("2026-03-10", "openrouter"))
+            now += 20_000 // 00:00:10 UTC
+            assertEquals(3, b.remainingToday())
+            b.acquire(Priority.INTERACTIVE)
+            assertEquals(1, store.requestsOn("2026-03-11", "openrouter"))
+            assertEquals(2, b.remainingToday())
+        } finally {
+            java.util.TimeZone.setDefault(saved)
+        }
+    }
+
     @Test fun tierSwitchRaisesTheDailyLimit() = runBlocking {
         val b = budgeter()
         assertEquals(50, b.dailyLimit)

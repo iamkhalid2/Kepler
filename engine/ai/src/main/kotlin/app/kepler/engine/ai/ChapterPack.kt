@@ -1,5 +1,6 @@
 package app.kepler.engine.ai
 
+import app.kepler.core.model.AiCacheKeys
 import app.kepler.core.model.AiStore
 import app.kepler.core.model.Book
 import app.kepler.core.model.ContentType
@@ -66,7 +67,7 @@ internal class ChapterPackService(
     private fun variant(book: Book) =
         if (book.contentType == ContentType.FICTION) PromptRegistry.PACK_FICTION else PromptRegistry.PACK_NONFICTION
 
-    private fun key(book: Book, text: SectionText) = sha256("pack", variant(book).tag, text.hash)
+    private fun key(book: Book, text: SectionText) = AiCacheKeys.scope(book.id, sha256("pack", variant(book).tag, text.hash))
 
     /**
      * Cheap lookup that needs no section text: the pack previously built for this section clipped at `end`
@@ -82,7 +83,7 @@ internal class ChapterPackService(
     }
 
     private fun refKey(book: Book, section: Section, end: Int) =
-        "${book.id}:${section.id}:$end:${variant(book).tag}"
+        AiCacheKeys.scope(book.id, "${section.id}:$end:${variant(book).tag}")
 
     /** The pack for this text, building it with one request when it is not cached. */
     suspend fun obtain(book: Book, text: SectionText, priority: Priority): PackResult =

@@ -9,9 +9,14 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,6 +32,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -59,6 +66,11 @@ class BookSpec(
     val material: BookMaterial,
     /** Optional jacket image. When present it fills the front face instead of the typographic cover. */
     val cover: ImageBitmap? = null,
+    /**
+     * How much of the jacket shows over the typographic cover, read at draw time. A screen that shows the
+     * typographic cover instantly and decodes the jacket afterwards ramps this 0 -> 1, so nothing flashes.
+     */
+    val jacketAlpha: () -> Float = { 1f },
 ) {
     /** A jacketed book's spine and boards wear the jacket's own colour, not a theme cloth. */
     val spineMaterial: BookMaterial by lazy { cover?.let(::jacketSpineMaterial) ?: material }
@@ -97,12 +109,14 @@ data class BookPose(
     val ry: Float, val rx: Float = 0f, val alpha: Float = 1f,
     /** 0 = standing on the plank (full contact shadow), 1 = held in the hand (shadow spreads and fades). */
     val lift: Float = 0f,
+    /** Lean in the picture plane, degrees; positive tips the top to the left about the bottom-left corner. */
+    val rz: Float = 0f,
 )
 
 const val BOOK_W = 150f
 const val BOOK_H = 225f
 private const val CAMERA = 1300f
-private const val SPACE_W = 390f
+internal const val SPACE_W = 390f
 
 private class PoseState(start: BookPose) {
     val cx = Animatable(start.cx)
@@ -112,7 +126,17 @@ private class PoseState(start: BookPose) {
     val rx = Animatable(start.rx)
     val alpha = Animatable(start.alpha)
     val lift = Animatable(start.lift)
+    val rz = Animatable(start.rz)
+    /** Press feedback: 0 at rest, 1 held (the book lifts a few millimetres toward the viewer). */
+    val press = Animatable(0f)
     var entered = false
+    /** A stage flight is landing here: skip the entrance and stand at the target. */
+    var claimed = false
+
+    suspend fun snap(t: BookPose) {
+        cx.snapTo(t.cx); cy.snapTo(t.cy); scale.snapTo(t.scale)
+        ry.snapTo(t.ry); rx.snapTo(t.rx); alpha.snapTo(t.alpha); lift.snapTo(t.lift); rz.snapTo(t.rz)
+    }
 }
 
 /**
@@ -127,11 +151,11 @@ private fun animatePose(t: BookPose, from: BookPose?): PoseState {
     LaunchedEffect(t, reduced) {
         val entering = !state.entered && from != null
         state.entered = true
-        if (reduced) {
-            state.cx.snapTo(t.cx); state.cy.snapTo(t.cy); state.scale.snapTo(t.scale)
-            state.ry.snapTo(t.ry); state.rx.snapTo(t.rx); state.alpha.snapTo(t.alpha); state.lift.snapTo(t.lift)
+        if (reduced || state.claimed) {
+            state.snap(t)
             return@LaunchedEffect
         }
+        launch { state.rz.animateTo(t.rz, KpMotion.turn()) }
         launch { state.lift.animateTo(t.lift, KpMotion.lift()) }
         launch { state.alpha.animateTo(t.alpha, spring(Spring.DampingRatioNoBouncy, 400f)) }
         launch { state.rx.animateTo(t.rx, KpMotion.settle()) }
@@ -167,6 +191,15 @@ fun BookScene(
     enterFrom: List<BookPose>? = null,
     /** Accessibility labels, one per book; when given each book gets a TalkBack node (click + long-press). */
     labels: List<String>? = null,
+    /**
+     * Book identities (the book id) for the shared book stage, one per book. When given, each book is published
+     * as a landing place so one book object can fly here from another screen; null keeps the scene local.
+     */
+    stageKeys: List<Any?>? = null,
+    /** Names this scene's slots (for example "shelf", "nowbar") so a book returns to the place it left from. */
+    stageTag: String = "",
+    /** Books lift a few millimetres toward the viewer while pressed. */
+    pressLift: Boolean = false,
 ) {
     val palette = Kp.palette
     val poses = books.indices.map { animatePose(targets[it], enterFrom?.getOrNull(it)) }
@@ -174,19 +207,63 @@ fun BookScene(
     val matrix = remember { Matrix() }
     val src = remember { FloatArray(8) }
     val dst = remember { FloatArray(8) }
+    val scope = rememberCoroutineScope()
+    val stage = LocalBookStage.current
+    val owner = LocalStageOwner.current
+    val sceneId = remember { Any() }
+    val geometry = remember { FloatArray(3) } // origin x, origin y, width (root px)
+    val latestTargets by rememberUpdatedState(targets)
+    val latestBooks by rememberUpdatedState(books)
+    val latestKeys by rememberUpdatedState(stageKeys)
+    val latestPoses by rememberUpdatedState(poses)
 
-    Box(modifier.fillMaxSize()) {
+    fun publish() {
+        val keys = latestKeys
+        if (stage == null || owner == null || keys == null || geometry[2] <= 0f) return
+        val u = geometry[2] / SPACE_W
+        val slots = latestBooks.indices.mapNotNull { i ->
+            val key = keys.getOrNull(i) ?: return@mapNotNull null
+            val t = latestTargets.getOrNull(i) ?: return@mapNotNull null
+            val b = latestBooks[i]
+            StageSlot(
+                key, owner, StageRole.Book, stageTag,
+                StagePose(geometry[0] + t.cx * u, geometry[1] + t.cy * u, u, t.scale, t.ry, t.rx, b.thickness),
+                b,
+                onClaim = claim@{
+                    val ps = latestPoses.getOrNull(i) ?: return@claim
+                    ps.claimed = true
+                    scope.launch { ps.snap(t) }
+                },
+            )
+        }
+        stage.publishScene(sceneId, slots)
+    }
+    if (stageKeys != null && stage != null) {
+        SideEffect { publish() }
+        DisposableEffect(stage, sceneId) { onDispose { stage.withdrawScene(sceneId) } }
+    }
+
+    Box(
+        modifier
+            .fillMaxSize()
+            .onGloballyPositioned {
+                if (stageKeys == null) return@onGloballyPositioned
+                val o = it.positionInRoot()
+                geometry[0] = o.x; geometry[1] = o.y; geometry[2] = it.size.width.toFloat()
+                publish()
+            },
+    ) {
         Canvas(
             Modifier
                 .fillMaxSize()
-                .pointerInput(books, targets, hitPad) {
+                .pointerInput(books, targets, hitPad, pressLift) {
                     val u = size.width / SPACE_W
                     // top-most book first (drawn last = highest index among opaque ones)
                     fun hit(p: Offset): Int {
                         for (i in books.indices.reversed()) {
                             val ps = poses[i]
                             if (ps.alpha.value < 0.3f) continue
-                            val half = projectedHalfExtent(books[i], ps.ry.value, ps.scale.value)
+                            val half = projectedHalfExtent(books[i].thickness, ps.ry.value, ps.scale.value)
                             val cx = ps.cx.value * u
                             val cy = ps.cy.value * u
                             if (abs(p.x - cx) <= (half.first + hitPad) * u && abs(p.y - cy) <= (half.second + hitPad) * u) return i
@@ -194,8 +271,24 @@ fun BookScene(
                         return -1
                     }
                     detectTapGestures(
+                        onPress = { p ->
+                            val i = if (pressLift) hit(p) else -1
+                            if (i >= 0) {
+                                val press = poses[i].press
+                                scope.launch { press.animateTo(1f, KpMotion.lift()) }
+                                tryAwaitRelease()
+                                scope.launch { press.animateTo(0f, KpMotion.settle()) }
+                            }
+                        },
                         onLongPress = { p -> hit(p).let { if (it >= 0) onLongPress(it) } },
-                        onTap = { p -> hit(p).let { if (it >= 0) onTap(it) } },
+                        onTap = { p ->
+                            hit(p).let {
+                                if (it >= 0) {
+                                    stage?.prefer(stageTag)
+                                    onTap(it)
+                                }
+                            }
+                        },
                     )
                 },
         ) {
@@ -203,10 +296,15 @@ fun BookScene(
             // draw far-to-near by scale so a pulled-down book sits above the shelf
             books.indices.sortedBy { poses[it].scale.value }.forEach { i ->
                 val ps = poses[i]
-                if (ps.alpha.value > 0.01f) {
+                if (ps.alpha.value > 0.01f && !(stage != null && stage.hides(stageKeys?.getOrNull(i), owner))) {
+                    val pr = ps.press.value
+                    val sc = ps.scale.value * (1f + 0.04f * pr)
+                    // keep the base on the plank, then rise 2 units: the book comes off the shelf toward you
+                    val cy = ps.cy.value - BOOK_H / 2f * ps.scale.value * 0.04f * pr - 2f * pr
                     drawBook(
-                        books[i], u, ps.cx.value, ps.cy.value, ps.scale.value,
-                        ps.ry.value, ps.rx.value, ps.alpha.value, ps.lift.value, palette, measurer, matrix, src, dst,
+                        books[i], books[i].thickness, u, ps.cx.value, cy, sc,
+                        ps.ry.value, ps.rx.value, ps.rz.value, ps.alpha.value, (ps.lift.value + 0.6f * pr).coerceAtMost(1f),
+                        0f, palette.page, palette, measurer, matrix, src, dst,
                     )
                 }
             }
@@ -218,7 +316,7 @@ fun BookScene(
                         .layout { measurable, constraints ->
                             val u = constraints.maxWidth / SPACE_W
                             val ps = poses[i]
-                            val half = projectedHalfExtent(books[i], ps.ry.value, ps.scale.value)
+                            val half = projectedHalfExtent(books[i].thickness, ps.ry.value, ps.scale.value)
                             val w = (half.first * 2 * u).toInt().coerceAtLeast(1)
                             val h = (half.second * 2 * u).toInt().coerceAtLeast(1)
                             val placeable = measurable.measure(Constraints.fixed(w, h))
@@ -238,22 +336,38 @@ fun BookScene(
     }
 }
 
-private fun projectedHalfExtent(b: BookSpec, ry: Float, scale: Float): Pair<Float, Float> {
+/** Screen rect (px, scene space) of a facing book's front face, used where the first page leaves the book. */
+internal fun projectedFrontRect(cxD: Float, cyD: Float, scale: Float, thickness: Float, u: Float): androidx.compose.ui.geometry.Rect {
+    val k = CAMERA / (CAMERA - thickness / 2f * scale)
+    val hw = BOOK_W / 2f * scale * k * u
+    val hh = BOOK_H / 2f * scale * k * u
+    return androidx.compose.ui.geometry.Rect(cxD * u - hw, cyD * u - hh, cxD * u + hw, cyD * u + hh)
+}
+
+private fun projectedHalfExtent(thickness: Float, ry: Float, scale: Float): Pair<Float, Float> {
     val a = Math.toRadians(ry.toDouble()).toFloat()
-    val w = abs(cos(a)) * BOOK_W + abs(sin(a)) * b.thickness
+    val w = abs(cos(a)) * BOOK_W + abs(sin(a)) * thickness
     return Pair(w / 2f * scale, BOOK_H / 2f * scale)
 }
 
 private class V3(val x: Float, val y: Float, val z: Float)
 
-private fun DrawScope.drawBook(
-    b: BookSpec, u: Float, cxD: Float, cyD: Float, scale: Float,
-    ryDeg: Float, rxDeg: Float, alpha: Float, lift: Float,
+/** Largest front-board swing when the cover is fully open (brief 4.2: 0 to -165 degrees). */
+private const val OPEN_DEG = 165f
+
+/**
+ * Draws one book. [thickness] overrides the spec's spine width (a flight interpolates it), [rzDeg] leans the
+ * book in the picture plane about its bottom-left corner, and [open] (0..1) swings the front board about the
+ * hinge, showing the paper liner and a first page of [pageColor].
+ */
+internal fun DrawScope.drawBook(
+    b: BookSpec, thickness: Float, u: Float, cxD: Float, cyD: Float, scale: Float,
+    ryDeg: Float, rxDeg: Float, rzDeg: Float, alpha: Float, lift: Float, open: Float, pageColor: Color,
     palette: KpPalette, tm: TextMeasurer, m: Matrix, src: FloatArray, dst: FloatArray,
 ) {
     val w = BOOK_W / 2f
     val h = BOOK_H / 2f
-    val t = b.thickness / 2f
+    val t = thickness / 2f
     val ry = Math.toRadians(ryDeg.toDouble()).toFloat()
     val rx = Math.toRadians(rxDeg.toDouble()).toFloat()
     val cYa = cos(ry); val sYa = sin(ry)
@@ -275,26 +389,32 @@ private fun DrawScope.drawBook(
     // light from upper-left-front
     val lx = -0.35f; val ly = -0.55f; val lz = 0.76f
     val ll = sqrt(lx * lx + ly * ly + lz * lz)
+    fun shadeFor(nx: Float, ny: Float, nz: Float): Float {
+        val n = rot(nx, ny, nz)
+        val dot = ((n.x * lx + n.y * ly + n.z * lz) / ll).coerceIn(-1f, 1f)
+        return (1f - (0.63f + 0.49f * dot.coerceAtLeast(0f))).coerceIn(0f, 0.6f)
+    }
 
     class Face(
         val name: String, val c: Array<V3>, val nx: Float, val ny: Float, val nz: Float,
         val fw: Float, val fh: Float,
     )
 
+    val opening = open > 0.001f
     val faces = listOf(
         Face("front", arrayOf(V3(-w, -h, t), V3(w, -h, t), V3(w, h, t), V3(-w, h, t)), 0f, 0f, 1f, BOOK_W, BOOK_H),
         Face("back", arrayOf(V3(w, -h, -t), V3(-w, -h, -t), V3(-w, h, -t), V3(w, h, -t)), 0f, 0f, -1f, BOOK_W, BOOK_H),
-        Face("spine", arrayOf(V3(-w, -h, -t), V3(-w, -h, t), V3(-w, h, t), V3(-w, h, -t)), -1f, 0f, 0f, b.thickness, BOOK_H),
-        Face("pages", arrayOf(V3(w, -h, t), V3(w, -h, -t), V3(w, h, -t), V3(w, h, t)), 1f, 0f, 0f, b.thickness, BOOK_H),
-        Face("top", arrayOf(V3(-w, -h, -t), V3(w, -h, -t), V3(w, -h, t), V3(-w, -h, t)), 0f, -1f, 0f, BOOK_W, b.thickness),
-        Face("bottom", arrayOf(V3(-w, h, t), V3(w, h, t), V3(w, h, -t), V3(-w, h, -t)), 0f, 1f, 0f, BOOK_W, b.thickness),
+        Face("spine", arrayOf(V3(-w, -h, -t), V3(-w, -h, t), V3(-w, h, t), V3(-w, h, -t)), -1f, 0f, 0f, thickness, BOOK_H),
+        Face("pages", arrayOf(V3(w, -h, t), V3(w, -h, -t), V3(w, h, -t), V3(w, h, t)), 1f, 0f, 0f, thickness, BOOK_H),
+        Face("top", arrayOf(V3(-w, -h, -t), V3(w, -h, -t), V3(w, -h, t), V3(-w, -h, t)), 0f, -1f, 0f, BOOK_W, thickness),
+        Face("bottom", arrayOf(V3(-w, h, t), V3(w, h, t), V3(w, h, -t), V3(-w, h, -t)), 0f, 1f, 0f, BOOK_W, thickness),
     )
 
     // soft contact: a cloth bounce on the plank, then a tight ellipse on the plank line (no blur)
     val base = project(rot(0f, h, 0f))
-    val coverW = (abs(cos(ry)) * BOOK_W + abs(sin(ry)) * b.thickness) * scale * u
+    val coverW = (abs(cos(ry)) * BOOK_W + abs(sin(ry)) * thickness) * scale * u
     val env = palette.materials.env
-    val grounded = alpha * (1f - 0.6f * lift)
+    val grounded = alpha * (1f - 0.6f * lift) * (1f - 0.5f * abs(rzDeg) / 90f)
     val spread = 1f + 0.3f * lift
     fun ellipse(rx: Float, ryy: Float, center: Offset, c: Color) {
         if (rx < 0.5f) return
@@ -309,41 +429,88 @@ private fun DrawScope.drawBook(
     ellipse(coverW * 0.7f * spread, 5f * u * scale, Offset(base.x, base.y + 1f * u), bounce.copy(alpha = env.bounceAlpha * grounded))
     ellipse(coverW * 0.64f * spread, 3f * u * scale, base, Color.Black.copy(alpha = env.contactAlpha * grounded))
 
-    for (f in faces) {
-        val pts = f.c.map { project(rot(it.x, it.y, it.z)) }
-        // winding test: draw only faces turned toward the camera
+    val nc = drawContext.canvas.nativeCanvas
+    fun mapped(pts: List<Offset>, fw: Float, fh: Float, body: DrawScope.() -> Unit) {
+        src[0] = 0f; src[1] = 0f; src[2] = fw; src[3] = 0f; src[4] = fw; src[5] = fh; src[6] = 0f; src[7] = fh
+        for (i in 0 until 4) { dst[i * 2] = pts[i].x; dst[i * 2 + 1] = pts[i].y }
+        m.reset()
+        if (!m.setPolyToPoly(src, 0, dst, 0, 4)) return
+        drawContext.canvas.save()
+        nc.concat(m)
+        body()
+        drawContext.canvas.restore()
+    }
+    fun facing(pts: List<Offset>): Boolean {
         var area = 0f
         for (i in 0 until 4) {
             val a = pts[i]; val c = pts[(i + 1) % 4]
             area += a.x * c.y - c.x * a.y
         }
-        if (area <= 0f) continue
-
-        // lighting from the rotated normal
-        val n = rot(f.nx, f.ny, f.nz)
-        val dot = ((n.x * lx + n.y * ly + n.z * lz) / ll).coerceIn(-1f, 1f)
-        val k = 0.63f + 0.49f * dot.coerceAtLeast(0f)
-        val shade = (1f - k).coerceIn(0f, 0.6f)
-
-        src[0] = 0f; src[1] = 0f; src[2] = f.fw; src[3] = 0f; src[4] = f.fw; src[5] = f.fh; src[6] = 0f; src[7] = f.fh
-        for (i in 0 until 4) { dst[i * 2] = pts[i].x; dst[i * 2 + 1] = pts[i].y }
-        m.reset()
-        if (!m.setPolyToPoly(src, 0, dst, 0, 4)) continue
-
-        val nc = drawContext.canvas.nativeCanvas
-        drawContext.canvas.save()
-        nc.concat(m)
-        when (f.name) {
-            "front" -> drawFront(b, tm, alpha)
-            "back" -> drawRect(b.spineMaterial.cloth.copy(alpha = alpha), size = Size(f.fw, f.fh))
-            "spine" -> drawSpine(b, tm, alpha)
-            "pages" -> drawPages(f.fw, f.fh, vertical = true, alpha = alpha, paper = palette.materials.paper)
-            "top" -> drawPages(f.fw, f.fh, vertical = false, alpha = alpha, paper = palette.materials.paper)
-            else -> drawRect(palette.materials.paper.fore.copy(alpha = alpha), size = Size(f.fw, f.fh))
-        }
-        drawRect(Color.Black.copy(alpha = shade * alpha), size = Size(f.fw, f.fh))
-        drawContext.canvas.restore()
+        return area > 0f
     }
+
+    // lean: rotate about the bottom-left corner of what is visible, after the contact shadow is laid down
+    val leaning = abs(rzDeg) > 0.01f
+    if (leaning) {
+        drawContext.canvas.save()
+        drawContext.transform.rotate(-rzDeg, Offset(base.x - coverW / 2f, base.y))
+    }
+    for (f in faces) {
+        if (opening && f.name == "front") continue
+        val pts = f.c.map { project(rot(it.x, it.y, it.z)) }
+        // winding test: draw only faces turned toward the camera
+        if (!facing(pts)) continue
+        val shade = shadeFor(f.nx, f.ny, f.nz)
+        mapped(pts, f.fw, f.fh) {
+            when (f.name) {
+                "front" -> drawFront(b, tm, alpha)
+                "back" -> drawRect(b.spineMaterial.cloth.copy(alpha = alpha), size = Size(f.fw, f.fh))
+                "spine" -> drawSpine(b, thickness, tm, alpha)
+                "pages" -> drawPages(f.fw, f.fh, vertical = true, alpha = alpha, paper = palette.materials.paper)
+                "top" -> drawPages(f.fw, f.fh, vertical = false, alpha = alpha, paper = palette.materials.paper)
+                else -> drawRect(palette.materials.paper.fore.copy(alpha = alpha), size = Size(f.fw, f.fh))
+            }
+            drawRect(Color.Black.copy(alpha = shade * alpha), size = Size(f.fw, f.fh))
+        }
+    }
+    if (opening) {
+        // the first page, just inside the board
+        val inset = 1.5f
+        val page = arrayOf(V3(-w + inset, -h + inset, t), V3(w - inset, -h + inset, t), V3(w - inset, h - inset, t), V3(-w + inset, h - inset, t))
+        val pagePts = page.map { project(rot(it.x, it.y, it.z)) }
+        if (facing(pagePts)) {
+            val shade = shadeFor(0f, 0f, 1f)
+            mapped(pagePts, BOOK_W, BOOK_H) {
+                drawRect(pageColor.copy(alpha = alpha), size = Size(BOOK_W, BOOK_H))
+                drawRect(Color.Black.copy(alpha = shade * 0.5f * alpha), size = Size(BOOK_W, BOOK_H))
+            }
+        }
+        // the board swings about the hinge (x = -w, z = t) toward the viewer and over to the left
+        val phi = Math.toRadians((OPEN_DEG * open).toDouble()).toFloat()
+        val cp = cos(phi); val sp = sin(phi)
+        fun board(x: Float, y: Float): Offset {
+            val dx = x + w
+            return project(rot(-w + dx * cp, y, t + dx * sp))
+        }
+        val boardPts = listOf(board(-w, -h), board(w, -h), board(w, h), board(-w, h))
+        if (facing(boardPts)) {
+            val shade = shadeFor(-sp, 0f, cp)
+            mapped(boardPts, BOOK_W, BOOK_H) {
+                drawFront(b, tm, alpha)
+                drawRect(Color.Black.copy(alpha = shade * alpha), size = Size(BOOK_W, BOOK_H))
+            }
+        } else {
+            // inside of the board: the paper liner, lit as the board turns toward the light
+            val shade = shadeFor(sp, 0f, -cp)
+            val liner = listOf(boardPts[1], boardPts[0], boardPts[3], boardPts[2])
+            mapped(liner, BOOK_W, BOOK_H) {
+                drawRect(palette.materials.paper.lit.copy(alpha = alpha), size = Size(BOOK_W, BOOK_H))
+                drawRect(b.spineMaterial.cloth.copy(alpha = alpha), Offset(BOOK_W - 3f, 0f), Size(3f, BOOK_H))
+                drawRect(Color.Black.copy(alpha = shade * alpha), size = Size(BOOK_W, BOOK_H))
+            }
+        }
+    }
+    if (leaning) drawContext.canvas.restore()
 }
 
 private val serif = KpFonts.displaySmall
@@ -380,14 +547,15 @@ private fun DrawScope.drawFront(b: BookSpec, tm: TextMeasurer, alpha: Float) {
     val ink = b.material.ink
     val img = b.cover
     drawRect(b.material.cloth.copy(alpha = alpha), size = Size(BOOK_W, BOOK_H))
-    if (img != null) {
+    val jacket = if (img != null) b.jacketAlpha().coerceIn(0f, 1f) else 0f
+    if (img != null && jacket > 0f) {
         // centre-crop the jacket to 2:3, flat on the face
         val wantW = minOf(img.width, (img.height * 2f / 3f).toInt())
         val wantH = minOf(img.height, (img.width * 3f / 2f).toInt())
         drawImage(
             img, srcOffset = androidx.compose.ui.unit.IntOffset((img.width - wantW) / 2, (img.height - wantH) / 2),
             srcSize = androidx.compose.ui.unit.IntSize(wantW, wantH),
-            dstSize = androidx.compose.ui.unit.IntSize(BOOK_W.toInt(), BOOK_H.toInt()), alpha = alpha,
+            dstSize = androidx.compose.ui.unit.IntSize(BOOK_W.toInt(), BOOK_H.toInt()), alpha = alpha * jacket,
         )
     }
     drawGrain(BOOK_W, BOOK_H, alpha)
@@ -406,8 +574,12 @@ private fun DrawScope.drawFront(b: BookSpec, tm: TextMeasurer, alpha: Float) {
     drawRect(Color.White.copy(alpha = 0.14f * alpha), Offset(12.5f, 0f), Size(1f, BOOK_H))
     // lit top edge
     drawRect(Color.White.copy(alpha = 0.22f * alpha), Offset(0f, 0f), Size(BOOK_W, 0.8f))
+    if (jacket < 1f) drawTypographicCover(b, tm, alpha * (1f - jacket))
+}
 
-    if (img != null) return
+/** Title, debossed medallion and author on bare cloth: the cover every book has before (or without) a jacket. */
+private fun DrawScope.drawTypographicCover(b: BookSpec, tm: TextMeasurer, alpha: Float) {
+    val ink = b.material.ink
     val titleLayout = tm.measure(
         b.title.uppercase(),
         TextStyle(color = ink.copy(alpha = alpha), fontFamily = serif, fontWeight = FontWeight.SemiBold, fontSize = (11f / fontScale).sp, letterSpacing = 1.6.sp, lineHeight = (14f / fontScale).sp),
@@ -430,10 +602,9 @@ private fun DrawScope.drawFront(b: BookSpec, tm: TextMeasurer, alpha: Float) {
     drawScaledText(authorLayout, Offset(24f, BOOK_H - 24f), 1f / density)
 }
 
-private fun DrawScope.drawSpine(b: BookSpec, tm: TextMeasurer, alpha: Float) {
+private fun DrawScope.drawSpine(b: BookSpec, tw: Float, tm: TextMeasurer, alpha: Float) {
     val mat = b.spineMaterial
     val ink = mat.ink
-    val tw = b.thickness
     drawRect(mat.cloth.copy(alpha = alpha), size = Size(tw, BOOK_H))
     drawGrain(tw, BOOK_H, alpha)
     drawRect(

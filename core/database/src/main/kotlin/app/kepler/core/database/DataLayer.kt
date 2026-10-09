@@ -65,7 +65,7 @@ class DataLayer internal constructor(
         settings = DataStoreSettingsStore(settingsDataStore(context.applicationContext), cipher),
     )
 
-    private val libraryImpl = LibraryRepositoryImpl(db, ingestor, booksDir, opener)
+    private val libraryImpl = LibraryRepositoryImpl(db, ingestor, booksDir, opener, audioDir = booksDir.parentFile?.let { File(it, "audio") })
     private val positionsImpl = PositionRepositoryImpl(db)
     private val spineImpl = SpineRepositoryImpl(db, onSectionsChanged = positionsImpl::refreshFractions)
 

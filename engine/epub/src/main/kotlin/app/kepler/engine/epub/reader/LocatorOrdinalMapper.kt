@@ -59,6 +59,7 @@ class LocatorOrdinalMapper(sentences: List<Sentence>) {
     private val runs: Map<String, Run> = ordered.groupBy { normalizeHref(it.href) }.mapValues { Run(it.value) }
     private val runOrder: List<Run> = runs.values.sortedBy { it.sentences.first().ordinal }
     private val bookChars: Long = runOrder.sumOf { it.key.length.toLong() }
+    // Guarded by itself: the mapper is immutable otherwise, so it may be used from any dispatcher.
     private val hrefCache = HashMap<String, Run?>()
 
     val isEmpty: Boolean get() = ordered.isEmpty()
@@ -149,9 +150,11 @@ class LocatorOrdinalMapper(sentences: List<Sentence>) {
         return o..o
     }
 
-    private fun runFor(href: String): Run? = hrefCache.getOrPut(href) {
-        val n = normalizeHref(href)
-        runs[n] ?: runs.entries.firstOrNull { (k, _) -> k.endsWith("/$n") || n.endsWith("/$k") }?.value
+    private fun runFor(href: String): Run? = synchronized(hrefCache) {
+        hrefCache.getOrPut(href) {
+            val n = normalizeHref(href)
+            runs[n] ?: runs.entries.firstOrNull { (k, _) -> k.endsWith("/$n") || n.endsWith("/$k") }?.value
+        }
     }
 
     private fun bestOccurrence(run: Run, needle: String, before: String?, after: String?, near: Int?): Int? {
@@ -166,8 +169,7 @@ class LocatorOrdinalMapper(sentences: List<Sentence>) {
             val at = run.key.indexOf(needle, from)
             if (at < 0) break
             seen++
-            val score = commonSuffix(b, run.key.substring(0, at).trimEnd()) +
-                commonPrefix(a, run.key.substring(at + needle.length).trimStart())
+            val score = suffixScore(b, run.key, at) + prefixScore(a, run.key, at + needle.length)
             val dist = near?.let { kotlin.math.abs(it - at) } ?: 0
             if (score > bestScore || (score == bestScore && dist < bestDist)) {
                 best = at; bestScore = score; bestDist = dist
@@ -183,15 +185,21 @@ class LocatorOrdinalMapper(sentences: List<Sentence>) {
         private const val MAX_OCCURRENCES = 200
         private const val CONTEXT_SCORE = 40
 
-        private fun commonSuffix(a: String, b: String): Int {
+        /** Chars shared by the end of [a] and the text just before [end] in [key] (spaces skipped), without copying. */
+        private fun suffixScore(a: String, key: String, end: Int): Int {
+            var e = end
+            while (e > 0 && key[e - 1].isWhitespace()) e--
             var n = 0
-            while (n < CONTEXT_SCORE && n < a.length && n < b.length && a[a.length - 1 - n] == b[b.length - 1 - n]) n++
+            while (n < CONTEXT_SCORE && n < a.length && n < e && a[a.length - 1 - n] == key[e - 1 - n]) n++
             return n
         }
 
-        private fun commonPrefix(a: String, b: String): Int {
+        /** Chars shared by the start of [a] and the text from [start] in [key] (spaces skipped), without copying. */
+        private fun prefixScore(a: String, key: String, start: Int): Int {
+            var s = start
+            while (s < key.length && key[s].isWhitespace()) s++
             var n = 0
-            while (n < CONTEXT_SCORE && n < a.length && n < b.length && a[n] == b[n]) n++
+            while (n < CONTEXT_SCORE && n < a.length && s + n < key.length && a[n] == key[s + n]) n++
             return n
         }
 

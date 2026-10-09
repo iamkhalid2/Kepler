@@ -1,5 +1,6 @@
 package app.kepler.engine.tts
 
+import app.kepler.core.model.PaidSwitch
 import java.time.Clock
 import java.time.Instant
 
@@ -18,7 +19,7 @@ class ModelPolicy(private val clock: Clock = Clock.systemUTC()) {
     companion object {
         const val FREE_MODEL = "s2.1-pro-free"
         const val PAID_MODEL = "s2.1-pro"
-        val FREE_UNTIL: Instant = Instant.parse("2026-11-30T23:59:59Z")
+        val FREE_UNTIL: Instant = PaidSwitch.FREE_UNTIL
         const val PAID_CENTS_PER_BYTE = 1500.0 / 1_000_000.0
     }
 }

@@ -74,4 +74,5 @@ internal fun materialFor(bookId: BookId?, palette: KpPalette): BookMaterial {
 
 internal fun bookSpec(
     bookId: BookId?, title: String?, author: String?, palette: KpPalette, cover: ImageBitmap?, thickness: Float = 24f,
-): BookSpec = BookSpec(title.orEmpty(), author.orEmpty(), thickness, materialFor(bookId, palette), cover)
+    jacketAlpha: () -> Float = { 1f },
+): BookSpec = BookSpec(title.orEmpty(), author.orEmpty(), thickness, materialFor(bookId, palette), cover, jacketAlpha)

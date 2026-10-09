@@ -89,6 +89,13 @@ import app.kepler.engine.epub.reader.ReadiumReaderEngine
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import app.kepler.core.designsystem.bookPageSlot
+import app.kepler.engine.epub.reader.ReaderStyle
+import app.kepler.engine.epub.reader.compositeOver
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 
@@ -125,15 +132,25 @@ fun ReaderRoute(
     val load by vm.load.collectAsStateWithLifecycle()
     val style by vm.style.collectAsStateWithLifecycle()
     val page = Color(style.pageColor)
-    when (val l = load) {
-        ReaderLoad.Loading -> ReaderLoading(page)
-        is ReaderLoad.Failed -> ReaderFailed(page, Color(style.inkColor), onClose)
-        is ReaderLoad.Ready -> ReaderScreen(
-            vm, l, readAlongOrdinal, mode, onModeChange, onPlayFromSentence,
-            onExplain, onAsk, onCard, onDefine, onOpenLearn, onClose, transport,
-        )
+    // The landing place of the shared book: the cover opens over this page and fades as soon as the first
+    // screen of text has a location. Published while loading too, so the book never waits for the EPUB.
+    val engine = (load as? ReaderLoad.Ready)?.engine
+    val located by remember(engine) { engine?.location?.map { it != null } ?: flowOf(false) }.collectAsStateWithLifecycle(false)
+    Box(Modifier.fillMaxSize().bookPageSlot(bookId, page, ready = located || load is ReaderLoad.Failed)) {
+        when (val l = load) {
+            ReaderLoad.Loading -> ReaderLoading(page, Color(style.inkColor), style.isDark)
+            is ReaderLoad.Failed -> ReaderFailed(page, Color(style.inkColor), onClose)
+            is ReaderLoad.Ready -> ReaderScreen(
+                vm, l, readAlongOrdinal, mode, onModeChange, onPlayFromSentence,
+                onExplain, onAsk, onCard, onDefine, onOpenLearn, onClose, transport,
+            )
+        }
     }
 }
+
+/** The web content's selection: the palette's selection mark composited over the page, with the page ink. */
+private fun ReaderStyle.withPaletteSelection(selection: Color): ReaderStyle =
+    copy(selectionColor = compositeOver(selection.toArgb(), pageColor), selectionInk = inkColor)
 
 private sealed interface Sheet {
     data object None : Sheet
@@ -166,7 +183,11 @@ private fun ReaderScreen(
     val engine = ready.engine
     val scope = rememberCoroutineScope()
 
-    val style by vm.style.collectAsStateWithLifecycle()
+    val baseStyle by vm.style.collectAsStateWithLifecycle()
+    val selectionMark = remember(p.seed, baseStyle.pageColor, baseStyle.inkColor, baseStyle.isDark) {
+        paperPalette(p.seed, Color(baseStyle.pageColor), Color(baseStyle.inkColor), baseStyle.isDark).materials.marks.selection
+    }
+    val style = remember(baseStyle, selectionMark) { baseStyle.withPaletteSelection(selectionMark) }
     val local by vm.localPrefs.collectAsStateWithLifecycle()
     val ordinal by vm.ordinal.collectAsStateWithLifecycle()
     val frontier by vm.frontier.collectAsStateWithLifecycle()
@@ -188,6 +209,19 @@ private fun ReaderScreen(
     // ------------------------------------------------------------- navigator host
 
     val activity = remember(context) { context.findFragmentActivity() }
+    // System bar icons follow the page, not the app theme: a paper page under a dark-theme app needs dark icons.
+    val view = LocalView.current
+    val appDark = p.isDark
+    DisposableEffect(activity, style.isDark, appDark) {
+        val window = activity?.window
+        val bars = window?.let { WindowCompat.getInsetsController(it, view) }
+        bars?.isAppearanceLightStatusBars = !style.isDark
+        bars?.isAppearanceLightNavigationBars = !style.isDark
+        onDispose {
+            bars?.isAppearanceLightStatusBars = !appDark
+            bars?.isAppearanceLightNavigationBars = !appDark
+        }
+    }
     val selectionCallback = remember(engine) {
         object : ActionMode.Callback {
             // The system menu stays empty; the Shelf selection strip is drawn in Compose instead.
@@ -666,8 +700,10 @@ private fun Bookmark(marked: Boolean, chrome: Boolean, reduced: Boolean, onToggl
 }
 
 @Composable
-private fun ReaderLoading(page: Color) {
-    val p = Kp.palette
+private fun ReaderLoading(page: Color, ink: Color, dark: Boolean) {
+    // Static loading blocks cut from the page's own paper, not the app's dark surfaces.
+    val seed = Kp.palette.seed
+    val p = remember(seed, page, ink, dark) { paperPalette(seed, page, ink, dark) }
     Column(Modifier.fillMaxSize().background(page).statusBarsPadding().padding(horizontal = 26.dp, vertical = 72.dp)) {
         repeat(9) { i ->
             Box(

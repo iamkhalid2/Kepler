@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.LocalBookStage
 import app.kepler.core.designsystem.KpType
 import app.kepler.core.designsystem.BookPose
 import app.kepler.core.designsystem.BookScene
@@ -76,6 +77,9 @@ fun NowBar(
 
     val cover = rememberCover(coverPath)
     val openLabel = stringResource(R.string.nowbar_open)
+    // The book on the bar is the one that flies up into the player.
+    val stage = LocalBookStage.current
+    val open = { stage?.prefer(NOWBAR_TAG); onOpen() }
     val caption = when {
         error != null -> error.orEmpty()
         buffering && !playing -> stringResource(R.string.nowbar_preparing)
@@ -104,14 +108,14 @@ fun NowBar(
                         onDragStart = { total = 0f },
                         onDragEnd = {
                             when {
-                                total < -48.dp.toPx() -> onOpen()
+                                total < -48.dp.toPx() -> open()
                                 total > 48.dp.toPx() -> { controller.pause(); hiddenFor = id; onDismiss() }
                             }
                         },
                         onVerticalDrag = { change, delta -> total += delta; change.consume() },
                     )
                 }
-                .clickable(onClickLabel = openLabel, role = Role.Button, onClick = onOpen),
+                .clickable(onClickLabel = openLabel, role = Role.Button, onClick = open),
         ) {
             Row(Modifier.fillMaxHeight().padding(start = 60.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.Center) {
@@ -145,7 +149,11 @@ fun NowBar(
                 books = listOf(spec),
                 targets = listOf(BookPose(cx = 195f, cy = 28f / u, scale = 32f / (150f * u), ry = 0f, rx = 0f)),
                 modifier = Modifier.size(48.dp, 56.dp),
+                stageKeys = listOf(id),
+                stageTag = NOWBAR_TAG,
             )
         }
     }
 }
+
+private const val NOWBAR_TAG = "nowbar"

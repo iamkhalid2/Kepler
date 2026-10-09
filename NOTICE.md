@@ -24,6 +24,22 @@ Kepler is licensed under GPL-3.0 (see LICENSE). It uses the following third-part
 | Test only: Turbine | 1.2.1 | Apache-2.0 |
 | Test only: Robolectric | 4.17 | MIT |
 
+### Runtime dependencies pulled in by the libraries above
+
+| Component | Licence |
+|---|---|
+| Kotlin standard library, JetBrains annotations, kotlinx-datetime | Apache-2.0 |
+| OkHttp, Okio (via Ktor and Readium) | Apache-2.0 |
+| kaml, snakeyaml-engine-kmp, urlencoder-lib (via Ktor) | Apache-2.0 |
+| Guava (failureaccess, listenablefuture), JSpecify | Apache-2.0 |
+| Timber, Koi, Accompanist drawablepainter (via Readium and Coil) | Apache-2.0 |
+| Compose Multiplatform runtime and UI artifacts (via Coil, Readium) | Apache-2.0 |
+| SLF4J API | MIT |
+
+FsrsKt's metadata also lists the Dokka documentation plugin (with Jackson, FreeMarker and more) as a runtime
+dependency. That is a packaging mistake upstream; it is excluded in `engine/srs/build.gradle.kts`, so none of it
+ships in the app.
+
 Build tooling (Android Gradle Plugin, Kotlin, KSP) is Apache-2.0 and is not distributed in the app.
 
 ## Bundled fonts
@@ -34,7 +50,8 @@ These fonts are bundled under the SIL Open Font License, Version 1.1 (https://sc
 - **Literata:** Copyright 2017 The Literata Project Authors (https://github.com/googlefonts/literata)
 - **Albert Sans:** Copyright 2021 The Albert Sans Project Authors (https://github.com/usted/Albert-Sans)
 
-Reserved font names, if any, are stated in each font's own name table.
+The full licence text is in [docs/licenses/OFL-1.1.txt](docs/licenses/OFL-1.1.txt) and is also bundled in the app
+as the asset `OFL-1.1.txt`. Reserved font names, if any, are stated in each font's own name table.
 
 ## Online services
 

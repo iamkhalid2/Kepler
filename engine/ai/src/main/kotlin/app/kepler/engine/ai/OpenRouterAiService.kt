@@ -1,6 +1,7 @@
 package app.kepler.engine.ai
 
 import app.kepler.core.model.AiBudget
+import app.kepler.core.model.AiCacheKeys
 import app.kepler.core.model.AiService
 import app.kepler.core.model.AiStore
 import app.kepler.core.model.AnswerCheck
@@ -77,7 +78,7 @@ class OpenRouterAiService(
         val ctx = passageContext(bookId, ordinal, FenceFeature.EXPLAIN, before = 12, after = 3)
         val sel = selection.trim().take(2000)
         val prompt = PromptRegistry.EXPLAIN
-        stripOrdinalMarkers(cachedText("explain", prompt, ctx.cacheKey, sel) {
+        stripOrdinalMarkers(cachedText(bookId, "explain", prompt, ctx.cacheKey, sel) {
             runner.text(Priority.INTERACTIVE, prompt.system, buildString {
                 bookLine(book)
                 appendLine("Passages:"); appendLine(ctx.rendered)
@@ -91,7 +92,7 @@ class OpenRouterAiService(
         val ctx = passageContext(bookId, ordinal, FenceFeature.DEFINE, before = 6, after = 1)
         val t = term.trim().take(200)
         val prompt = PromptRegistry.DEFINE
-        stripOrdinalMarkers(cachedText("define", prompt, ctx.cacheKey, t.lowercase()) {
+        stripOrdinalMarkers(cachedText(bookId, "define", prompt, ctx.cacheKey, t.lowercase()) {
             runner.text(Priority.INTERACTIVE, prompt.system, buildString {
                 bookLine(book)
                 appendLine("Passages:"); appendLine(ctx.rendered)
@@ -106,7 +107,7 @@ class OpenRouterAiService(
         val max = fence.maxOrdinal(bookId, FenceFeature.ASK)
         if (max < 0) throw AiError.NothingRead()
         val prompt = PromptRegistry.ASK
-        val cacheKey = sha256("ask", prompt.tag, bookId.toString(), q.lowercase(), max.toString())
+        val cacheKey = AiCacheKeys.scope(bookId, sha256("ask", prompt.tag, bookId.toString(), q.lowercase(), max.toString()))
         aiStore.get("ask", cacheKey)?.let { raw ->
             runCatching { AiJson.decodeFromString(StoredAnswer.serializer(), raw) }.getOrNull()?.let { return@guard it.toAnswer() }
         }
@@ -255,8 +256,8 @@ class OpenRouterAiService(
         return PassageContext(rendered, sha256(bookId.toString(), ordinal.toString(), rendered))
     }
 
-    private suspend fun cachedText(kind: String, prompt: PromptRegistry.Prompt, ctxKey: String, subject: String, produce: suspend () -> String): String {
-        val key = sha256(kind, prompt.tag, ctxKey, subject)
+    private suspend fun cachedText(bookId: BookId, kind: String, prompt: PromptRegistry.Prompt, ctxKey: String, subject: String, produce: suspend () -> String): String {
+        val key = AiCacheKeys.scope(bookId, sha256(kind, prompt.tag, ctxKey, subject))
         aiStore.get(kind, key)?.let { return it }
         return produce().also { aiStore.put(kind, key, it) }
     }

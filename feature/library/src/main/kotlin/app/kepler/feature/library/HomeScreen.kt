@@ -156,6 +156,9 @@ private fun Stage(book: Book, onOpenBook: (Long) -> Unit) {
             listOf(spec), listOf(BookPose((left + HOME_BOOK_W / 2f - 4f) * k, cy, s, ry = 16f, rx = -4f)),
             Modifier.fillMaxSize(),
             onTap = { onOpenBook(book.id) },
+            stageKeys = listOf(book.id),
+            stageTag = "home",
+            pressLift = true,
         )
         BookRibbons(
             book.readFraction, book.listenFraction, swingKey = book.id,

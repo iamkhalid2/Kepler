@@ -57,8 +57,12 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import app.kepler.AppContainer
 import app.kepler.R
+import app.kepler.core.designsystem.BookStageOverlay
 import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.KpMotion
+import app.kepler.core.designsystem.LocalBookStage
+import app.kepler.core.designsystem.LocalStageOwner
+import app.kepler.core.designsystem.rememberBookStage
 import app.kepler.core.designsystem.KpToastHost
 import app.kepler.core.designsystem.rememberReducedMotion
 import app.kepler.core.model.AppSettings
@@ -226,7 +230,11 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow
     val reduced = rememberReducedMotion()
     val index = stack.entries.lastIndex
     val entryKey = "$index:${top.stateKey()}"
+    // The shared book layer: screens publish where their book stands; one book flies between entries.
+    val stage = rememberBookStage()
+    SideEffect { stage.setTop(entryKey) }
 
+    CompositionLocalProvider(LocalBookStage provides stage) {
     Box(Modifier.fillMaxSize().background(Kp.palette.bg)) {
         AnimatedContent(
             targetState = entryKey to top,
@@ -238,6 +246,7 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow
             label = "nav",
         ) { (key, route) ->
             EntryScope(key, stores, holder) {
+              CompositionLocalProvider(LocalStageOwner provides key) {
                 when (route) {
                     Route.Onboarding -> OnboardingRoute(onDone = { stack.resetTo(Route.Tabs(Tab.HOME)) })
                     is Route.Tabs -> TabsHost(
@@ -296,8 +305,12 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow
                     }
                     Route.Settings -> SettingsRoute(onBack = { stack.pop() })
                 }
+              }
             }
         }
+
+        // Above every screen, below sheets and toasts.
+        BookStageOverlay(stage)
 
         when (val req = sheet) {
             null -> Unit
@@ -321,6 +334,7 @@ private fun AppNavHost(container: AppContainer, stack: BackStack, incoming: Flow
             onDismiss = { toast = null },
             modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = chrome + 16.dp),
         )
+    }
     }
 }
 

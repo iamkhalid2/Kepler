@@ -6,6 +6,7 @@ import app.kepler.core.database.db.BookEntity
 import app.kepler.core.database.db.SectionEntity
 import app.kepler.core.database.db.SentenceEntity
 import app.kepler.core.database.toModel
+import app.kepler.core.model.AiCacheKeys
 import app.kepler.core.model.Book
 import app.kepler.core.model.BookId
 import app.kepler.core.model.BookIngestor
@@ -35,12 +36,15 @@ internal class LibraryRepositoryImpl(
     private val ingestor: BookIngestor,
     private val booksDir: File,
     private val opener: SourceOpener,
+    /** Rendered narration lives in `<audioDir>/<bookId>/`; null when the layout has none. */
+    private val audioDir: File? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : LibraryRepository {
     private val bookDao = db.books()
     private val sectionDao = db.sections()
     private val sentenceDao = db.sentences()
     private val audioDao = db.audio()
+    private val aiDao = db.ai()
 
     /** Serializes imports and the start-up cleanup of half-imported books. */
     private val importLock = Mutex()
@@ -133,7 +137,10 @@ internal class LibraryRepositoryImpl(
             val book = bookDao.get(id) ?: return@withContext
             val audioFiles = audioDao.filePaths(id)
             bookDao.delete(id)
+            aiDao.deleteScoped(AiCacheKeys.prefix(id))
             audioFiles.forEach { runCatching { File(it).delete() } }
+            // The whole per-book folder also takes out sidecar files and renders that never got registered.
+            audioDir?.let { runCatching { File(it, id.toString()).deleteRecursively() } }
             ownedDir(book.epubPath)?.deleteRecursively()
         }
     }

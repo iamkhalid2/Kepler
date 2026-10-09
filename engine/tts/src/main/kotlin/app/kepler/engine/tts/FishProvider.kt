@@ -96,25 +96,38 @@ class FishProvider(
         }
     }
 
-    override suspend fun synthesize(request: SynthesisRequest): SynthesisResult = withRetry {
+    override suspend fun synthesize(request: SynthesisRequest): SynthesisResult = withRetry { attempt ->
         val key = key()
         if (timestampEndpointAvailable) {
             try {
-                return@withRetry streamWithTimestamps(request, key)
+                return@withRetry streamWithTimestamps(request, key, attempt)
             } catch (e: TtsException.EndpointUnavailable) {
                 timestampEndpointAvailable = false
             }
         }
-        plain(request, key)
+        plain(request, key, attempt)
     }
 
-    private suspend fun streamWithTimestamps(request: SynthesisRequest, key: String): SynthesisResult {
+    /** What one HTTP attempt did, so a failure can tell whether the service already charged for it. */
+    private class Attempt {
+        @Volatile var accepted = false
+        @Volatile var paidModel = false
+    }
+
+    private fun accepted(request: SynthesisRequest, attempt: Attempt) {
+        attempt.accepted = true
+        attempt.paidModel = !policy.isFree()
+        request.onAccepted()
+    }
+
+    private suspend fun streamWithTimestamps(request: SynthesisRequest, key: String, attempt: Attempt): SynthesisResult {
         val model = policy.model()
         return client.preparePost("$BASE/v1/tts/stream/with-timestamp") { body(request, key) }.execute { response ->
             if (response.status.value == 404 || response.status.value == 405) {
                 throw TtsException.EndpointUnavailable(response.status.value)
             }
             check(response)
+            accepted(request, attempt)
             val acc = FishSseAccumulator()
             val channel = response.bodyAsChannel()
             while (true) {
@@ -128,10 +141,11 @@ class FishProvider(
         }
     }
 
-    private suspend fun plain(request: SynthesisRequest, key: String): SynthesisResult {
+    private suspend fun plain(request: SynthesisRequest, key: String, attempt: Attempt): SynthesisResult {
         val model = policy.model()
         return client.preparePost("$BASE/v1/tts") { body(request, key) }.execute { response ->
             check(response)
+            accepted(request, attempt)
             val bytes = response.readRawBytes()
             if (bytes.isEmpty()) throw TtsException.Engine("Fish Audio returned no audio")
             SynthesisResult(SynthAudio.Encoded(bytes, FORMAT), words = null, model = model)
@@ -178,21 +192,28 @@ class FishProvider(
         }
     }
 
-    /** Exponential backoff with full jitter; Fish sends no Retry-After header. */
-    private suspend fun <T> withRetry(block: suspend () -> T): T {
+    /**
+     * Exponential backoff with full jitter; Fish sends no Retry-After header.
+     * A connection that breaks after the service accepted the request (2xx, stream begun) was already charged:
+     * on the paid model it is never repeated automatically, on the free model it is repeated at most twice.
+     */
+    private suspend fun <T> withRetry(block: suspend (Attempt) -> T): T {
         var attempt = 0
+        var midStream = 0
         while (true) {
+            val state = Attempt()
             val error: TtsException = try {
-                return permits.withPermit { block() }
+                return permits.withPermit { block(state) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TtsException) {
                 e
             } catch (e: IOException) {
-                TtsException.Network(e)
+                TtsException.Network(e, billed = state.accepted && state.paidModel)
             }
             attempt++
             if (!error.retryable || attempt >= maxAttempts) throw error
+            if (state.accepted && ++midStream > MAX_MIDSTREAM_RETRIES) throw error
             sleep(backoffMs(attempt, random))
         }
     }
@@ -203,6 +224,7 @@ class FishProvider(
         const val MODEL_HEADER = "model"
         const val FORMAT = "mp3"
         const val DEFAULT_CONCURRENCY = 5
+        const val MAX_MIDSTREAM_RETRIES = 2
 
         internal fun backoffMs(attempt: Int, random: Random): Long {
             val cap = min(30_000L, 500L shl min(attempt, 10))

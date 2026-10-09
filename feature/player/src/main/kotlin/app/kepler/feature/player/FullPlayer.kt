@@ -34,7 +34,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kepler.core.designsystem.BOOK_H
+import androidx.compose.animation.core.Animatable
 import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.KpMotion
+import app.kepler.core.designsystem.LocalBookStage
+import app.kepler.core.designsystem.rememberReducedMotion
 import app.kepler.core.designsystem.KpCaps
 import app.kepler.core.designsystem.KpDot
 import app.kepler.core.designsystem.KpIconKey
@@ -116,10 +120,20 @@ fun FullPlayerRoute(
                 KpTextLink(stringResource(R.string.player_read_along), { onReadAlong(controller.state.value.ordinal) })
             }
 
-            Hero(bookId = loadedId ?: bookId, title = title, author = author, cover = cover, ready = title != null && coverReady)
+            // Until playback reports this book, its look comes from the screen it was opened from (the stage
+            // remembers it), so the hero is never an empty hole and never shows the previous book.
+            val stage = LocalBookStage.current
+            val known = stage?.knownSpec(bookId)
+            val current = loadedId == bookId
+            val shownTitle = title.takeIf { current } ?: known?.title
+            val shownAuthor = author.takeIf { current } ?: known?.author
+            val shownCover = cover.takeIf { current && coverReady } ?: known?.cover
+            Hero(bookId = bookId, title = shownTitle, author = shownAuthor, cover = shownCover)
 
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
-                if (title == null) LoadingBlocks() else {
+                if (shownTitle == null) LoadingBlocks() else {
+                    val title = shownTitle
+                    val author = shownAuthor
                     Text(title.orEmpty(), color = p.text, style = KpType.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (!author.isNullOrBlank()) {
                         Text(author.orEmpty(), color = p.text2, style = KpType.author, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -199,29 +213,40 @@ fun FullPlayerRoute(
     }
 }
 
-/** The book standing on a plank. Its width is 220 dp at a 390 dp screen and scales with the screen. */
+/**
+ * The book standing on a plank. Its width is 220 dp at a 390 dp screen and scales with the screen. It shows at
+ * once: the typographic cover first when no jacket is known yet, then the jacket fades in over it.
+ */
 @Composable
-private fun Hero(bookId: BookId, title: String?, author: String?, cover: androidx.compose.ui.graphics.ImageBitmap?, ready: Boolean) {
+private fun Hero(bookId: BookId, title: String?, author: String?, cover: androidx.compose.ui.graphics.ImageBitmap?) {
     val p = Kp.palette
+    val reduced = rememberReducedMotion()
+    val jacket = remember(bookId) { Animatable(if (cover != null) 1f else 0f) }
+    LaunchedEffect(cover != null, reduced) {
+        if (cover != null) { if (reduced) jacket.snapTo(1f) else jacket.animateTo(1f, KpMotion.settle()) }
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val unit: Dp = maxWidth / 390f
         val scale = HERO_WIDTH / 150f
         val bookHeight = unit * (BOOK_H * scale)
         val top = 16.dp
         val height = top + bookHeight - PlankBaseline + PlankHeight
-        val spec = remember(bookId, title, author, cover, p) { bookSpec(bookId, title, author, p, cover, thickness = 26f) }
+        val spec = remember(bookId, title, author, cover, p) {
+            bookSpec(bookId, title, author, p, cover, thickness = 26f, jacketAlpha = { jacket.value })
+        }
         Box(Modifier.fillMaxWidth().height(height)) {
             ShelfPlank(Modifier.align(Alignment.BottomCenter))
-            if (ready) {
-                // The book turns to face you: it arrives at the hub's three-quarter pose and settles square (brief 4.3).
-                val pose = BookPose(cx = 195f, cy = (top + bookHeight / 2f) / unit, scale = scale, ry = 0f, rx = HERO_PITCH)
-                BookScene(
-                    books = listOf(spec),
-                    targets = listOf(pose),
-                    modifier = Modifier.fillMaxSize(),
-                    enterFrom = listOf(pose.copy(scale = scale / 1.14f, ry = 24f, rx = -2f, alpha = 0f, lift = 1f)),
-                )
-            }
+            // The book turns to face you (brief 4.3). Arriving from another screen, the shared stage carries it
+            // here; opened cold (a notification), it makes the same turn on its own.
+            val pose = BookPose(cx = 195f, cy = (top + bookHeight / 2f) / unit, scale = scale, ry = 0f, rx = HERO_PITCH)
+            BookScene(
+                books = listOf(spec),
+                targets = listOf(pose),
+                modifier = Modifier.fillMaxSize(),
+                enterFrom = listOf(pose.copy(scale = scale / 1.14f, ry = 24f, rx = -2f, alpha = 0f, lift = 1f)),
+                stageKeys = listOf(bookId),
+                stageTag = "player",
+            )
         }
     }
 }

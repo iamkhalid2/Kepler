@@ -153,6 +153,9 @@ internal interface AiDao {
     @Query("INSERT OR REPLACE INTO ai_cache (kind, `key`, json) VALUES (:kind, :key, :json)")
     suspend fun put(kind: String, key: String, json: String)
 
+    @Query("DELETE FROM ai_cache WHERE `key` LIKE :prefix || '%'")
+    suspend fun deleteScoped(prefix: String)
+
     @Query("SELECT COALESCE(SUM(count), 0) FROM ai_usage WHERE day = :day AND provider = :provider")
     suspend fun requestsOn(day: String, provider: String): Int
 

@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kepler.core.designsystem.BOOK_W
 import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.KpCaps
+import app.kepler.core.designsystem.LocalBookStage
 import app.kepler.core.designsystem.KpHairline
 import app.kepler.core.designsystem.KpPrimaryKey
 import app.kepler.core.designsystem.KpRing
@@ -173,7 +174,10 @@ private fun Hero(book: Book, ui: HubUi) {
     val p = Kp.palette
     val materials = rememberBookMaterials()
     val coverLoad = rememberCoverLoad(book.coverPath, 480)
-    val spec = rememberHubSpec(book, materials, coverLoad.image)
+    // While the jacket decodes, wear the one the shelf already showed (same picture, smaller), so the book
+    // can land from the shelf at once instead of waiting or swapping covers.
+    val known = LocalBookStage.current?.knownSpec(book.id)?.cover
+    val spec = rememberHubSpec(book, materials, coverLoad.image ?: known)
     BoxWithConstraints(Modifier.fillMaxWidth().height(HERO_H.dp)) {
         val w = maxWidth.value
         val k = 390f / w
@@ -181,12 +185,15 @@ private fun Hero(book: Book, ui: HubUi) {
         val bookH = HUB_BOOK_W * 1.5f
         val cy = (PLANK_TOP + PlankBaseline.value - bookH / 2f) * k
         ShelfPlank(Modifier.offset(y = PLANK_TOP.dp))
-        if (coverLoad.ready) {
-            // Spine to cover: the book leaves the shelf edge-on, lifts, and turns to face you (brief 4.1).
+        if (coverLoad.ready || known != null) {
+            // Spine to cover (brief 4.1): the shared stage flies the very book from the shelf; opened without a
+            // source (a deep link, an import) the same entrance plays locally.
             val pose = BookPose((24f + 72f) * k, cy, s, ry = 24f, rx = -4f)
             BookScene(
                 listOf(spec), listOf(pose), Modifier.fillMaxSize(),
                 enterFrom = listOf(pose.copy(cx = pose.cx - 18f * k, scale = s * 0.94f, ry = 90f, rx = 0f, alpha = 0f, lift = 1f)),
+                stageKeys = listOf(book.id),
+                stageTag = "hub",
             )
         }
         val ribbonScale = HUB_BOOK_W / 100f

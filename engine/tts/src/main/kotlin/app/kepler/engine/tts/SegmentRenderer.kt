@@ -5,7 +5,9 @@ import app.kepler.core.model.AudioSegment
 import app.kepler.core.model.BookId
 import app.kepler.core.model.SyncRow
 import app.kepler.core.model.VoiceRef
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -74,7 +76,7 @@ class SegmentRenderer(
                 return@withLock RenderOutcome(register(bookId, audioFile, cached), requested = false, utf8Bytes = bytes, wallMs = now() - started)
             }
 
-            val result = provider.synthesize(SynthesisRequest(chunk.texts, voice.id, speed))
+            val result = provider.synthesize(SynthesisRequest(chunk.texts, voice.id, speed, bookId = bookId))
             val meta = withContext(Dispatchers.Default) {
                 val decoded = transcoder.decode(result.audio, scratchDir)
                 val totalMs = decoded.durationMs
@@ -108,11 +110,30 @@ class SegmentRenderer(
         val rows = meta.spans.mapIndexed { i, s ->
             SyncRow(bookId, meta.startOrdinal + i, segmentId = 0, startMs = s[0], endMs = s[1])
         }
-        val id = repo.addSegment(segment, rows)
+        val id = try {
+            repo.addSegment(segment, rows)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            if (!isConstraintFailure(e)) throw e
+            // The book was deleted while this was rendering: leave no orphan file behind.
+            withContext(NonCancellable + Dispatchers.IO) {
+                file.delete()
+                File(file.parentFile, file.nameWithoutExtension + ".json").delete()
+                file.parentFile?.takeIf { it.list().isNullOrEmpty() }?.delete()
+            }
+            throw TtsException.BookGone()
+        }
         return segment.copy(id = id)
     }
 
     companion object {
+        /** A foreign-key or other constraint violation anywhere in the cause chain (the book row is gone). */
+        internal fun isConstraintFailure(e: Throwable): Boolean = generateSequence(e) { it.cause }.take(8).any {
+            it.javaClass.simpleName.contains("Constraint", ignoreCase = true) ||
+                it.message.orEmpty().contains("constraint", ignoreCase = true)
+        }
+
         private val json = Json { ignoreUnknownKeys = true }
 
         /** Moves spans onto the trimmed timeline and keeps them contiguous over [0, durationMs]. */

@@ -89,7 +89,7 @@ class NarrationWorker(context: Context, params: WorkerParameters) : CoroutineWor
         val from = inputData.getInt(KEY_FROM, 0)
         return try {
             when (val r = engine.runJob(bookId, config, from)) {
-                NarrationEngine.JobResult.Done, NarrationEngine.JobResult.Paused -> Result.success()
+                NarrationEngine.JobResult.Done, NarrationEngine.JobResult.Paused, NarrationEngine.JobResult.BookGone -> Result.success()
                 is NarrationEngine.JobResult.Failed -> if (r.retry && runAttemptCount < MAX_RETRIES) Result.retry() else Result.failure()
             }
         } catch (e: CancellationException) {

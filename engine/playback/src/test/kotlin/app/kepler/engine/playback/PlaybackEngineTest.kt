@@ -8,7 +8,9 @@ import app.kepler.core.model.Book
 import app.kepler.core.model.ContentType
 import app.kepler.core.model.ImportResult
 import app.kepler.core.model.LibraryRepository
+import app.kepler.core.model.NarrationBlockedException
 import app.kepler.core.model.NarrationConfig
+import app.kepler.core.model.PauseReason
 import app.kepler.core.model.NarrationEstimate
 import app.kepler.core.model.NarrationService
 import app.kepler.core.model.NarrationState
@@ -23,6 +25,7 @@ import app.kepler.core.model.SpineRepository
 import app.kepler.core.model.SyncRow
 import app.kepler.core.model.VoiceOption
 import app.kepler.core.model.VoiceRef
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -46,6 +49,7 @@ private class Fakes(segments: List<AudioSegment>, val rows: List<SyncRow>) {
     val saved = mutableListOf<Int>()
     val consumed = mutableListOf<IntRange>()
     val ensured = mutableListOf<Int>()
+    var blocked: PauseReason? = null
 
     val book = Book(1, "Meditations", "Marcus Aurelius", "en", ContentType.NONFICTION, "/x.epub", null, 0, null, 40, 0f, 0f)
     val sections = listOf(
@@ -88,6 +92,7 @@ private class Fakes(segments: List<AudioSegment>, val rows: List<SyncRow>) {
         override fun stop(bookId: Long) = Unit
         override suspend fun ensureAhead(bookId: Long, config: NarrationConfig, ordinal: Int, minutes: Int) {
             ensured += ordinal
+            blocked?.let { throw NarrationBlockedException(it) }
         }
         override suspend fun preview(voice: VoiceRef, sampleText: String) = ""
     }
@@ -128,7 +133,7 @@ class PlaybackEngineTest {
     @Before fun setUp() {
         fakes = Fakes(segs, segs.flatMap(::rowsFor))
         PlaybackHub.initialize(fakes.deps())
-        engine = PlaybackEngine(RuntimeEnvironment.getApplication(), fakes.deps())
+        engine = PlaybackEngine(RuntimeEnvironment.getApplication(), fakes.deps(), persistContext = Dispatchers.Unconfined)
         idle()
     }
 
@@ -180,6 +185,18 @@ class PlaybackEngineTest {
         assertFalse(engine.state.value.buffering)
     }
 
+    @Test fun blockedNarrationIsNotReadyWithTheReason() {
+        fakes.segmentFlow.value = listOf(segs[0])
+        fakes.blocked = PauseReason.PAID_CONFIRM
+        engine.play(1, 25)
+        idle()
+        val error = engine.state.value.error
+        assertNotNull(error)
+        assertTrue(error!!.startsWith("Narration for this part isn't ready yet."))
+        assertTrue(error.contains("Confirm paid narration"))
+        assertFalse(engine.state.value.buffering)
+    }
+
     @Test fun speedIsClampedAndPersisted() {
         engine.play(1, 0)
         idle()
@@ -210,7 +227,6 @@ class PlaybackEngineTest {
         engine.play(1, 3)
         idle()
         engine.pause()
-        Thread.sleep(200)
         idle()
         assertTrue(fakes.saved.contains(3))
         assertFalse(engine.state.value.playing)

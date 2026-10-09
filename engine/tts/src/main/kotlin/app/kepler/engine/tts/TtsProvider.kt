@@ -1,5 +1,6 @@
 package app.kepler.engine.tts
 
+import app.kepler.core.model.BookId
 import app.kepler.core.model.VoiceOption
 
 enum class MarkupDialect { NONE, FISH_S2, FISH_S1 }
@@ -21,6 +22,13 @@ data class SynthesisRequest(
     val sentences: List<String>,
     val voiceId: String,
     val speed: Float = 1f,
+    /** The book being narrated (spend is accounted per book); null for previews. */
+    val bookId: BookId? = null,
+    /**
+     * Called by a provider that bills per request the moment the service accepted the request (HTTP 2xx),
+     * before the audio is decoded. Spend is recorded there, so a later failure cannot hide a charge.
+     */
+    val onAccepted: () -> Unit = {},
 ) {
     val text: String get() = sentences.joinToString(" ")
 }
@@ -71,11 +79,17 @@ sealed class TtsException(message: String, cause: Throwable? = null) : Exception
     class PaymentRequired : TtsException("Fish Audio needs credit on the account to continue.")
     class RateLimited : TtsException("Fish Audio is busy. Narration tries again shortly.")
     class ServerBusy(code: Int) : TtsException("Fish Audio is unavailable right now. Try again in a little while.")
-    class Network(cause: Throwable) : TtsException("No connection. Narration that is already made still plays.", cause)
+    /** [billed]: the service had already accepted (and charged) the request when the connection broke. */
+    class Network(cause: Throwable, val billed: Boolean = false) :
+        TtsException("No connection. Narration that is already made still plays.", cause)
     class Http(val code: Int) : TtsException("Fish Audio couldn’t make this part (error $code).")
     class EndpointUnavailable(val code: Int) : TtsException("Endpoint unavailable ($code)")
     class Engine(message: String) : TtsException(message)
     class Audio(message: String, cause: Throwable? = null) : TtsException(message, cause)
 
-    val retryable: Boolean get() = this is RateLimited || this is ServerBusy || this is Network
+    /** The book was deleted while its narration was being made; not an error to show. */
+    class BookGone : TtsException("The book was removed.")
+
+    /** Never repeats a request that was already billed: the user starts it again deliberately. */
+    val retryable: Boolean get() = this is RateLimited || this is ServerBusy || (this is Network && !billed)
 }

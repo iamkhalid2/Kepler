@@ -39,6 +39,9 @@ android {
         }
     }
 
+    // The full licence texts (SIL OFL for the bundled fonts) ship inside the app as assets.
+    sourceSets.getByName("main").assets.directories.add("../docs/licenses")
+
     buildFeatures {
         compose = true
         buildConfig = true

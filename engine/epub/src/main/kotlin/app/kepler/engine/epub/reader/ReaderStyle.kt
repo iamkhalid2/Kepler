@@ -52,6 +52,14 @@ data class ReaderStyle(
     val scroll: Boolean = false,
     val justify: Boolean = false,
     val tapZones: Boolean = true,
+    /**
+     * Opaque ARGB for the web content's `::selection` background, already composited over the page so it
+     * needs no CSS alpha. The reader derives it from the palette (`marks.selection`); null keeps the engine's
+     * default. The engine maps it to Readium CSS `--RS__selectionBackgroundColor`.
+     */
+    val selectionColor: Int? = null,
+    /** ARGB for selected text (the page ink, so selection never changes the type colour); null = default. */
+    val selectionInk: Int? = null,
 ) {
     val pageColor: Int get() = if (theme == ReaderThemeId.CUSTOM) customPage ?: theme.page else theme.page
     val inkColor: Int get() = if (theme == ReaderThemeId.CUSTOM) customInk ?: theme.ink else theme.ink
@@ -64,4 +72,15 @@ data class ReaderStyle(
             val l = 0.2126 * ((c shr 16) and 0xFF) + 0.7152 * ((c shr 8) and 0xFF) + 0.0722 * (c and 0xFF)
             return l < 128
         }
+}
+
+/** Composites [argb] (with alpha) over the opaque [under] colour, returning an opaque ARGB int. */
+fun compositeOver(argb: Int, under: Int): Int {
+    val a = ((argb ushr 24) and 0xFF) / 255f
+    fun ch(shift: Int): Int {
+        val top = (argb shr shift) and 0xFF
+        val bottom = (under shr shift) and 0xFF
+        return (top * a + bottom * (1f - a) + 0.5f).toInt().coerceIn(0, 255)
+    }
+    return (0xFF shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
 }

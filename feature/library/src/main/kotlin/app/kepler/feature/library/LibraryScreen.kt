@@ -3,6 +3,11 @@ package app.kepler.feature.library
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -42,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kepler.core.designsystem.BOOK_H
 import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.KpCaps
+import app.kepler.core.designsystem.LocalBookStage
 import app.kepler.core.designsystem.KpIcon
 import app.kepler.core.designsystem.KpIconKey
 import app.kepler.core.designsystem.KpIconKind
@@ -64,8 +70,6 @@ import app.kepler.core.designsystem.ShelfPlank
 import app.kepler.core.designsystem.rememberHaptics
 import app.kepler.core.model.Book
 
-private const val SHELF_ROW_DP = 196f
-private const val SPINE_DP = 150f
 private const val GUTTER_DP = 24f
 
 @Composable
@@ -145,7 +149,7 @@ fun LibraryScreen(
                         stringResource(R.string.no_matches, ui.query), color = p.text2, style = KpType.body,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                     )
-                    ui.layout == LibraryLayout.Shelf -> ShelfView(ui.books, onOpenBook, onLongPress)
+                    ui.layout == LibraryLayout.Shelf -> ShelfView(ui.books, onOpenBook, onLongPress, onAdd, ui.importing)
                     else -> ListView(ui.books, onOpenBook, onLongPress)
                 }
                 KpToastHost(
@@ -222,16 +226,26 @@ private fun EmptyShelf(onAdd: () -> Unit, importing: Boolean) {
 
 // ------------------------------------------------------------------ shelf
 
+/**
+ * The bookcase: lit planks every 196 dp fill the viewport whatever the count, books stand at natural heights,
+ * the first stands face-out, the last spine leans, and a ghost spine waits where the next book goes.
+ */
 @Composable
-private fun ShelfView(books: List<Book>, onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit) {
+private fun ShelfView(books: List<Book>, onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit, onAdd: () -> Unit, importing: Boolean) {
     val materials = rememberBookMaterials()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val width = maxWidth.value
-        val widthsDp = remember(books) { books.map { spineThicknessUnits(it.sentenceCount) * (SPINE_DP / BOOK_H) } }
-        val rows = remember(books, width) { packShelfRows(widthsDp, width - 2 * GUTTER_DP) }
+        val facts = remember(books) { books.map { ShelfBookFacts(it.id, spineThicknessUnits(it.sentenceCount)) } }
+        val plans = remember(facts, width) { ShelfLayout.plan(facts, width - 2 * GUTTER_DP) }
+        val planks = ShelfLayout.plankCount(plans.size, maxHeight.value)
         LazyColumn(Modifier.fillMaxSize()) {
-            items(rows) { idx ->
-                ShelfRow(idx.map { books[it] }, materials, width, onOpen, onLongPress)
+            items(planks) { r ->
+                val plan = plans.getOrNull(r)
+                if (plan == null) {
+                    Box(Modifier.fillMaxWidth().height(ShelfLayout.ROW.dp)) { ShelfPlank(Modifier.align(Alignment.BottomCenter)) }
+                } else {
+                    ShelfRow(plan, books, materials, width, onOpen, onLongPress, onAdd, importing)
+                }
             }
         }
     }
@@ -239,35 +253,86 @@ private fun ShelfView(books: List<Book>, onOpen: (Long) -> Unit, onLongPress: (B
 
 @Composable
 private fun ShelfRow(
-    books: List<Book>, materials: List<BookMaterial>, widthDp: Float,
-    onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit,
+    plan: ShelfRowPlan, all: List<Book>, materials: List<BookMaterial>, widthDp: Float,
+    onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit, onAdd: () -> Unit, importing: Boolean,
 ) {
     val haptics = rememberHaptics()
     val k = 390f / widthDp                // design units per dp
-    val s = SPINE_DP * k / BOOK_H         // book scale so the spine is 150 dp tall
-    val baselineDp = SHELF_ROW_DP - PlankHeight.value + PlankBaseline.value
-    val cy = (baselineDp - SPINE_DP / 2f) * k
-    // small jackets so each spine can wear its jacket's colour
-    val covers = books.map { rememberCover(it.coverPath, 96) }
+    val baselineDp = ShelfLayout.ROW - PlankHeight.value + PlankBaseline.value
+    val books = plan.books.map { all[it.index] }
+    // small jackets so each spine can wear its jacket's colour; the face-out book shows its jacket
+    // While a jacket decodes (or after the order changed), wear the look the stage last saw for that book,
+    // never the previous occupant's jacket and never a typographic flash.
+    val stage = LocalBookStage.current
+    val covers = plan.books.map {
+        val b = all[it.index]
+        val load = rememberCoverLoad(b.coverPath, if (it.faceOut) 240 else 96)
+        if (load.ready && (load.image != null || b.coverPath == null)) load.image else stage?.knownSpec(b.id)?.cover ?: load.image
+    }
     val specs = remember(books, materials, covers) { books.mapIndexed { i, b -> bookSpecFor(b, materials, covers[i]) } }
-    val targets = remember(books, widthDp) {
-        var x = GUTTER_DP
-        books.map { b ->
-            val t = spineThicknessUnits(b.sentenceCount) * SPINE_DP / BOOK_H
-            val c = (x + t / 2f) * k
-            x += t + 2f
-            BookPose(c, cy, s, ry = 90f)
+    val targets = remember(plan, widthDp) {
+        plan.books.map { pb ->
+            val b = all[pb.index]
+            val s = pb.height * k / BOOK_H
+            val cy = (baselineDp - pb.height / 2f) * k
+            if (pb.faceOut) {
+                BookPose((GUTTER_DP + pb.x + pb.width / 2f) * k, cy, s, ry = ShelfLayout.FACE_YAW, rx = -3f)
+            } else {
+                // a leaning spine pivots on its bottom-left corner, so its centre is laid out upright
+                val t = spineThicknessUnits(b.sentenceCount) * pb.height / BOOK_H
+                BookPose((GUTTER_DP + pb.x + t / 2f) * k, cy, s, ry = 90f, rz = pb.lean)
+            }
         }
     }
-    Box(Modifier.fillMaxWidth().height(SHELF_ROW_DP.dp)) {
+    Box(Modifier.fillMaxWidth().height(ShelfLayout.ROW.dp)) {
         ShelfPlank(Modifier.align(Alignment.BottomCenter))
-        BookScene(
-            specs, targets, Modifier.fillMaxSize(),
-            onTap = { i -> haptics.play(HapticToken.Settle); onOpen(books[i].id) },
-            onLongPress = { i -> haptics.play(HapticToken.Confirm); onLongPress(books[i]) },
-            hitPad = 10f,
-            labels = books.map { listOf(it.title, it.authors).filter { s -> s.isNotBlank() }.joinToString(", ") },
-        )
+        if (books.isNotEmpty()) {
+            BookScene(
+                specs, targets, Modifier.fillMaxSize(),
+                onTap = { i -> haptics.play(HapticToken.Settle); onOpen(books[i].id) },
+                onLongPress = { i -> haptics.play(HapticToken.Confirm); onLongPress(books[i]) },
+                hitPad = 10f,
+                labels = books.map { listOf(it.title, it.authors).filter { s -> s.isNotBlank() }.joinToString(", ") },
+                stageKeys = books.map { it.id },
+                stageTag = "shelf",
+                pressLift = true,
+            )
+        }
+        plan.ghost?.let { g ->
+            GhostSpine(
+                Modifier.offset(x = (GUTTER_DP + g.x + g.width / 2f - 24f).dp, y = (baselineDp - g.height).dp),
+                g.width, g.height, onAdd, enabled = !importing,
+            )
+        }
+    }
+}
+
+/** A dashed outline where the next book will stand, with a small plus at its foot. 48 dp wide touch target. */
+@Composable
+private fun GhostSpine(modifier: Modifier, widthDp: Float, heightDp: Float, onAdd: () -> Unit, enabled: Boolean) {
+    val p = Kp.palette
+    val label = stringResource(R.string.add_a_book)
+    val haptics = rememberHaptics()
+    Box(
+        modifier
+            .size(48.dp, heightDp.dp)
+            .clickable(enabled = enabled, onClickLabel = label, role = androidx.compose.ui.semantics.Role.Button) {
+                haptics.play(HapticToken.Tap); onAdd()
+            }
+            .semantics { contentDescription = label },
+    ) {
+        Canvas(Modifier.align(Alignment.Center).size(widthDp.dp, heightDp.dp)) {
+            val stroke = 1.5.dp.toPx()
+            val c = p.text2.copy(alpha = if (enabled) 0.6f else 0.3f)
+            drawRoundRect(
+                c, Offset(stroke / 2f, stroke / 2f), Size(size.width - stroke, size.height - stroke), CornerRadius(1.5.dp.toPx()),
+                style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))),
+            )
+            val arm = 4.dp.toPx()
+            val mid = Offset(size.width / 2f, size.height - 18.dp.toPx())
+            drawLine(c, mid.copy(x = mid.x - arm), mid.copy(x = mid.x + arm), stroke)
+            drawLine(c, mid.copy(y = mid.y - arm), mid.copy(y = mid.y + arm), stroke)
+        }
     }
 }
 

@@ -19,8 +19,11 @@ class FakeAudioRepo : AudioRepository {
     val segs = MutableStateFlow<List<AudioSegment>>(emptyList())
     val rows = mutableListOf<SyncRow>()
     private var next = 1L
+    /** Set to make the next inserts fail (for example a foreign-key violation when the book is gone). */
+    @Volatile var insertFailure: Throwable? = null
     override fun segments(bookId: BookId): Flow<List<AudioSegment>> = segs
     override suspend fun addSegment(segment: AudioSegment, rows: List<SyncRow>): Long = synchronized(this) {
+        insertFailure?.let { throw it }
         val id = next++
         segs.value = segs.value + segment.copy(id = id)
         this.rows += rows.map { it.copy(segmentId = id) }
@@ -37,6 +40,8 @@ class FakeAudioRepo : AudioRepository {
 /** Speaks every sentence as 1 s of tone with 200 ms of silence before and after the whole request. */
 class FakeProvider(override val id: String = "fake", private val pricePerByte: Double = 0.0) : TtsProvider {
     val calls = AtomicInteger()
+    /** Runs before the fake "HTTP response" (so before the request counts as accepted). */
+    @Volatile var beforeAccept: suspend (SynthesisRequest) -> Unit = {}
     val requests = mutableListOf<SynthesisRequest>()
     override val capabilities = TtsCapabilities(false, true, false, 1200, MarkupDialect.NONE, 0.5f..2f, 2)
     override fun currentModel() = "m1"
@@ -45,6 +50,8 @@ class FakeProvider(override val id: String = "fake", private val pricePerByte: D
     override suspend fun synthesize(request: SynthesisRequest): SynthesisResult {
         calls.incrementAndGet()
         synchronized(requests) { requests += request }
+        beforeAccept(request)
+        request.onAccepted()
         val rate = 1000
         val parts = mutableListOf(ShortArray(200))
         val words = mutableListOf<WordTiming>()
@@ -64,7 +71,11 @@ class FakeProvider(override val id: String = "fake", private val pricePerByte: D
 }
 
 class FakeTranscoder : AudioTranscoder {
-    override fun decode(audio: SynthAudio, scratchDir: File) = audio as SynthAudio.Pcm
+    @Volatile var decodeFailure: TtsException? = null
+    override fun decode(audio: SynthAudio, scratchDir: File): SynthAudio.Pcm {
+        decodeFailure?.let { throw it }
+        return audio as SynthAudio.Pcm
+    }
     override fun encodeAac(pcm: SynthAudio.Pcm, out: File) {
         out.parentFile?.mkdirs()
         out.writeText("aac:${pcm.samples.size}")

@@ -8,12 +8,13 @@ import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 
 enum class Priority { INTERACTIVE, PREFETCH, BACKGROUND }
 
 /**
  * Spends OpenRouter requests. Per minute (sliding window, a few slots always left for INTERACTIVE) and per day
- * (persisted in [AiStore], day = local yyyy-MM-dd). BACKGROUND never touches the last 10% of the day and runs
+ * (persisted in [AiStore], day = UTC yyyy-MM-dd, the provider's reset boundary). BACKGROUND never touches the last 10% of the day and runs
  * at most one request per [backgroundSpacingMs]; PREFETCH stops 5% short so the user can always ask something.
  */
 class RequestBudgeter(
@@ -22,7 +23,7 @@ class RequestBudgeter(
     private val perMinute: Int = 15,
     dailyLimit: Int = FREE_DAILY,
     private val clock: () -> Long = System::currentTimeMillis,
-    private val zone: ZoneId = ZoneId.systemDefault(),
+    private val zone: ZoneId = ZoneOffset.UTC,
     private val sleeper: suspend (Long) -> Unit = { delay(it) },
     private val interactiveReservePerMinute: Int = 3,
     private val backgroundSpacingMs: Long = 4_000,

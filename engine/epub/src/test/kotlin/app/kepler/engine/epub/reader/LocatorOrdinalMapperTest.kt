@@ -86,4 +86,26 @@ class LocatorOrdinalMapperTest {
         assertTrue(a.after!!.startsWith(",” she said."))
         assertEquals(1..2, mapper.rangeAt(a))
     }
+
+    @Test fun manyRepeatsAreResolvedByContextAndSafeFromManyThreads() {
+        val big = (0 until 150).map { i ->
+            s(i, "OEBPS/big.xhtml", "Same words again.", before = "marker${i - 1}", after = "marker${i + 1}")
+        }
+        // The context is carried in the text of the neighbours, as ingested.
+        val withText = big.map { it.copy(text = "Same words again. marker${it.ordinal}") }
+        val m = LocatorOrdinalMapper(withText)
+        val errors = java.util.concurrent.ConcurrentLinkedQueue<String>()
+        val threads = (0 until 4).map { t ->
+            Thread {
+                for (i in listOf(10, 75, 149, 7 + t)) {
+                    val got = m.ordinalAt(
+                        TextAnchor("OEBPS/big.xhtml", before = "marker${i - 1} ", highlight = "Same words again.", after = " marker$i"),
+                    )
+                    if (got != i) errors += "wanted $i got $got"
+                }
+            }.also { it.start() }
+        }
+        threads.forEach { it.join() }
+        assertTrue(errors.toString(), errors.isEmpty())
+    }
 }

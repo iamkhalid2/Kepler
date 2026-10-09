@@ -21,6 +21,7 @@ import app.kepler.core.model.AudioSegment
 import app.kepler.core.model.Book
 import app.kepler.core.model.BookId
 import app.kepler.core.model.NarrationConfig
+import app.kepler.core.model.NarrationBlockedException
 import app.kepler.core.model.NarrationState
 import app.kepler.core.model.PlaybackController
 import app.kepler.core.model.PlaybackInfo
@@ -57,11 +58,12 @@ class PlaybackEngine(
     looper: Looper = Looper.getMainLooper(),
     private val clock: () -> Long = System::currentTimeMillis,
     private val gaps: GapPolicy = GapPolicy(),
+    persistContext: kotlin.coroutines.CoroutineContext = Dispatchers.IO.limitedParallelism(1),
 ) : ReadAlongHost, PlaybackController, PlaybackInfoSource {
 
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val persistScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+    private val persistScope = CoroutineScope(SupervisorJob() + persistContext)
     private val hub = PlaybackHub
 
     private val inner: ExoPlayer = ExoPlayer.Builder(appContext)
@@ -404,6 +406,10 @@ class PlaybackEngine(
                 deps.narration.ensureAhead(id, NarrationConfig(voice), target, AHEAD_MINUTES)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: NarrationBlockedException) {
+                ensuring = false
+                fail("$NOT_READY ${e.message}")
+                return
             } catch (e: Exception) {
                 ensuring = false
                 fail(e.message?.takeIf { it.isNotBlank() } ?: NOT_READY)
