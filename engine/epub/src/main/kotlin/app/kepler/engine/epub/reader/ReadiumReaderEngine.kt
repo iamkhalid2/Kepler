@@ -32,6 +32,8 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.epub.css.FontStyle
+import org.readium.r2.navigator.epub.css.RsProperties
+import org.readium.r2.navigator.epub.css.Color as RsColor
 import org.readium.r2.navigator.html.HtmlDecorationTemplate
 import org.readium.r2.navigator.html.HtmlDecorationTemplates
 import org.readium.r2.navigator.input.InputListener
@@ -207,6 +209,10 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
     private fun navigatorFragmentFactory(initial: TextAnchor?): FragmentFactory {
         val configuration = EpubNavigatorFragment.Configuration {
             servedAssets = listOf("fonts/.*")
+            readiumCssRsProperties = RsProperties(
+                selectionBackgroundColor = style.selectionColor?.let { RsColor.Int(it) },
+                selectionTextColor = style.selectionInk?.let { RsColor.Int(it) },
+            )
             decorationTemplates = HtmlDecorationTemplates.defaultTemplates().copy().apply {
                 set(BandStyle::class, bandTemplate)
             }
