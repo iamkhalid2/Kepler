@@ -26,6 +26,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -34,7 +42,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -158,6 +165,8 @@ fun BookScene(
     hitPad: Float = 6f,
     /** Poses the books start from when the scene first appears (an entrance); null = start at [targets]. */
     enterFrom: List<BookPose>? = null,
+    /** Accessibility labels, one per book; when given each book gets a TalkBack node (click + long-press). */
+    labels: List<String>? = null,
 ) {
     val palette = Kp.palette
     val poses = books.indices.map { animatePose(targets[it], enterFrom?.getOrNull(it)) }
@@ -200,6 +209,30 @@ fun BookScene(
                         ps.ry.value, ps.rx.value, ps.alpha.value, ps.lift.value, palette, measurer, matrix, src, dst,
                     )
                 }
+            }
+        }
+        if (labels != null) {
+            books.indices.forEach { i ->
+                Box(
+                    Modifier
+                        .layout { measurable, constraints ->
+                            val u = constraints.maxWidth / SPACE_W
+                            val ps = poses[i]
+                            val half = projectedHalfExtent(books[i], ps.ry.value, ps.scale.value)
+                            val w = (half.first * 2 * u).toInt().coerceAtLeast(1)
+                            val h = (half.second * 2 * u).toInt().coerceAtLeast(1)
+                            val placeable = measurable.measure(Constraints.fixed(w, h))
+                            layout(constraints.maxWidth, constraints.maxHeight) {
+                                placeable.place((ps.cx.value * u - w / 2f).toInt(), (ps.cy.value * u - h / 2f).toInt())
+                            }
+                        }
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = labels.getOrElse(i) { "" }
+                            role = Role.Button
+                            onClick { onTap(i); true }
+                            onLongClick { onLongPress(i); true }
+                        },
+                )
             }
         }
     }

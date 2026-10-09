@@ -190,7 +190,7 @@ class EpubIngestorTest {
         val dialogue = (1..60).joinToString("") { "<p>“Where are you going?” she asked.</p><p>“Home,” he said.</p>" }
         val f = TestEpub().apply { subjects = listOf("Fiction"); chapter("c1.xhtml", "<h1>One</h1>$dialogue"); nav("""<li><a href="c1.xhtml">One</a></li>""") }
         assertEquals(ContentType.FICTION, ingest(f.build(tmp.newFolder())).contentType)
-        val n = TestEpub().apply { chapter("c1.xhtml", "<h1>One</h1><p>Habits are the compound interest of self-improvement.</p>"); nav("""<li><a href="c1.xhtml">One</a></li>""") }
+        val n = TestEpub().apply { subjects = listOf("Self-help"); chapter("c1.xhtml", "<h1>One</h1><p>Habits are the compound interest of self-improvement.</p>"); nav("""<li><a href="c1.xhtml">One</a></li>""") }
         assertEquals(ContentType.NONFICTION, ingest(n.build(tmp.newFolder())).contentType)
     }
 

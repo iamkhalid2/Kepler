@@ -97,7 +97,7 @@ class NarrationEngine(
                 chunks += Chunker.plan(page, { covered[it] }, provider.capabilities.maxChars)
             }
         }
-        return Estimator.estimate(chunks, provider.centsPerByte(), config.speed, aggregateThroughput(provider))
+        return Estimator.estimate(chunks, provider.centsPerByte(), SYNTH_SPEED, aggregateThroughput(provider))
     }
 
     override fun start(bookId: BookId, config: NarrationConfig, fromOrdinal: Int) {
@@ -112,8 +112,8 @@ class NarrationEngine(
 
     override suspend fun ensureAhead(bookId: BookId, config: NarrationConfig, ordinal: Int, minutes: Int) {
         val provider = provider(config.voice.provider)
-        if (overCap(provider, 0.0)) {
-            stateFlow(bookId).value = NarrationState.Paused(bookId, REASON_CAP)
+        blockReason(provider, bookId, 0.0)?.let {
+            stateFlow(bookId).value = NarrationState.Paused(bookId, it)
             return
         }
         val work = work(bookId, config.voice)
@@ -132,7 +132,7 @@ class NarrationEngine(
                 if (seconds >= target) break
                 if (!narrated[s.ordinal]) continue
                 window += s
-                seconds += Estimator.audioSeconds(s.text, config.speed)
+                seconds += Estimator.audioSeconds(s.text, SYNTH_SPEED)
             }
             from = page.last().ordinal + 1
         }
@@ -205,6 +205,7 @@ class NarrationEngine(
         val done = AtomicInteger(covered.cardinality())
         val tp = aggregateThroughput(provider)
         val capHit = AtomicBoolean(false)
+        var stopReason = REASON_CAP
         // Seconds of audio per sentence, refined per page; ETA covers everything still missing.
         var secondsPerSentence = 6.0
 
@@ -222,7 +223,7 @@ class NarrationEngine(
                     val chunks = claim(work, page, covered(bookId, config.voice), 0)
                     val pageSentences = chunks.sumOf { it.sentences.size }
                     if (pageSentences > 0) {
-                        secondsPerSentence = chunks.sumOf { Estimator.audioSeconds(it.text, config.speed) } / pageSentences
+                        secondsPerSentence = chunks.sumOf { Estimator.audioSeconds(it.text, SYNTH_SPEED) } / pageSentences
                     }
                     publish()
                     val gate = Semaphore(provider.capabilities.concurrency)
@@ -232,8 +233,9 @@ class NarrationEngine(
                                 try {
                                     gate.withPermit {
                                         val cost = chunk.text.toByteArray(Charsets.UTF_8).size * provider.centsPerByte()
-                                        if (capHit.get() || overCap(provider, cost)) {
-                                            capHit.set(true)
+                                        val why = if (capHit.get()) REASON_CAP else blockReason(provider, bookId, cost)
+                                        if (why != null) {
+                                            if (!capHit.getAndSet(true)) stopReason = why
                                             return@withPermit
                                         }
                                         renderTracked(bookId, work, chunk, provider, config)
@@ -254,7 +256,7 @@ class NarrationEngine(
             return JobResult.Failed(e, retry = e.retryable)
         }
         return if (capHit.get()) {
-            flow.value = NarrationState.Paused(bookId, REASON_CAP)
+            flow.value = NarrationState.Paused(bookId, stopReason)
             JobResult.Paused
         } else {
             flow.value = NarrationState.Done(bookId)
@@ -322,9 +324,9 @@ class NarrationEngine(
         val self = kotlinx.coroutines.CompletableDeferred<AudioSegment>()
         work.inFlight[chunk.startOrdinal..chunk.endOrdinal] = self
         try {
-            val outcome = renderer.render(bookId, chunk, provider, config.voice, config.speed)
+            val outcome = renderer.render(bookId, chunk, provider, config.voice, SYNTH_SPEED)
             if (outcome.requested) {
-                account(provider, outcome.utf8Bytes)
+                account(provider, outcome.utf8Bytes, bookId)
                 meter(provider).record(outcome.segment.durationMs, outcome.wallMs)
                 prefs.edit().putFloat(TP_PREFIX + provider.id, meter(provider).value.toFloat()).apply()
             }
@@ -352,19 +354,37 @@ class NarrationEngine(
 
     fun spentThisMonthCents(): Double = prefs.getLong(monthKey(), 0) / 1000.0
 
-    private fun account(provider: TtsProvider, bytes: Long) {
+    private fun account(provider: TtsProvider, bytes: Long, bookId: BookId? = null) {
         val cents = bytes * provider.centsPerByte()
         if (cents <= 0) return
         synchronized(prefs) {
             val key = monthKey()
-            prefs.edit().putLong(key, prefs.getLong(key, 0) + (cents * 1000).roundToLong()).apply()
+            val micro = (cents * 1000).roundToLong()
+            val e = prefs.edit().putLong(key, prefs.getLong(key, 0) + micro)
+            if (bookId != null) e.putLong(bookKey(bookId), prefs.getLong(bookKey(bookId), 0) + micro)
+            e.apply()
         }
     }
 
-    private suspend fun overCap(provider: TtsProvider, nextCents: Double): Boolean {
-        if (provider.centsPerByte() <= 0) return false
-        val cap = settings.settings.first().monthlyCapCents
-        return cap > 0 && spentThisMonthCents() + nextCents > cap
+    private fun bookKey(bookId: BookId) = BOOK_SPEND_PREFIX + bookId
+
+    fun spentOnBookCents(bookId: BookId): Double = prefs.getLong(bookKey(bookId), 0) / 1000.0
+
+    /** True once the user has accepted that generation now bills the paid model. */
+    fun paidGenerationConfirmed(): Boolean = prefs.getBoolean(PAID_CONFIRMED, false)
+
+    /** Called by the UI after the user accepts the paid-model prompt. Until then paid generation stays paused. */
+    fun confirmPaidGeneration() = prefs.edit().putBoolean(PAID_CONFIRMED, true).apply()
+
+    /** Why the next [nextCents] of paid synthesis for [bookId] must not start, or null when it may. */
+    private suspend fun blockReason(provider: TtsProvider, bookId: BookId, nextCents: Double): String? {
+        if (provider.centsPerByte() <= 0) return null
+        if (!paidGenerationConfirmed()) return REASON_PAID_CONFIRM
+        // 0 means "unset": a paid model never runs uncapped.
+        val cap = settings.settings.first().monthlyCapCents.takeIf { it > 0 } ?: DEFAULT_MONTHLY_CAP_CENTS
+        if (spentThisMonthCents() + nextCents > cap) return REASON_CAP
+        if (spentOnBookCents(bookId) + nextCents > PER_BOOK_CAP_CENTS) return REASON_BOOK_CAP
+        return null
     }
 
     internal class VoiceWork {
@@ -378,13 +398,21 @@ class NarrationEngine(
     }
 
     companion object {
+        /** Audio is always rendered at 1.0x; playback speed is applied only by the player. */
+        const val SYNTH_SPEED = 1f
         const val MICRO_SENTENCES = 2
         const val REASON_CAP = "monthly_cap"
+        const val REASON_BOOK_CAP = "book_cap"
+        const val REASON_PAID_CONFIRM = "paid_confirm"
+        const val DEFAULT_MONTHLY_CAP_CENTS = 500
+        const val PER_BOOK_CAP_CENTS = 300.0
         const val REASON_SYSTEM = "system_stop"
         const val REASON_OFFLINE = "offline"
         private const val PREFS = "narration_engine"
         private const val TP_PREFIX = "tp_"
         private const val SPEND_PREFIX = "spend_"
+        private const val BOOK_SPEND_PREFIX = "bookspend_"
+        private const val PAID_CONFIRMED = "paid_confirmed"
         private const val PAGE = 500
         private const val JIT_WAIT_MS = 120_000L
 

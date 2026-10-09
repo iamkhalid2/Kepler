@@ -7,7 +7,7 @@ internal data class ContentStats(
     val structuralBlocks: Int, val totalBlocks: Int, val citationMarkers: Int, val noteBlocks: Int,
 )
 
-/** Heuristic fiction / non-fiction guess (no LLM). NONFICTION when unsure. */
+/** Heuristic fiction / non-fiction guess (no LLM). MIXED when unsure (never silently NONFICTION: that would lift the spoiler fence). */
 internal object ContentTypeGuesser {
     private val nonfictionSubject = Regex(
         """non-?fiction|biograph|autobiograph|memoir|history|self-help|business|economic|science|psycholog|philosoph|health|religio|politic|""" +
@@ -37,7 +37,8 @@ internal object ContentTypeGuesser {
             fiction >= 2 && non == 0 -> ContentType.FICTION
             fiction >= 1 && non >= 1 && fiction + non >= 4 -> ContentType.MIXED
             fiction >= 3 && non <= 1 -> ContentType.FICTION
-            else -> ContentType.NONFICTION
+            non >= 2 && fiction == 0 -> ContentType.NONFICTION
+            else -> ContentType.MIXED
         }
     }
 }

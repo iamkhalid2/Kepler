@@ -141,8 +141,9 @@ class PlaybackEngineTest {
     }
 
     @Test fun playOpensTheBookAtTheRequestedSentence() {
+        // Read before the main looper runs: the nonexistent test files make ExoPlayer post an error that
+        // would otherwise skip to the next item and race the assertions.
         engine.play(1, 7)
-        idle()
         val st = engine.state.value
         assertEquals(1L, st.bookId)
         assertEquals(7, st.ordinal)

@@ -92,10 +92,33 @@ class NarrationEngineTest {
         // Each paragraph is ~100 bytes, so 0.6 cents; a 1 cent cap allows at most one more request.
         val provider = FakeProvider(pricePerByte = 0.006)
         val repo = FakeAudioRepo()
-        val e = engine(provider, repo, cap = 1)
+        val e = engine(provider, repo, cap = 1).also { it.confirmPaidGeneration() }
         assertEquals(NarrationEngine.JobResult.Paused, e.runJob(1, config, 0))
         assertTrue(provider.calls.get() in 1..2)
         assertEquals(NarrationState.Paused(1, NarrationEngine.REASON_CAP), e.state(1).first())
+    }
+
+    @Test fun paidGenerationWaitsForConfirmation() = runBlocking {
+        val provider = FakeProvider(pricePerByte = 0.0001)
+        val e = engine(provider, FakeAudioRepo())
+        assertEquals(NarrationEngine.JobResult.Paused, e.runJob(1, config, 0))
+        assertEquals(0, provider.calls.get())
+        assertEquals(NarrationState.Paused(1, NarrationEngine.REASON_PAID_CONFIRM), e.state(1).first())
+    }
+
+    @Test fun unsetCapStillStopsPaidGeneration() = runBlocking {
+        // cap 0 = unset; the 500 cent default applies, so a price of 100 cents per byte stops it at once.
+        val provider = FakeProvider(pricePerByte = 100.0)
+        val e = engine(provider, FakeAudioRepo(), cap = 0).also { it.confirmPaidGeneration() }
+        assertEquals(NarrationEngine.JobResult.Paused, e.runJob(1, config, 0))
+        assertEquals(0, provider.calls.get())
+        assertEquals(NarrationState.Paused(1, NarrationEngine.REASON_CAP), e.state(1).first())
+    }
+
+    @Test fun narrationIsAlwaysSynthesizedAtNormalSpeed() = runBlocking {
+        val provider = FakeProvider()
+        engine(provider, FakeAudioRepo()).runJob(1, config.copy(speed = 1.5f), 0)
+        assertTrue(provider.requests.isNotEmpty() && provider.requests.all { it.speed == 1f })
     }
 
     @Test fun excludedSectionsAreNeverNarrated() = runBlocking {

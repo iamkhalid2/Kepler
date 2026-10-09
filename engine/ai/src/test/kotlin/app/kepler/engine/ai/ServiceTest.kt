@@ -91,6 +91,15 @@ class FenceLeakTest {
         assertEquals(0, rig.mock.chatBodies.size)
     }
 
+    @Test fun askStaysFencedWhenAPerBookModeTriesToOpenAFictionBook() = runBlocking {
+        val spine = FakeSpine(false)
+        val positions = FakePositions(3)
+        val fence = FenceService(positions, FakeLibrary(testBook(ContentType.FICTION)), spine) { FenceMode.WHOLE_BOOK }
+        assertEquals(3, fence.maxOrdinal(1, FenceFeature.ASK))
+        val nonfiction = FenceService(positions, FakeLibrary(testBook(ContentType.NONFICTION)), spine)
+        assertEquals(spine.sentenceCount(1) - 1, nonfiction.maxOrdinal(1, FenceFeature.ASK))
+    }
+
     @Test fun packHashChangesWithTheFenceSoAWiderPackIsNeverReusedForANarrowerFence() = runBlocking {
         val rig = Rig(ContentType.FICTION, frontier = 19)
         rig.service.takeaways(1, 2)

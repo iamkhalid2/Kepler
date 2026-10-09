@@ -30,10 +30,13 @@ class FenceService(
         if (feature == FenceFeature.CARDS || feature == FenceFeature.CHECK_ANSWER || feature == FenceFeature.CHECK_IN) {
             return frontier
         }
-        val mode = modeFor(bookId) ?: if (feature == FenceFeature.ASK) {
+        // Fail closed: Ask sees the whole book only when the book is confirmed non-fiction. Any other feature
+        // opens up only through an explicit per-book choice from [modeFor].
+        val mode = if (feature == FenceFeature.ASK) {
             val book = library.book(bookId).first()
-            if (book?.contentType == ContentType.NONFICTION) FenceMode.WHOLE_BOOK else FenceMode.FRONTIER
-        } else FenceMode.FRONTIER
+            if (book?.contentType == ContentType.NONFICTION && modeFor(bookId) != FenceMode.FRONTIER) FenceMode.WHOLE_BOOK
+            else FenceMode.FRONTIER
+        } else modeFor(bookId) ?: FenceMode.FRONTIER
         return if (mode == FenceMode.WHOLE_BOOK) spine.sentenceCount(bookId) - 1 else frontier
     }
 }

@@ -98,9 +98,14 @@ class PlaybackService : MediaLibraryService() {
     ) : MediaLibrarySession.Callback {
 
         override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+            val trusted = controller.packageName == packageName || controller.isTrusted
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
-                .also { b -> PlaybackCommands.ALL.forEach { b.add(it) } }
+                .also { b -> if (controller.packageName == packageName) PlaybackCommands.ALL.forEach { b.add(it) } }
                 .build()
+            if (!trusted) {
+                // Unknown apps get no library browsing and no custom commands.
+                return MediaSession.ConnectionResult.reject()
+            }
             return MediaSession.ConnectionResult.accept(commands, MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
         }
 

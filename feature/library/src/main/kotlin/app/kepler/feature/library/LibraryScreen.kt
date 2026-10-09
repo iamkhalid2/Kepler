@@ -266,6 +266,7 @@ private fun ShelfRow(
             onTap = { i -> haptics.play(HapticToken.Settle); onOpen(books[i].id) },
             onLongPress = { i -> haptics.play(HapticToken.Confirm); onLongPress(books[i]) },
             hitPad = 10f,
+            labels = books.map { listOf(it.title, it.authors).filter { s -> s.isNotBlank() }.joinToString(", ") },
         )
     }
 }
