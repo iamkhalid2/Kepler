@@ -115,7 +115,8 @@ fun HubScreen(
             LearnContents(book, ui.cardCount, onLearnAt)
             if (onRemove != null) {
                 Spacer(Modifier.height(24.dp))
-                Box(Modifier.padding(horizontal = 24.dp)) {
+                // The link pads its label by 4 dp; 20 dp here puts the text on the 24 dp gutter.
+                Box(Modifier.padding(horizontal = 20.dp)) {
                     KpTextLink(stringResource(R.string.remove_from_library), { confirmRemove = true }, color = p.negative)
                 }
             }
@@ -282,7 +283,7 @@ private fun NarrationLine(ui: HubUi, onSetup: () -> Unit) {
         is NarrationStatus.Failed -> Triple(0f, stringResource(R.string.narration_failed), stringResource(R.string.set_up))
     }
     Row(
-        Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp).height(64.dp),
+        Modifier.fillMaxWidth().padding(start = 24.dp, end = 20.dp).height(64.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         KpRing(ringValue)

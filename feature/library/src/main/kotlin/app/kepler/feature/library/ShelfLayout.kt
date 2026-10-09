@@ -100,7 +100,10 @@ object ShelfLayout {
                 val gap = leanGap(b.height, n.height)
                 val footprint = (b.width * cos(a)).toFloat()
                 val left = n.x + n.width + gap
-                if (left + footprint + GHOST_GAP + ghostWidth <= rowWidth) {
+                // Lean whenever it fits, unless leaning is what pushes the ghost off this plank.
+                val ghostFitsUpright = b.x + b.width + GHOST_GAP + ghostWidth <= rowWidth
+                val ghostFitsLeaning = left + footprint + GHOST_GAP + ghostWidth <= rowWidth
+                if (left + footprint <= rowWidth && (ghostFitsLeaning || !ghostFitsUpright)) {
                     last[last.size - 1] = b.copy(x = left, width = footprint, lean = LEAN)
                 }
             }

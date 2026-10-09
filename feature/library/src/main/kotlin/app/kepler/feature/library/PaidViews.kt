@@ -1,9 +1,13 @@
 package app.kepler.feature.library
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.KpDot
 import app.kepler.core.designsystem.KpPrimaryKey
 import app.kepler.core.designsystem.KpSecondaryKey
 import app.kepler.core.designsystem.KpSheet
@@ -64,31 +69,38 @@ internal fun PausedPanel(
 ) {
     val p = Kp.palette
     Column {
-        Text(
-            stringResource(
-                if (kind == PausedKind.PaidConfirm) R.string.paid_confirm_body else pausedReasonRes(kindReason(kind)),
-                *(if (kind == PausedKind.PaidConfirm) arrayOf(hourlyText(paid.centsPerHour)) else emptyArray()),
-            ),
-            color = p.text, style = KpType.body,
-        )
-        val detail = when (kind) {
-            PausedKind.PaidConfirm -> buildList {
-                bookEstimateCents?.let { add(stringResource(R.string.paid_this_book, moneyText(Math.round(it).toInt()))) }
-                add(stringResource(R.string.paid_limits, moneyText(paid.bookCapCents), moneyText(paid.monthlyCapCents), moneyText(paid.spentMonthCents)))
-            }.joinToString(" ")
-            PausedKind.BookCap -> stringResource(R.string.paid_spent_book, moneyText(paid.spentBookCents), moneyText(paid.bookCapCents))
-            PausedKind.MonthlyCap -> stringResource(R.string.paid_spent_month, moneyText(paid.spentMonthCents), moneyText(paid.monthlyCapCents))
-            else -> null
+        // Status line in the player's language: a warning dot hangs beside the reason and its figures.
+        Row {
+            KpDot(p.warning, Modifier.padding(top = 10.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(
+                        if (kind == PausedKind.PaidConfirm) R.string.paid_confirm_body else pausedReasonRes(kindReason(kind)),
+                        *(if (kind == PausedKind.PaidConfirm) arrayOf(hourlyText(paid.centsPerHour)) else emptyArray()),
+                    ),
+                    color = p.text, style = KpType.body,
+                )
+                val detail = when (kind) {
+                    PausedKind.PaidConfirm -> buildList {
+                        bookEstimateCents?.let { add(stringResource(R.string.paid_this_book, moneyText(Math.round(it).toInt()))) }
+                        add(stringResource(R.string.paid_limits, moneyText(paid.bookCapCents), moneyText(paid.monthlyCapCents), moneyText(paid.spentMonthCents)))
+                    }.joinToString(" ")
+                    PausedKind.BookCap -> stringResource(R.string.paid_spent_book, moneyText(paid.spentBookCents), moneyText(paid.bookCapCents))
+                    PausedKind.MonthlyCap -> stringResource(R.string.paid_spent_month, moneyText(paid.spentMonthCents), moneyText(paid.monthlyCapCents))
+                    else -> null
+                }
+                if (detail != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(detail, color = p.text2, style = KpType.caption)
+                }
+            }
         }
-        if (detail != null) {
-            Spacer(Modifier.height(4.dp))
-            Text(detail, color = p.text2, style = KpType.caption)
-        }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
         when (kind) {
             PausedKind.PaidConfirm -> KpPrimaryKey(stringResource(R.string.paid_continue), onConfirmPaid)
             PausedKind.Offline, PausedKind.System -> KpSecondaryKey(stringResource(R.string.resume), onResume, Modifier.fillMaxWidth())
-            PausedKind.MonthlyCap -> if (onOpenSettings != null) KpTextLink(stringResource(R.string.change_limit), onOpenSettings)
+            PausedKind.MonthlyCap -> if (onOpenSettings != null) KpTextLink(stringResource(R.string.change_limit), onOpenSettings, Modifier.offset(x = (-4).dp))
             PausedKind.BookCap -> Unit
         }
         if (fishVoice && kind != PausedKind.Offline && kind != PausedKind.System) {

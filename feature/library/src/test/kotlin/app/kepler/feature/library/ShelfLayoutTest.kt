@@ -35,6 +35,22 @@ class ShelfLayoutTest {
         assertEquals(ShelfLayout.leanGap(leaning[0].height, n.height), gap, 0.01f)
     }
 
+    @Test fun aFullPlankStillLeansItsLastSpineWhenTheGhostMovesOn() {
+        var seen = 0
+        for (n in 3..60) {
+            val plan = ShelfLayout.plan(books(n), 342f)
+            if (plan.last().books.isNotEmpty()) continue
+            val row = plan[plan.size - 2].books
+            if (row.size < 2 || row[row.size - 2].faceOut) continue
+            val b = row.last()
+            val nb = row[row.size - 2]
+            val fits = nb.x + nb.width + ShelfLayout.leanGap(b.height, nb.height) +
+                b.width * kotlin.math.cos(Math.toRadians(ShelfLayout.LEAN.toDouble())).toFloat() <= 342f
+            if (b.lean == 0f) assertTrue("n=$n should lean", !fits) else seen++
+        }
+        assertTrue(seen > 0)
+    }
+
     @Test fun ghostMovesToANewPlankWhenTheLastIsFull() {
         val plan = ShelfLayout.plan(books(1), 105f)
         assertTrue(plan.last().books.isEmpty())

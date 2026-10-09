@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -132,7 +133,7 @@ fun NarrationSetupScreen(
                             stringResource(if (v.problem == VoiceProblem.NoFishKey) R.string.voices_no_key else R.string.voices_offline),
                             color = p.text2, style = KpType.body,
                         )
-                        if (v.problem == VoiceProblem.NoFishKey && onOpenSettings != null) KpTextLink(stringResource(R.string.open_settings), onOpenSettings)
+                        if (v.problem == VoiceProblem.NoFishKey && onOpenSettings != null) KpTextLink(stringResource(R.string.open_settings), onOpenSettings, Modifier.offset(x = (-4).dp))
                         KpSecondaryKey(stringResource(R.string.use_system_voice), { onProvider(PROVIDER_SYSTEM) })
                     }
                     is VoicesUi.Ready -> v.voices.forEach { opt ->

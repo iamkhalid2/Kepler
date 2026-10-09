@@ -205,7 +205,7 @@
     <string name="resume">Resume</string>
     <string name="change_limit">Change the limit</string>
     <string name="book_cap">Limit for one book</string>
-    <string name="book_cap_body">Narration for one book stops before it passes this amount. Free voices don’t count.</string>
+    <string name="book_cap_body">Paid narration pauses at this amount</string>
     <string name="cap_default">Default %1$s</string>
     <string name="cap_field_label">Monthly limit in dollars</string>
     <string name="cap_field_hint">Leave empty for the default</string>
