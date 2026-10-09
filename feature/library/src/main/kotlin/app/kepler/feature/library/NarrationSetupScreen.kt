@@ -244,7 +244,7 @@ private fun Progress(ui: SetupUi, onStop: () -> Unit, onUseSystem: () -> Unit) {
             }
         }
         is NarrationState.Paused -> Column {
-            Text(stringResource(R.string.narration_paused, n.reason), color = p.text2, style = KpType.body)
+            Text(stringResource(pausedReasonRes(n.reason)), color = p.text2, style = KpType.body)
             if (ui.provider == PROVIDER_FISH) {
                 Spacer(Modifier.height(8.dp))
                 KpSecondaryKey(stringResource(R.string.use_system_voice), onUseSystem)

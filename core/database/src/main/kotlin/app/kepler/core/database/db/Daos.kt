@@ -36,6 +36,7 @@ internal interface SectionDao {
     @Insert suspend fun insert(section: SectionEntity): Long
     @Query("UPDATE section SET parentId = :parentId WHERE id = :id") suspend fun setParent(id: Long, parentId: Long)
     @Query("SELECT * FROM section WHERE bookId = :bookId ORDER BY sectionIndex") suspend fun forBook(bookId: Long): List<SectionEntity>
+    @Query("SELECT * FROM section WHERE bookId = :bookId ORDER BY sectionIndex") fun observeForBook(bookId: Long): Flow<List<SectionEntity>>
     @Query("SELECT bookId FROM section WHERE id = :id") suspend fun bookIdOf(id: Long): Long?
     @Query("UPDATE section SET included = :included WHERE id = :id") suspend fun setIncluded(id: Long, included: Boolean)
 }

@@ -13,6 +13,7 @@
     <string name="fence_whole">Whole book</string>
     <string name="fence_none">Nothing read yet</string>
     <string name="ask_intro">Answers use only what you have read so far.</string>
+    <string name="ask_intro_whole">Answers draw on the whole book.</string>
     <string name="ask_hint">Ask about this book</string>
     <string name="sugg_main_argument">What is the main argument so far?</string>
     <string name="sugg_key_terms">Which key terms should I know?</string>

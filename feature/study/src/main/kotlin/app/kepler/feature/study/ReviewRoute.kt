@@ -75,7 +75,7 @@ fun ReviewRoute(deps: StudyDeps, onClose: () -> Unit) {
     val s by vm.state.collectAsState()
     val p = Kp.palette
     Column(Modifier.fillMaxSize().background(p.bg).safeDrawingPadding()) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 24.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Caps(
                 if (s.loading || s.finished) stringResource(R.string.review_caps) else stringResource(R.string.review_caps_left, s.left),
                 Modifier.weight(1f),

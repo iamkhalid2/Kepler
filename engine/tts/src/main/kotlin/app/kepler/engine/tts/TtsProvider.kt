@@ -66,13 +66,13 @@ interface TtsProvider {
 
 /** Neutral, technical error taxonomy. Messages are safe to show in the UI. */
 sealed class TtsException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    class MissingKey : TtsException("No Fish Audio API key is set")
-    class InvalidKey : TtsException("The Fish Audio API key was rejected (401)")
-    class PaymentRequired : TtsException("Fish Audio needs a payment method or credit (402)")
-    class RateLimited : TtsException("Fish Audio is limiting concurrent requests (429)")
-    class ServerBusy(code: Int) : TtsException("Fish Audio is temporarily unavailable ($code)")
-    class Network(cause: Throwable) : TtsException("Network error: ${cause.javaClass.simpleName}", cause)
-    class Http(val code: Int) : TtsException("Fish Audio returned HTTP $code")
+    class MissingKey : TtsException("Add a Fish Audio key in Settings to use Fish voices.")
+    class InvalidKey : TtsException("Fish Audio didn’t accept the key. Check it in Settings.")
+    class PaymentRequired : TtsException("Fish Audio needs credit on the account to continue.")
+    class RateLimited : TtsException("Fish Audio is busy. Narration tries again shortly.")
+    class ServerBusy(code: Int) : TtsException("Fish Audio is unavailable right now. Try again in a little while.")
+    class Network(cause: Throwable) : TtsException("No connection. Narration that is already made still plays.", cause)
+    class Http(val code: Int) : TtsException("Fish Audio couldn’t make this part (error $code).")
     class EndpointUnavailable(val code: Int) : TtsException("Endpoint unavailable ($code)")
     class Engine(message: String) : TtsException(message)
     class Audio(message: String, cause: Throwable? = null) : TtsException(message, cause)

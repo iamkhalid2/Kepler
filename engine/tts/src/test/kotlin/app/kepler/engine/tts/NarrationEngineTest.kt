@@ -5,6 +5,7 @@ import app.kepler.core.model.BookId
 import app.kepler.core.model.NarrationConfig
 import app.kepler.core.model.NarrationState
 import app.kepler.core.model.Section
+import app.kepler.core.model.SectionKind
 import app.kepler.core.model.Sentence
 import app.kepler.core.model.SettingsStore
 import app.kepler.core.model.SpineRepository
@@ -29,8 +30,10 @@ class NarrationEngineTest {
     /** 3 paragraphs of 4 sentences, 4 words each. */
     private val book: List<Sentence> = List(12) { sentence(it, "word$it alpha beta gamma.", paragraph = it / 4) }
 
+    private var sections = emptyList<Section>()
+
     private val spine = object : SpineRepository {
-        override suspend fun sections(bookId: BookId) = emptyList<Section>()
+        override suspend fun sections(bookId: BookId) = sections
         override suspend fun sentence(bookId: BookId, ordinal: Int) = book.getOrNull(ordinal)
         override suspend fun sentences(bookId: BookId, fromOrdinal: Int, toOrdinal: Int) =
             book.filter { it.ordinal in fromOrdinal..toOrdinal }
@@ -93,6 +96,19 @@ class NarrationEngineTest {
         assertEquals(NarrationEngine.JobResult.Paused, e.runJob(1, config, 0))
         assertTrue(provider.calls.get() in 1..2)
         assertEquals(NarrationState.Paused(1, NarrationEngine.REASON_CAP), e.state(1).first())
+    }
+
+    @Test fun excludedSectionsAreNeverNarrated() = runBlocking {
+        sections = listOf(
+            Section(1, 1, null, 0, 0, "Front", "f", SectionKind.FRONT, 0, 3, included = false),
+            Section(2, 1, null, 1, 0, "One", "b", SectionKind.BODY, 4, 11, included = true),
+        )
+        val provider = FakeProvider()
+        val repo = FakeAudioRepo()
+        val e = engine(provider, repo)
+        assertEquals(2, e.estimate(1, config).requests)
+        assertEquals(NarrationEngine.JobResult.Done, e.runJob(1, config, 0))
+        assertEquals((4 until 12).toList(), repo.rows.map { it.ordinal }.sorted())
     }
 
     @Test fun estimateCountsOnlyMissingAudio() = runBlocking {

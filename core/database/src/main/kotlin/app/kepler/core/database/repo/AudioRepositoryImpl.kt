@@ -49,11 +49,20 @@ internal class AudioRepositoryImpl(
 
     /** Share of the book's sentences covered by segments of the active voice (any voice while none is chosen). */
     override fun coverage(bookId: BookId): Flow<Float> =
-        combine(dao.segments(bookId), settings.settings.map { it.voice }.distinctUntilChanged(), books.sentenceCountFlow(bookId)) { segs, voice, total ->
+        combine(
+            dao.segments(bookId),
+            settings.settings.map { it.voice }.distinctUntilChanged(),
+            books.sentenceCountFlow(bookId),
+            db.sections().observeForBook(bookId),
+        ) { segs, voice, total, sections ->
             if (total == null || total <= 0) return@combine 0f
             val own = if (voice == null) segs else segs.filter { it.sameVoice(voice) }
             val ranges = own.map { OrdinalRange(it.startOrdinal, it.endOrdinal) }.filter { it.start <= it.end }
-            ConsumedIntervals.fraction(ranges, listOf(OrdinalRange(0, total - 1)))
+            // Only included sections are narrated, so they are the whole of "the book" here.
+            val scope = sections.filter { it.included && it.startOrdinal <= it.endOrdinal }
+                .map { OrdinalRange(it.startOrdinal, it.endOrdinal) }
+                .ifEmpty { listOf(OrdinalRange(0, total - 1)) }
+            ConsumedIntervals.fraction(ranges, scope)
         }.distinctUntilChanged()
 
     override suspend fun deleteSegments(bookId: BookId) {

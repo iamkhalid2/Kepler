@@ -353,10 +353,16 @@ internal fun errorText(kind: UiErrorKind): Int = when (kind) {
 
 /** Renders any [Load] with the shared loading and error states. */
 @Composable
-internal fun <T> LoadView(load: Load<T>, onRetry: (() -> Unit)?, lines: Int = 3, content: @Composable (T) -> Unit) {
+internal fun <T> LoadView(
+    load: Load<T>,
+    onRetry: (() -> Unit)?,
+    lines: Int = 3,
+    stateModifier: Modifier = Modifier,
+    content: @Composable (T) -> Unit,
+) {
     when (load) {
-        Load.Idle, Load.Loading -> LoadingBlocks(lines, Modifier.padding(vertical = 8.dp))
-        is Load.Failed -> ErrorNote(load.error, onRetry)
+        Load.Idle, Load.Loading -> LoadingBlocks(lines, stateModifier.padding(vertical = 8.dp))
+        is Load.Failed -> ErrorNote(load.error, onRetry, stateModifier)
         is Load.Ready -> content(load.value)
     }
 }

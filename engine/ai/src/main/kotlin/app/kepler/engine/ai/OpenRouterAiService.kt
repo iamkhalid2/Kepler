@@ -77,13 +77,13 @@ class OpenRouterAiService(
         val ctx = passageContext(bookId, ordinal, FenceFeature.EXPLAIN, before = 12, after = 3)
         val sel = selection.trim().take(2000)
         val prompt = PromptRegistry.EXPLAIN
-        cachedText("explain", prompt, ctx.cacheKey, sel) {
+        stripOrdinalMarkers(cachedText("explain", prompt, ctx.cacheKey, sel) {
             runner.text(Priority.INTERACTIVE, prompt.system, buildString {
                 bookLine(book)
                 appendLine("Passages:"); appendLine(ctx.rendered)
                 appendLine(); appendLine("Selection to explain: \"$sel\"")
             })
-        }
+        })
     }
 
     override suspend fun define(bookId: BookId, ordinal: Int, term: String): String = guard {
@@ -91,13 +91,13 @@ class OpenRouterAiService(
         val ctx = passageContext(bookId, ordinal, FenceFeature.DEFINE, before = 6, after = 1)
         val t = term.trim().take(200)
         val prompt = PromptRegistry.DEFINE
-        cachedText("define", prompt, ctx.cacheKey, t.lowercase()) {
+        stripOrdinalMarkers(cachedText("define", prompt, ctx.cacheKey, t.lowercase()) {
             runner.text(Priority.INTERACTIVE, prompt.system, buildString {
                 bookLine(book)
                 appendLine("Passages:"); appendLine(ctx.rendered)
                 appendLine(); appendLine("Term to define: \"$t\"")
             }, maxTokens = 400)
-        }
+        })
     }
 
     override suspend fun ask(bookId: BookId, question: String): AskAnswer = guard {
@@ -246,7 +246,10 @@ class OpenRouterAiService(
 
     /** Sentences around `ordinal`, never beyond the fence. With nothing readable yet the context is simply empty. */
     private suspend fun passageContext(bookId: BookId, ordinal: Int, feature: FenceFeature, before: Int, after: Int): PassageContext {
-        val max = fence.maxOrdinal(bookId, feature)
+        // The selected sentence is on the reader's screen, so it is never a spoiler even when the
+        // consumed frontier lags behind (a jump, or pages turned faster than the reading dwell).
+        // Nothing after it is let through.
+        val max = maxOf(fence.maxOrdinal(bookId, feature), ordinal)
         val window = context.window(bookId, ordinal, before, after, max)
         val rendered = context.render(window)
         return PassageContext(rendered, sha256(bookId.toString(), ordinal.toString(), rendered))
@@ -368,3 +371,13 @@ class OpenRouterAiService(
         )
     }
 }
+
+/**
+ * Explain and Define show prose, not citations, but models still echo the passage tags
+ * ("(see [145]-[147])", "[148]"). Remove them and tidy the gaps they leave.
+ */
+internal fun stripOrdinalMarkers(text: String): String =
+    text.replace(Regex("""\s*\((?:see\s+)?\[\d+](?:\s*[-–,]\s*\[\d+])*\)"""), "")
+        .replace(Regex("""\s*\[\d+](?:\s*[-–,]\s*\[\d+])*"""), "")
+        .replace(Regex("[ \\t]+([.,;:])"), "$1")
+        .trim()

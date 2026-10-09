@@ -165,7 +165,7 @@ class NarrationSetupViewModel(
             return
         }
         val voices = try {
-            deps.narration.voices(provider)
+            voicesForLanguage(deps.narration.voices(provider), deps.library.book(bookId).first()?.language)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -201,3 +201,17 @@ fun splitHoursMinutes(seconds: Long): Pair<Int, Int> {
 
 /** 0..100 for a 0..1 fraction. */
 fun percentOf(fraction: Float): Int = (fraction.coerceIn(0f, 1f) * 100f).toInt()
+
+/** Voices that speak the book's language (by primary subtag), or every voice when none match. */
+internal fun voicesForLanguage(voices: List<VoiceOption>, language: String?): List<VoiceOption> {
+    val want = language?.substringBefore('-')?.substringBefore('_')?.lowercase()?.takeIf { it.isNotBlank() } ?: return voices
+    val matching = voices.filter { it.language?.substringBefore('-')?.substringBefore('_')?.lowercase() == want }
+    return matching.ifEmpty { voices }
+}
+
+/** Plain copy for a NarrationState.Paused reason code from the narration engine. */
+internal fun pausedReasonRes(reason: String): Int = when (reason) {
+    "monthly_cap" -> R.string.narration_paused_cap
+    "offline" -> R.string.narration_paused_offline
+    else -> R.string.narration_paused_system
+}

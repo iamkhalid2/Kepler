@@ -373,7 +373,7 @@ private fun DrawScope.drawSpine(b: BookSpec, tm: TextMeasurer, alpha: Float) {
         rotate(-90f, Offset.Zero)
     }) { drawScaledText(layout, Offset.Zero, s) }
     if (tw >= 14f) {
-        val bb = tm.measure("BB", TextStyle(color = ink.copy(alpha = 0.8f * alpha), fontFamily = serif, fontSize = (8f / fontScale).sp))
+        val bb = tm.measure("K", TextStyle(color = ink.copy(alpha = 0.8f * alpha), fontFamily = serif, fontSize = (8f / fontScale).sp))
         drawScaledText(bb, Offset(tw / 2f - bb.size.width * s / 2f, BOOK_H - 24f), s)
     }
 }

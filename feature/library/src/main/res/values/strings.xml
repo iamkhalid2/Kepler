@@ -83,7 +83,9 @@
     <string name="narration_partial_voice">%1$d%% bound · %2$s</string>
     <string name="narration_ready">Narration ready</string>
     <string name="narration_ready_voice">Narration ready · %1$s</string>
-    <string name="narration_paused">Paused. %1$s</string>
+    <string name="narration_paused_cap">Paused. This month’s narration cap is reached.</string>
+    <string name="narration_paused_offline">Paused until you’re back online. It continues on its own.</string>
+    <string name="narration_paused_system">Paused by Android for now. It continues on its own.</string>
     <string name="narration_failed">Narration stopped. Set it up to continue.</string>
     <string name="set_up">Set up</string>
     <string name="view">View</string>
@@ -133,7 +135,7 @@
     <string name="provider_or_name">OpenRouter</string>
     <string name="provider_or_meta">Ask, recap and cards</string>
     <string name="requests_today">AI requests</string>
-    <string name="requests_left">%1$d left today</string>
+    <string name="library_requests_left">%1$d left today</string>
     <string name="ai_model">AI model</string>
     <string name="automatic">Automatic</string>
     <string name="fish_spend">Narration spend this month</string>
@@ -159,7 +161,7 @@
     <string name="version_x">Version %1$s</string>
     <string name="about_license">Kepler is free software under the GNU General Public License, version 3. You may use, study, share and change it under that licence.</string>
     <string name="about_fonts">Fraunces, Literata and Albert Sans are used under the SIL Open Font License.</string>
-    <string name="learn_caps">Learn</string>
+    <string name="hub_learn_caps">Learn</string>
     <string name="learn_ask">Ask the book</string>
     <string name="learn_recap">Recap</string>
     <string name="learn_concepts">Concepts and people</string>

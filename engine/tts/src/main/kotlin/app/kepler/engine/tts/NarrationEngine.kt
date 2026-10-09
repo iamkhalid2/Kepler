@@ -89,10 +89,12 @@ class NarrationEngine(
         val provider = provider(config.voice.provider)
         val covered = covered(bookId, config.voice)
         val count = spine.sentenceCount(bookId)
+        val narrated = narrated(bookId, count)
         val chunks = ArrayList<Chunk>()
         for (range in jobOrder(fromOrdinal, count)) {
             pages(range).forEach { (a, b) ->
-                chunks += Chunker.plan(spine.sentences(bookId, a, b), { covered[it] }, provider.capabilities.maxChars)
+                val page = spine.sentences(bookId, a, b).filter { narrated[it.ordinal] }
+                chunks += Chunker.plan(page, { covered[it] }, provider.capabilities.maxChars)
             }
         }
         return Estimator.estimate(chunks, provider.centsPerByte(), config.speed, aggregateThroughput(provider))
@@ -117,6 +119,7 @@ class NarrationEngine(
         val work = work(bookId, config.voice)
         val count = spine.sentenceCount(bookId)
         if (ordinal !in 0 until count) return
+        val narrated = narrated(bookId, count)
 
         val window = ArrayList<Sentence>()
         var seconds = 0.0
@@ -127,6 +130,7 @@ class NarrationEngine(
             if (page.isEmpty()) break
             for (s in page) {
                 if (seconds >= target) break
+                if (!narrated[s.ordinal]) continue
                 window += s
                 seconds += Estimator.audioSeconds(s.text, config.speed)
             }
@@ -194,8 +198,10 @@ class NarrationEngine(
             return JobResult.Failed(e, retry = false)
         }
         val work = work(bookId, config.voice)
-        val count = spine.sentenceCount(bookId)
-        val covered = covered(bookId, config.voice)
+        val bookCount = spine.sentenceCount(bookId)
+        val narrated = narrated(bookId, bookCount)
+        val count = narrated.cardinality()
+        val covered = covered(bookId, config.voice).apply { and(narrated) }
         val done = AtomicInteger(covered.cardinality())
         val tp = aggregateThroughput(provider)
         val capHit = AtomicBoolean(false)
@@ -209,10 +215,11 @@ class NarrationEngine(
         }
 
         try {
-            for (range in jobOrder(fromOrdinal, count)) {
+            for (range in jobOrder(fromOrdinal, bookCount)) {
                 for ((a, b) in pages(range)) {
                     if (capHit.get()) break
-                    val chunks = claim(work, spine.sentences(bookId, a, b), covered(bookId, config.voice), 0)
+                    val page = spine.sentences(bookId, a, b).filter { narrated[it.ordinal] }
+                    val chunks = claim(work, page, covered(bookId, config.voice), 0)
                     val pageSentences = chunks.sumOf { it.sentences.size }
                     if (pageSentences > 0) {
                         secondsPerSentence = chunks.sumOf { Estimator.audioSeconds(it.text, config.speed) } / pageSentences
@@ -275,6 +282,18 @@ class NarrationEngine(
 
     private fun work(bookId: BookId, voice: VoiceRef) =
         works.getOrPut("$bookId|${voice.provider}|${voice.id}") { VoiceWork() }
+
+    /** Ordinals in included sections; excluded front and back matter is never narrated. */
+    private suspend fun narrated(bookId: BookId, count: Int): BitSet {
+        val bits = BitSet(count)
+        val included = spine.sections(bookId).filter { it.included && it.startOrdinal <= it.endOrdinal }
+        if (included.isEmpty()) {
+            bits.set(0, count)
+        } else {
+            included.forEach { bits.set(it.startOrdinal.coerceIn(0, count), (it.endOrdinal + 1).coerceIn(0, count)) }
+        }
+        return bits
+    }
 
     private suspend fun covered(bookId: BookId, voice: VoiceRef): BitSet {
         val set = BitSet()
@@ -362,6 +381,7 @@ class NarrationEngine(
         const val MICRO_SENTENCES = 2
         const val REASON_CAP = "monthly_cap"
         const val REASON_SYSTEM = "system_stop"
+        const val REASON_OFFLINE = "offline"
         private const val PREFS = "narration_engine"
         private const val TP_PREFIX = "tp_"
         private const val SPEND_PREFIX = "spend_"

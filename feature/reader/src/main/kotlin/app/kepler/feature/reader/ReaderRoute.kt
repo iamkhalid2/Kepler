@@ -182,6 +182,7 @@ private fun ReaderScreen(
     var selectionActive by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<ReaderSelection?>(null) }
     var navigatorTop by remember { mutableFloatStateOf(0f) }
+    var transportPx by remember { mutableFloatStateOf(0f) }
     val listening = mode == ReaderMode.READ_LISTEN
 
     // ------------------------------------------------------------- navigator host
@@ -210,7 +211,7 @@ private fun ReaderScreen(
     }
     remember(engine, activity) {
         activity?.let(ReaderFragmentFactory::install)
-        engine.fragmentFactory(vm.currentAnchor(), style, selectionCallback)
+        engine.fragmentFactory({ vm.currentAnchor() }, style, selectionCallback)
     }
     DisposableEffect(engine) { onDispose { engine.detach() } }
 
@@ -305,7 +306,8 @@ private fun ReaderScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(top = 48.dp, bottom = 24.dp)
+                // In Read + Listen the transport stays up, so the page must end above it.
+                .padding(top = 48.dp, bottom = 24.dp + with(density) { if (listening) transportPx.toDp() else 0.dp })
                 .onGloballyPositioned { navigatorTop = it.positionInRoot().y },
             onUpdate = { fragment -> engine.attach(fragment, scope) },
         )
@@ -359,8 +361,10 @@ private fun ReaderScreen(
             }
             if (listening) {
                 Column(Modifier.fillMaxWidth().background(page)) {
-                    Hairline()
-                    transport()
+                    Column(Modifier.onGloballyPositioned { transportPx = it.size.height.toFloat() }) {
+                        Hairline()
+                        transport()
+                    }
                     if (!chrome) Spacer(Modifier.navigationBarsPadding())
                 }
             }

@@ -3,9 +3,13 @@
 package app.kepler.engine.epub.reader
 
 import android.content.Context
+import android.os.Bundle
 import android.os.Parcel
 import android.os.Parcelable
 import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentFactory
@@ -13,6 +17,7 @@ import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,6 +95,28 @@ class ReaderFragmentFactory(private val fallback: FragmentFactory) : FragmentFac
             val fm = activity.supportFragmentManager
             if (fm.fragmentFactory !is ReaderFragmentFactory) fm.fragmentFactory = ReaderFragmentFactory(fm.fragmentFactory)
         }
+
+        /**
+         * Call before `super.onCreate(savedInstanceState)`. After process death no publication is
+         * open, so the FragmentManager could only restore Readium's dummy navigator, which crashes as
+         * soon as it reports a location. Drop the saved fragment state instead; the reader creates a
+         * fresh navigator at the saved position once the book has loaded.
+         */
+        fun install(activity: FragmentActivity, savedInstanceState: Bundle?) {
+            if (live == null && savedInstanceState != null) dropFragmentState(savedInstanceState, depth = 0)
+            install(activity)
+        }
+
+        private const val FRAGMENTS_KEY = "android:support:fragments"
+
+        private fun dropFragmentState(bundle: Bundle, depth: Int) {
+            bundle.remove(FRAGMENTS_KEY)
+            if (depth >= 2) return
+            for (key in bundle.keySet().toList()) {
+                val nested = runCatching { bundle.getBundle(key) }.getOrNull() ?: continue
+                dropFragmentState(nested, depth + 1)
+            }
+        }
     }
 }
 
@@ -138,14 +165,52 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
         initial: TextAnchor?,
         style: ReaderStyle,
         selectionCallback: ActionMode.Callback?,
+    ): FragmentFactory = fragmentFactory({ initial }, style, selectionCallback)
+
+    /**
+     * Like the overload above, but [initial] is read when the fragment is instantiated. After a
+     * configuration change the FragmentManager re-creates the navigator inside the new activity's
+     * `onCreate`, before any composition runs; reading the anchor (and the latest style and
+     * selection callback) at that moment keeps the page the reader was on.
+     */
+    fun fragmentFactory(
+        initial: () -> TextAnchor?,
+        style: ReaderStyle,
+        selectionCallback: ActionMode.Callback?,
     ): FragmentFactory {
         this.style = style
+        this.selectionCallback = selectionCallback
+        val factory = object : FragmentFactory() {
+            override fun instantiate(classLoader: ClassLoader, className: String): Fragment =
+                navigatorFragmentFactory(initial()).instantiate(classLoader, className)
+        }
+        liveFactory = factory
+        ReaderFragmentFactory.live = factory
+        return factory
+    }
+
+    private var selectionCallback: ActionMode.Callback? = null
+
+    /** Forwards to the latest host callback, so a restored fragment never talks to a disposed composition. */
+    private val forwardingSelectionCallback = object : ActionMode.Callback {
+        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean =
+            selectionCallback?.onCreateActionMode(mode, menu) ?: false
+        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean =
+            selectionCallback?.onPrepareActionMode(mode, menu) ?: false
+        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean =
+            selectionCallback?.onActionItemClicked(mode, item) ?: false
+        override fun onDestroyActionMode(mode: ActionMode) {
+            selectionCallback?.onDestroyActionMode(mode)
+        }
+    }
+
+    private fun navigatorFragmentFactory(initial: TextAnchor?): FragmentFactory {
         val configuration = EpubNavigatorFragment.Configuration {
             servedAssets = listOf("fonts/.*")
             decorationTemplates = HtmlDecorationTemplates.defaultTemplates().copy().apply {
                 set(BandStyle::class, bandTemplate)
             }
-            selectionActionModeCallback = selectionCallback
+            selectionActionModeCallback = forwardingSelectionCallback
             // The Compose host pads the navigator around its own chrome and the system bars.
             shouldApplyInsetsPadding = false
             addFontFamilyDeclaration(FontFamily(ReaderFont.LITERATA.css!!)) {
@@ -161,10 +226,7 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
             initialPreferences = style.toPreferences(),
             listener = navListener,
             configuration = configuration,
-        ).also {
-            liveFactory = it
-            ReaderFragmentFactory.live = it
-        }
+        )
     }
 
     /** Binds the hosted fragment. [scope] should be tied to the hosting composition. */
@@ -181,20 +243,63 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
         listeners.forEach(fragment::addInputListener)
         inputListeners = listeners
         fragment.addDecorationListener(GROUP_HIGHLIGHTS, decorationListener)
+        attachScope = scope
+        fragment.view?.addOnLayoutChangeListener(resizeListener)
         attachJob = scope.launch {
             launch { marks.forEach { (group, list) -> fragment.applyDecorations(list, group) } }
             fragment.currentLocator.collectLatest { loc ->
-                val first = runCatching { fragment.firstVisibleElementLocator() }.getOrNull()
-                    ?.takeIf { it.href.removeFragment() == loc.href.removeFragment() }
-                _location.value = loc.toAnchor(textFrom = first ?: loc)
+                // While the WebView reflows it reports passing positions (often the resource start).
+                if (settling?.isActive == true) return@collectLatest
+                publish(fragment, loc)
             }
+        }
+    }
+
+    private suspend fun publish(fragment: EpubNavigatorFragment, loc: Locator) {
+        stableLocator = loc
+        val first = runCatching { fragment.firstVisibleElementLocator() }.getOrNull()
+            ?.takeIf { it.href.removeFragment() == loc.href.removeFragment() }
+        _location.value = loc.toAnchor(textFrom = first ?: loc)
+    }
+
+    private var attachScope: CoroutineScope? = null
+    private var stableLocator: Locator? = null
+    private var settling: Job? = null
+
+    private val resizeListener = View.OnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
+        val was = (or - ol) to (ob - ot)
+        if (was.first > 0 && was.second > 0 && was != (r - l) to (b - t)) settle()
+    }
+
+    /**
+     * Readium's paginated WebView can lose its place when it reflows (rotation, window resize, a
+     * font size change) and lands near the start of the resource. Hold the last settled position
+     * and go back to it once the reflow is done.
+     */
+    private fun settle() {
+        val nav = navigator ?: return
+        val target = stableLocator ?: return
+        val scope = attachScope ?: return
+        settling?.cancel()
+        settling = scope.launch {
+            delay(SETTLE_MS)
+            nav.go(target, animated = false)
+            delay(SETTLE_AFTER_GO_MS)
+        }
+        scope.launch {
+            settling?.join()
+            if (navigator === nav) publish(nav, nav.currentLocator.value)
         }
     }
 
     fun detach() {
         attachJob?.cancel()
         attachJob = null
+        settling?.cancel()
+        settling = null
+        attachScope = null
         navigator?.let { nav ->
+            nav.view?.removeOnLayoutChangeListener(resizeListener)
             inputListeners.forEach(nav::removeInputListener)
             nav.removeDecorationListener(decorationListener)
         }
@@ -217,9 +322,11 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
 
     override fun submit(style: ReaderStyle) {
         val tapsChanged = style.tapZones != this.style.tapZones
+        val changed = style != this.style
         this.style = style
         val nav = navigator ?: return
         nav.submitPreferences(style.toPreferences())
+        if (changed) settle()
         if (tapsChanged) {
             inputListeners.firstOrNull { it is DirectionalNavigationAdapter }?.let {
                 nav.removeInputListener(it)
@@ -329,6 +436,10 @@ class ReadiumReaderEngine(val publication: Publication) : ReaderEngine {
     }
 
     companion object {
+        /** How long a reflow is given before the held position is restored. */
+        private const val SETTLE_MS = 350L
+        private const val SETTLE_AFTER_GO_MS = 200L
+
         private val bandTemplate = HtmlDecorationTemplate(
             layout = HtmlDecorationTemplate.Layout.BOXES,
             width = HtmlDecorationTemplate.Width.WRAP,

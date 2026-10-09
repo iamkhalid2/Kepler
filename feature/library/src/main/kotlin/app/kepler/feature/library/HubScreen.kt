@@ -127,12 +127,13 @@ private fun LearnContents(book: Book, cardCount: Int, onLearnAt: (HubLearnEntry)
     val entries = listOf(
         Triple(HubLearnEntry.ASK, R.string.learn_ask, fence),
         Triple(HubLearnEntry.RECAP, R.string.learn_recap, recapCaption),
-        Triple(HubLearnEntry.CONCEPTS, R.string.learn_concepts, fence),
-        Triple(HubLearnEntry.MAP, R.string.learn_map, fence),
+        // Only Ask may read past the frontier (whole book for non-fiction); the others stop at it.
+        Triple(HubLearnEntry.CONCEPTS, R.string.learn_concepts, recapCaption),
+        Triple(HubLearnEntry.MAP, R.string.learn_map, recapCaption),
         Triple(HubLearnEntry.TAKEAWAYS, R.string.learn_takeaways, stringResource(R.string.learn_by_chapter)),
     )
     Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.Bottom) {
-        KpCaps(stringResource(R.string.learn_caps), Modifier.weight(1f))
+        KpCaps(stringResource(R.string.hub_learn_caps), Modifier.weight(1f))
         if (cardCount > 0) {
             Text(
                 androidx.compose.ui.res.pluralStringResource(R.plurals.learn_cards, cardCount, cardCount),
@@ -249,7 +250,7 @@ private fun NarrationLine(ui: HubUi, onSetup: () -> Unit) {
             if (voice.isNullOrBlank()) stringResource(R.string.narration_ready) else stringResource(R.string.narration_ready_voice, voice),
             stringResource(R.string.change),
         )
-        is NarrationStatus.Paused -> Triple(0f, stringResource(R.string.narration_paused, n.reason), stringResource(R.string.view))
+        is NarrationStatus.Paused -> Triple(0f, stringResource(pausedReasonRes(n.reason)), stringResource(R.string.view))
         is NarrationStatus.Failed -> Triple(0f, stringResource(R.string.narration_failed), stringResource(R.string.set_up))
     }
     Row(

@@ -168,7 +168,7 @@ private fun AskTab(s: LearnState, vm: LearnViewModel, onJumpTo: (Int) -> Unit, o
             if (s.transcript.isEmpty() && !s.asking) {
                 item {
                     Column {
-                        BasicText(stringResource(R.string.ask_intro), style = StudyType.prose(p.text2))
+                        BasicText(stringResource(if (s.fence.wholeBook) R.string.ask_intro_whole else R.string.ask_intro), style = StudyType.prose(p.text2))
                         Spacer(Modifier.height(8.dp))
                         suggestionTexts.forEach { q ->
                             ListRow({ vm.ask(q) }) { BasicText(q, Modifier.weight(1f), style = StudyType.quote(p.text)) }
@@ -255,12 +255,21 @@ private fun WorkingRule(f: FenceInfo) {
 private fun AnswerBlock(a: AskAnswer, onJumpTo: (Int) -> Unit) {
     val p = Kp.palette
     val accent = p.accentText
-    val styled: AnnotatedString = remember(a.text, accent) {
+    val styled: AnnotatedString = remember(a, accent) {
         buildAnnotatedString {
+            // The service marks citations with sentence ordinals ("[3358]"); show them as 1-based numerals
+            // matching the list below, and drop any marker that is not in that list.
             var last = 0
-            Regex("\\[(\\d{1,2})]").findAll(a.text).forEach { m ->
+            var prevMarkerEnd = -1
+            Regex("\\s*\\[(\\d+)]").findAll(a.text).forEach { m ->
                 append(a.text.substring(last, m.range.first))
-                withStyle(SpanStyle(color = accent, baselineShift = BaselineShift.Superscript, fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp))) { append(m.groupValues[1]) }
+                val n = citationNumber(a, m.groupValues[1].toIntOrNull())
+                if (n != null) {
+                    withStyle(SpanStyle(color = accent, baselineShift = BaselineShift.Superscript, fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp))) {
+                        append(if (prevMarkerEnd == m.range.first) ",$n" else "$n")
+                    }
+                    prevMarkerEnd = m.range.last + 1
+                }
                 last = m.range.last + 1
             }
             append(a.text.substring(last))
@@ -310,7 +319,7 @@ private fun RecapTab(s: LearnState, vm: LearnViewModel, onOpenSettings: (() -> U
 @Composable
 private fun ConceptsTab(s: LearnState, vm: LearnViewModel, onJumpTo: (Int) -> Unit) {
     val p = Kp.palette
-    LoadView(s.concepts, { vm.loadConcepts(force = true) }, lines = 6) { map ->
+    LoadView(s.concepts, { vm.loadConcepts(force = true) }, lines = 6, stateModifier = Modifier.padding(24.dp)) { map ->
         if (map.nodes.isEmpty()) Box(Modifier.padding(24.dp)) { EmptyNote(stringResource(R.string.concepts_empty)) }
         else {
             val grouped = map.nodes.sortedBy { it.label.lowercase() }.groupBy { indexLetter(it.label) }.toSortedMap()
@@ -377,7 +386,7 @@ private fun stringResource0(label: String) = "What is $label?"
 
 @Composable
 private fun MapTab(s: LearnState, vm: LearnViewModel) {
-    LoadView(s.concepts, { vm.loadConcepts(force = true) }, lines = 6) { map ->
+    LoadView(s.concepts, { vm.loadConcepts(force = true) }, lines = 6, stateModifier = Modifier.padding(24.dp)) { map ->
         if (map.nodes.isEmpty()) Box(Modifier.padding(24.dp)) { EmptyNote(stringResource(R.string.concepts_empty)) }
         else Column(Modifier.fillMaxSize()) {
             ConceptMapView(map, s.positions, s.pinned, s.selectedNode, vm::moveNode, vm::selectNode, Modifier.weight(1f).fillMaxWidth())
@@ -424,3 +433,7 @@ private fun TakeawaysTab(s: LearnState, vm: LearnViewModel) {
         }
     }
 }
+
+/** 1-based position of the citation for [ordinal] in [a]'s list, or null when it is not cited. */
+internal fun citationNumber(a: AskAnswer, ordinal: Int?): Int? =
+    ordinal?.let { o -> a.citations.indexOfFirst { it.ordinal == o }.takeIf { it >= 0 }?.plus(1) }

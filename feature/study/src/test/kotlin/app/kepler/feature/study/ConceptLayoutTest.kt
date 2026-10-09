@@ -37,4 +37,19 @@ class ConceptLayoutTest {
     }
 
     @Test fun emptyMapIsEmpty() = assertTrue(ConceptLayout.layout(ConceptMap(emptyList(), emptyList())).isEmpty())
+
+    @Test fun separatedLabelsNeitherOverlapNorLeaveTheMap() {
+        val sizes = List(4) { 200 to 60 }
+        val origins = listOf(floatArrayOf(-50f, 900f), floatArrayOf(10f, 905f), floatArrayOf(60f, 910f), floatArrayOf(700f, 0f))
+        separate(origins, sizes, width = 800, height = 1000, inset = 16, gap = 8f)
+        origins.forEachIndexed { i, o ->
+            assertTrue(o[0] >= 16f && o[0] + 200 <= 784f && o[1] >= 16f && o[1] + 60 <= 984f)
+            for (j in i + 1 until origins.size) {
+                val q = origins[j]
+                val overlapX = minOf(o[0], q[0]) + 200 > maxOf(o[0], q[0])
+                val overlapY = minOf(o[1], q[1]) + 60 > maxOf(o[1], q[1])
+                assertTrue("boxes $i and $j overlap", !(overlapX && overlapY))
+            }
+        }
+    }
 }

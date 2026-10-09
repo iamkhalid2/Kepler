@@ -40,6 +40,7 @@ fun ReadAlongTransport(controller: PlaybackController, modifier: Modifier = Modi
     val voice by controller.selectInfo { it.voiceName }
     val ahead by controller.selectInfo { it.aheadMs }
     val generating by controller.selectInfo { it.generating }
+    val error by controller.select { it.error }
     var speedSheet by remember { mutableStateOf(false) }
     val minutes = PlayerFormat.minutesAhead(ahead, speed)
 
@@ -55,6 +56,7 @@ fun ReadAlongTransport(controller: PlaybackController, modifier: Modifier = Modi
                 style = KpType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             val sub = when {
+                error != null && !playing -> stringResource(R.string.player_error_short)
                 buffering -> stringResource(R.string.player_buffering_short)
                 minutes > 0 -> pluralStringResource(R.plurals.player_ahead_minutes, minutes, minutes)
                 generating -> stringResource(R.string.player_binding_short)

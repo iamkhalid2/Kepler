@@ -100,13 +100,14 @@ fun ConceptMapView(
         ) { measurables, c ->
             val loose = Constraints(maxWidth = (c.maxWidth * 0.42f).toInt().coerceAtLeast(1))
             val placeables = measurables.map { it.measure(loose) }
+            val inset = 16.dp.roundToPx()
+            val origins = placeables.mapIndexed { i, pl ->
+                val pt = positions[map.nodes[i].id] ?: MapPt(0.5f, 0.5f)
+                floatArrayOf(pt.x * c.maxWidth - pl.width / 2f, pt.y * c.maxHeight - pl.height / 2f)
+            }
+            separate(origins, placeables.map { it.width to it.height }, c.maxWidth, c.maxHeight, inset, gap = 8.dp.toPx())
             layout(c.maxWidth, c.maxHeight) {
-                placeables.forEachIndexed { i, pl ->
-                    val pt = positions[map.nodes[i].id] ?: MapPt(0.5f, 0.5f)
-                    val x = (pt.x * c.maxWidth - pl.width / 2f).toInt().coerceIn(0, (c.maxWidth - pl.width).coerceAtLeast(0))
-                    val y = (pt.y * c.maxHeight - pl.height / 2f).toInt().coerceIn(0, (c.maxHeight - pl.height).coerceAtLeast(0))
-                    pl.place(IntOffset(x, y))
-                }
+                placeables.forEachIndexed { i, pl -> pl.place(IntOffset(origins[i][0].toInt(), origins[i][1].toInt())) }
             }
         }
     }
@@ -147,5 +148,39 @@ private fun MapNode(node: ConceptNode, pinned: Boolean, selected: Boolean, onTap
                 if (pinned) Box(Modifier.padding(start = 6.dp).size(6.dp).background(ink.copy(alpha = 0.6f), CircleShape))
             }
         }
+    }
+}
+
+/**
+ * The force layout works in normalised units and knows nothing of label sizes, so labels can
+ * overlap or run off the edge. Nudge the placed boxes apart along their shallower overlap and keep
+ * them [inset] inside the map.
+ */
+internal fun separate(origins: List<FloatArray>, sizes: List<Pair<Int, Int>>, width: Int, height: Int, inset: Int, gap: Float) {
+    fun clamp(i: Int) {
+        val (w, h) = sizes[i]
+        origins[i][0] = origins[i][0].coerceIn(inset.toFloat(), (width - w - inset).toFloat().coerceAtLeast(inset.toFloat()))
+        origins[i][1] = origins[i][1].coerceIn(inset.toFloat(), (height - h - inset).toFloat().coerceAtLeast(inset.toFloat()))
+    }
+    origins.indices.forEach(::clamp)
+    repeat(40) {
+        var moved = false
+        for (i in origins.indices) for (j in i + 1 until origins.size) {
+            val a = origins[i]; val b = origins[j]
+            val (aw, ah) = sizes[i]; val (bw, bh) = sizes[j]
+            val ox = minOf(a[0] + aw, b[0] + bw) - maxOf(a[0], b[0]) + gap
+            val oy = minOf(a[1] + ah, b[1] + bh) - maxOf(a[1], b[1]) + gap
+            if (ox <= 0f || oy <= 0f) continue
+            moved = true
+            if (oy <= ox) {
+                val d = oy / 2f * if (a[1] <= b[1]) 1f else -1f
+                a[1] -= d; b[1] += d
+            } else {
+                val d = ox / 2f * if (a[0] <= b[0]) 1f else -1f
+                a[0] -= d; b[0] += d
+            }
+            clamp(i); clamp(j)
+        }
+        if (!moved) return
     }
 }

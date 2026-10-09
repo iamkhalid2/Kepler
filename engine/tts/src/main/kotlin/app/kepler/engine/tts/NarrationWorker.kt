@@ -99,6 +99,8 @@ class NarrationWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 // reschedule a timed-out foreground worker by itself, so queue the continuation explicitly.
                 WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT ->
                     engine.onJobInterrupted(bookId, config, from, NarrationEngine.REASON_SYSTEM, TIMEOUT_RESUME_SECONDS)
+                WorkInfo.STOP_REASON_CONSTRAINT_CONNECTIVITY ->
+                    engine.onJobInterrupted(bookId, config, from, NarrationEngine.REASON_OFFLINE, null)
                 else -> engine.onJobInterrupted(bookId, config, from, NarrationEngine.REASON_SYSTEM, null)
             }
             throw e

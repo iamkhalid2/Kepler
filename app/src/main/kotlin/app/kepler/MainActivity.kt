@@ -34,7 +34,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        ReaderFragmentFactory.install(this)
+        ReaderFragmentFactory.install(this, savedInstanceState)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as KeplerApp).container

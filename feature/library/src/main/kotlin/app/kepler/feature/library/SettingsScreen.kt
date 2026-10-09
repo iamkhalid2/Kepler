@@ -92,7 +92,7 @@ fun SettingsScreen(ui: SettingsUi, onBack: () -> Unit, vm: SettingsViewModel) {
                 trailing = {
                     val b = ui.budget
                     Text(
-                        if (b != null) stringResource(R.string.requests_left, b.requestsLeftToday) else stringResource(R.string.not_set),
+                        if (b != null) stringResource(R.string.library_requests_left, b.requestsLeftToday) else stringResource(R.string.not_set),
                         color = if (b != null) p.text else p.text2, style = KpType.numeral,
                     )
                 },

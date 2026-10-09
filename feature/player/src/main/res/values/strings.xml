@@ -31,6 +31,7 @@
     <string name="player_narration_paused">Narration paused</string>
     <string name="player_buffering">Preparing the next passage</string>
     <string name="player_buffering_short">Preparing</string>
+    <string name="player_error_short">Not ready</string>
     <string name="player_binding_short">Binding</string>
     <string name="player_try_again">Try again</string>
 
