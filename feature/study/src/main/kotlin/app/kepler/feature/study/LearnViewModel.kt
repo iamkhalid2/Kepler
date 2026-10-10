@@ -4,14 +4,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.kepler.core.model.AiBudget
 import app.kepler.core.model.AskAnswer
+import app.kepler.core.model.AskEvent
 import app.kepler.core.model.Book
 import app.kepler.core.model.BookId
+import app.kepler.core.model.Citation
 import app.kepler.core.model.ConceptMap
 import app.kepler.core.model.ConceptNode
 import app.kepler.core.model.Section
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -19,8 +24,19 @@ import kotlinx.coroutines.launch
 /** One entry in the Ask transcript. Questions are quiet, answers are book prose. */
 sealed interface AskItem {
     data class Question(val text: String) : AskItem
-    data class Answer(val answer: AskAnswer) : AskItem
+    data class Answer(val answer: AskAnswer, val question: String = "") : AskItem
     data class Failure(val question: String, val error: UiError) : AskItem
+}
+
+/** The answer being written right now. [text] grows token by token; [citations] fill in as they resolve. */
+data class LiveAnswer(
+    val question: String,
+    val text: String = "",
+    val citations: List<Citation> = emptyList(),
+    /** `System.nanoTime()` when the question was sent, for the time-to-first-words measurement. */
+    val startedNs: Long = 0L,
+) {
+    val started: Boolean get() = text.isNotEmpty()
 }
 
 data class LearnState(
@@ -30,14 +46,17 @@ data class LearnState(
     val fence: FenceInfo = FenceInfo(false, null, null),
     val budget: AiBudget? = null,
     val transcript: List<AskItem> = emptyList(),
-    val asking: Boolean = false,
+    val live: LiveAnswer? = null,
+    /** Recap text so far; [Load.Loading] until the first words, then [Load.Ready] while it keeps streaming. */
     val recap: Load<String> = Load.Idle,
+    val recapStreaming: Boolean = false,
     val concepts: Load<ConceptMap> = Load.Idle,
     val positions: Map<String, MapPt> = emptyMap(),
     val pinned: Set<String> = emptySet(),
     val selectedNode: String? = null,
     val takeaways: Map<Long, Load<List<String>>> = emptyMap(),
 ) {
+    val asking: Boolean get() = live != null
     val reached: List<Section> get() = reachedSections(sections, frontier)
     val studyMode: Boolean get() = Study.isStudyMode(book?.contentType)
     val node: ConceptNode? get() =
@@ -47,6 +66,8 @@ data class LearnState(
 class LearnViewModel(private val bookId: BookId, private val deps: StudyDeps) : ViewModel() {
     private val _state = MutableStateFlow(LearnState())
     val state: StateFlow<LearnState> = _state.asStateFlow()
+    private var askJob: Job? = null
+    private var recapJob: Job? = null
 
     init { viewModelScope.launch { refreshContext() } }
 
@@ -55,12 +76,14 @@ class LearnViewModel(private val bookId: BookId, private val deps: StudyDeps) : 
         val sections = deps.spine.sections(bookId)
         val frontier = deps.positions.frontier(bookId)
         _state.update { it.copy(book = book, sections = sections, frontier = frontier, fence = fenceInfo(book?.contentType, sections, frontier)) }
+        // Concepts, Map and the recap read packs built in the background; start building them as soon as Learn opens.
+        if (frontier >= 0) deps.prefetch?.prefetch(bookId, frontier)
         refreshBudget()
     }
 
     fun refreshBudget() {
         viewModelScope.launch {
-            val b = try { deps.ai.budget() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Throwable) { null }
+            val b = try { deps.ai.budget() } catch (e: CancellationException) { throw e } catch (_: Throwable) { null }
             _state.update { it.copy(budget = b ?: it.budget) }
         }
     }
@@ -73,21 +96,43 @@ class LearnViewModel(private val bookId: BookId, private val deps: StudyDeps) : 
     fun ask(question: String) {
         val q = question.trim()
         if (q.isEmpty() || _state.value.asking) return
-        _state.update { it.copy(asking = true, transcript = it.transcript + AskItem.Question(q)) }
-        viewModelScope.launch {
-            val r = loading { deps.ai.ask(bookId, q) }
-            _state.update {
-                it.copy(
-                    asking = false,
-                    transcript = it.transcript + when (r) {
-                        is Load.Ready -> AskItem.Answer(r.value)
-                        is Load.Failed -> AskItem.Failure(q, r.error)
-                        else -> AskItem.Failure(q, UiError(UiErrorKind.OTHER, true))
-                    },
-                )
+        _state.update { it.copy(live = LiveAnswer(q, startedNs = System.nanoTime()), transcript = it.transcript + AskItem.Question(q)) }
+        askJob = viewModelScope.launch {
+            var final: AskAnswer? = null
+            var failure: UiError? = null
+            deps.streaming.askStream(bookId, q).catch { failure = it.toUiError() }.collect { e ->
+                when (e) {
+                    is AskEvent.Delta -> _state.update { s -> s.live?.let { s.copy(live = it.copy(text = it.text + e.text)) } ?: s }
+                    is AskEvent.Citations -> _state.update { s -> s.live?.let { s.copy(live = it.copy(citations = e.citations)) } ?: s }
+                    is AskEvent.Done -> final = e.answer
+                    is AskEvent.Failed -> failure = e.error.toUiError()
+                }
             }
-            refreshBudget()
+            finishAsk(q, final, failure)
         }
+    }
+
+    private fun finishAsk(q: String, final: AskAnswer?, failure: UiError?) {
+        _state.update { s ->
+            val live = s.live
+            val partial = live?.takeIf { it.text.isNotBlank() }?.let { AskAnswer(it.text.trim(), it.citations) }
+            val answer = final ?: partial
+            val items = buildList {
+                if (answer != null) add(AskItem.Answer(answer, q))
+                if (final == null && failure != null) add(AskItem.Failure(q, failure))
+            }
+            s.copy(live = null, transcript = s.transcript + items)
+        }
+        refreshBudget()
+    }
+
+    /** Stops the answer where it is; what was written stays. */
+    fun stop() {
+        val job = askJob ?: return
+        val live = _state.value.live ?: return
+        job.cancel()
+        askJob = null
+        finishAsk(live.question, null, null)
     }
 
     /** Drops the failed attempt (and its question line) and asks again. */
@@ -101,11 +146,21 @@ class LearnViewModel(private val bookId: BookId, private val deps: StudyDeps) : 
 
     fun loadRecap(force: Boolean = false) {
         if (!force && _state.value.recap is Load.Ready) return
-        if (_state.value.recap is Load.Loading) return
-        _state.update { it.copy(recap = Load.Loading) }
-        viewModelScope.launch {
-            val r = loading { deps.ai.recap(bookId) }
-            _state.update { it.copy(recap = r) }
+        if (recapJob?.isActive == true) return
+        _state.update { it.copy(recap = Load.Loading, recapStreaming = true) }
+        recapJob = viewModelScope.launch {
+            var text = ""
+            var failure: UiError? = null
+            deps.streaming.recapStream(bookId).catch { failure = it.toUiError() }.collect { d ->
+                text += d
+                _state.update { it.copy(recap = Load.Ready(text)) }
+            }
+            _state.update {
+                it.copy(
+                    recapStreaming = false,
+                    recap = if (text.isBlank() && failure != null) Load.Failed(failure!!) else Load.Ready(text),
+                )
+            }
             refreshBudget()
         }
     }

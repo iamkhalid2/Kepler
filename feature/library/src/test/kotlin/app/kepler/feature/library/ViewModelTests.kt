@@ -37,15 +37,16 @@ class LibraryViewModelTest : VmTest() {
         assertEquals(listOf(1L), vm.state.value.books.map { it.id })
         vm.setQuery("zzz")
         assertTrue(vm.state.value.noMatches)
-        vm.toggleSearch(); vm.toggleSearch()
+        vm.setQuery("")
         assertEquals("", vm.state.value.query)
     }
 
-    @Test fun closingSearchClearsTheQuery() = runTest {
+    @Test fun clearingSearchResetsTheList() = runTest {
         val vm = LibraryViewModel(deps(book(1)))
-        vm.toggleSearch(); vm.setQuery("x")
-        vm.toggleSearch()
-        assertFalse(vm.state.value.searching)
+        vm.setQuery("x")
+        assertEquals(emptyList<Long>(), vm.state.value.books.map { it.id })
+        vm.setQuery("")
+        assertEquals(listOf(1L), vm.state.value.books.map { it.id })
         assertEquals("", vm.state.value.query)
     }
 
@@ -99,9 +100,9 @@ class LibraryViewModelTest : VmTest() {
 
     @Test fun layoutToggles() = runTest {
         val vm = LibraryViewModel(deps())
-        assertEquals(LibraryLayout.Shelf, vm.state.value.layout)
+        assertEquals(LibraryLayout.Grid, vm.state.value.layout)
         vm.toggleLayout()
-        assertEquals(LibraryLayout.List, vm.state.value.layout)
+        assertEquals(LibraryLayout.Bookcase, vm.state.value.layout)
     }
 }
 

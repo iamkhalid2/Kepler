@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import app.kepler.core.model.Book
 import app.kepler.core.model.BookId
 import app.kepler.core.model.NarrationState
+import app.kepler.core.model.Section
+import app.kepler.core.model.SectionKind
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -22,6 +25,29 @@ sealed interface NarrationStatus {
     data class Failed(val message: String) : NarrationStatus
 }
 
+enum class ChapterState { Done, Current, Upcoming }
+
+/** One chapter row of the Hub: where you are in it, by the saved position. */
+data class HubChapter(val id: Long, val title: String, val state: ChapterState)
+
+/** Chapters (body sections) with their state relative to the saved position ordinal. */
+fun hubChapters(sections: List<Section>, positionOrdinal: Int, started: Boolean): List<HubChapter> {
+    val body = sections.filter { it.kind == SectionKind.BODY && it.included && it.title.isNotBlank() }
+    val current = if (started) chapterAt(sections, positionOrdinal)?.id else null
+    val currentIndex = body.indexOfFirst { it.id == current }
+    return body.mapIndexed { i, s ->
+        HubChapter(
+            s.id, s.title,
+            when {
+                currentIndex < 0 -> ChapterState.Upcoming
+                i < currentIndex -> ChapterState.Done
+                i == currentIndex -> ChapterState.Current
+                else -> ChapterState.Upcoming
+            },
+        )
+    }
+}
+
 data class HubUi(
     val loaded: Boolean = false,
     val book: Book? = null,
@@ -31,6 +57,9 @@ data class HubUi(
     val narration: NarrationStatus = NarrationStatus.None,
     val voiceName: String? = null,
     val cardCount: Int = 0,
+    val chapters: List<HubChapter> = emptyList(),
+    /** Estimated minutes of listening left from the saved position, at the chosen speed. */
+    val minutesToListen: Int? = null,
 )
 
 /** Primary key goes to the mode the reader used most; reading wins a tie. */
@@ -52,26 +81,44 @@ fun narrationStatus(state: NarrationState, coverage: Float): NarrationStatus = w
 }
 
 class HubViewModel(private val deps: LibraryDeps, val bookId: BookId) : ViewModel() {
+    private val sections = MutableStateFlow<List<Section>>(emptyList())
+
     val state: StateFlow<HubUi> = combine(
         deps.library.book(bookId),
         deps.narration.state(bookId),
         deps.audio.coverage(bookId),
         deps.settings.settings,
         deps.cards.cards(bookId),
-    ) { book, narration, coverage, settings, cards ->
+    ) { book, narration, coverage, settings, cards -> Parts(book, narration, coverage, settings, cards) }
+        .combine(sections) { x, sec ->
+        val book = x.book
+        val narration = x.narration
+        val coverage = x.coverage
+        val settings = x.settings
+        val cards = x.cards
         HubUi(
             loaded = true,
             book = book,
             primary = book?.let(::primaryMode) ?: HubMode.Read,
-            started = book != null && (book.readFraction > 0f || book.listenFraction > 0f),
+            started = book != null && hasStarted(book),
             narration = narrationStatus(narration, coverage),
             voiceName = settings.voice?.name,
             cardCount = cards.size,
+            chapters = book?.let { hubChapters(sec, (it.positionFraction * it.sentenceCount).toInt(), hasStarted(it)) }.orEmpty(),
+            minutesToListen = book?.let { minutesLeft(it, settings.speed, listening = true) },
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HubUi())
 
+    private class Parts(
+        val book: Book?, val narration: NarrationState, val coverage: Float,
+        val settings: app.kepler.core.model.AppSettings, val cards: List<app.kepler.core.model.Card>,
+    )
+
     init {
         viewModelScope.launch { deps.library.markOpened(bookId) }
+        deps.spine?.let { spine ->
+            viewModelScope.launch { sections.value = runCatching { spine.sections(bookId) }.getOrDefault(emptyList()) }
+        }
     }
 
     /** Stops playback and narration for this book, then deletes it. [done] runs once it is gone. */

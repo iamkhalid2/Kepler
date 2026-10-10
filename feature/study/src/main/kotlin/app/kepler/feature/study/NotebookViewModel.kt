@@ -6,6 +6,7 @@ import app.kepler.core.model.Annotation
 import app.kepler.core.model.Book
 import app.kepler.core.model.Card
 import app.kepler.core.model.CardType
+import app.kepler.core.model.RecallResult
 import app.kepler.core.model.Section
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,7 +41,23 @@ data class NotebookData(
     val words: List<BookCards> = emptyList(),
     val dueCount: Int = 0,
     val week: WeekProgress? = null,
+    val stats: ReviewStats = ReviewStats(),
 )
+
+/** Numbers behind the Stats tab. */
+data class ReviewStats(
+    val reviewedToday: Int = 0,
+    val newCards: Int = 0,
+    val learning: Int = 0,
+    val mature: Int = 0,
+    val words: Int = 0,
+    /** Average predicted and actual chapter recall (0..100) over the saved attempts; null with no attempts. */
+    val predictedRecall: Int? = null,
+    val actualRecall: Int? = null,
+    val recallAttempts: Int = 0,
+) {
+    val cards: Int get() = newCards + learning + mature
+}
 
 enum class ExportFormat { MARKDOWN, WEB_ANNOTATION }
 enum class ExportStatus { IDLE, WORKING, DONE, FAILED }
@@ -54,8 +71,11 @@ class NotebookViewModel(private val deps: StudyDeps) : ViewModel() {
         deps.library.books,
         deps.cards.cards(null),
         deps.cards.dueCount(deps.clock()),
-        combine(deps.reviewStats.reviewDays, deps.reviewStats.weeklyGoalDays) { d, g -> d to g },
-    ) { ann, books, cards, due, stats -> Inputs(ann, books, cards, due, stats.first, stats.second) }
+        combine(
+            deps.reviewStats.reviewDays, deps.reviewStats.weeklyGoalDays,
+            deps.cards.reviewedTodayFlow(deps.clock()), deps.reviewStats.recalls,
+        ) { d, g, r, rc -> Extras(d, g, r, rc) },
+    ) { ann, books, cards, due, x -> Inputs(ann, books, cards, due, x) }
         .mapLatest { i ->
             val sections = i.annotations.map { it.bookId }.distinct().associateWith { deps.spine.sections(it) }
             val titles = i.books.associateBy { it.id }
@@ -67,15 +87,32 @@ class NotebookViewModel(private val deps: StudyDeps) : ViewModel() {
                 cards = grouped(i.cards.filter { it.type != CardType.VOCAB }),
                 words = grouped(i.cards.filter { it.type == CardType.VOCAB }),
                 dueCount = i.due,
-                week = weekProgress(today, i.days, i.goal),
+                week = weekProgress(today, i.x.days, i.x.goal),
+                stats = reviewStats(i.cards, i.x),
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotebookData())
 
+    private class Extras(val days: Set<String>, val goal: Int, val reviewedToday: Int, val recalls: List<RecallResult>)
+
     private class Inputs(
         val annotations: List<Annotation>, val books: List<Book>, val cards: List<Card>,
-        val due: Int, val days: Set<String>, val goal: Int,
+        val due: Int, val x: Extras,
     )
+
+    private fun reviewStats(cards: List<Card>, x: Extras): ReviewStats {
+        val qa = cards.filter { it.type != CardType.VOCAB }
+        return ReviewStats(
+            reviewedToday = x.reviewedToday,
+            newCards = qa.count { it.state == 0 },
+            learning = qa.count { it.state == 1 || it.state == 3 },
+            mature = qa.count { it.state == 2 },
+            words = cards.size - qa.size,
+            predictedRecall = x.recalls.takeIf { it.isNotEmpty() }?.let { r -> r.sumOf { it.predicted } / r.size },
+            actualRecall = x.recalls.takeIf { it.isNotEmpty() }?.let { r -> r.sumOf { it.actual } / r.size },
+            recallAttempts = x.recalls.size,
+        )
+    }
 
     private val _export = MutableStateFlow(ExportState())
     val export: StateFlow<ExportState> = _export

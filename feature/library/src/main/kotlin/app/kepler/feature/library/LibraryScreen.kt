@@ -3,15 +3,16 @@ package app.kepler.feature.library
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,8 +21,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,50 +39,64 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kepler.core.designsystem.BOOK_H
-import app.kepler.core.designsystem.Kp
-import app.kepler.core.designsystem.KpCaps
-import app.kepler.core.designsystem.LocalBookStage
-import app.kepler.core.designsystem.KpIcon
-import app.kepler.core.designsystem.KpIconKey
-import app.kepler.core.designsystem.KpIconKind
-import app.kepler.core.designsystem.KpInput
-import app.kepler.core.designsystem.KpPrimaryKey
-import app.kepler.core.designsystem.KpRow
-import app.kepler.core.designsystem.KpRowSeparator
-import app.kepler.core.designsystem.KpSecondaryKey
-import app.kepler.core.designsystem.KpSheet
-import app.kepler.core.designsystem.KpTextLink
-import app.kepler.core.designsystem.KpToastHost
-import app.kepler.core.designsystem.KpType
+import app.kepler.core.designsystem.BOOK_W
 import app.kepler.core.designsystem.BookMaterial
+import app.kepler.core.designsystem.BookObject
 import app.kepler.core.designsystem.BookPose
 import app.kepler.core.designsystem.BookScene
+import app.kepler.core.designsystem.CoverImage
+import app.kepler.core.designsystem.CoverRequest
 import app.kepler.core.designsystem.HapticToken
+import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.KpChip
+import app.kepler.core.designsystem.KpCoverTile
+import app.kepler.core.designsystem.KpEmptyState
+import app.kepler.core.designsystem.KpIconButton
+import app.kepler.core.designsystem.KpIconButtonStyle
+import app.kepler.core.designsystem.KpIconView
+import app.kepler.core.designsystem.KpIcons
+import app.kepler.core.designsystem.KpLargeTopBar
+import app.kepler.core.designsystem.KpRing
+import app.kepler.core.designsystem.KpRow
+import app.kepler.core.designsystem.KpSectionHeader
+import app.kepler.core.designsystem.KpSheet
+import app.kepler.core.designsystem.KpSkeleton
+import app.kepler.core.designsystem.KpSpace
+import app.kepler.core.designsystem.KpToastHost
+import app.kepler.core.designsystem.KpType
 import app.kepler.core.designsystem.PlankBaseline
 import app.kepler.core.designsystem.PlankHeight
 import app.kepler.core.designsystem.ShelfPlank
+import app.kepler.core.designsystem.rememberCoverImage
 import app.kepler.core.designsystem.rememberHaptics
 import app.kepler.core.model.Book
 
-private const val GUTTER_DP = 24f
+private const val GUTTER_DP = 20f
 
 @Composable
-fun LibraryRoute(onOpenBook: (bookId: Long) -> Unit, deps: LibraryDeps = LocalLibraryDeps.current) {
+fun LibraryRoute(
+    onOpenBook: (bookId: Long) -> Unit,
+    deps: LibraryDeps = LocalLibraryDeps.current,
+    onRead: ((bookId: Long) -> Unit)? = null,
+    onListen: ((bookId: Long) -> Unit)? = null,
+) {
     val vm = libraryViewModel { LibraryViewModel(deps) }
     val ui by vm.state.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -84,13 +107,17 @@ fun LibraryRoute(onOpenBook: (bookId: Long) -> Unit, deps: LibraryDeps = LocalLi
         onOpenBook = onOpenBook,
         onAdd = { picker.launch(arrayOf("application/epub+zip")) },
         onQuery = vm::setQuery,
-        onToggleSearch = vm::toggleSearch,
+        onFilter = vm::setFilter,
         onToggleLayout = vm::toggleLayout,
         onSort = vm::setSort,
-        onLongPress = vm::requestDelete,
+        onLongPress = vm::openMenu,
+        onCloseMenu = vm::closeMenu,
+        onRemove = vm::requestDelete,
         onConfirmDelete = vm::confirmDelete,
         onCancelDelete = vm::cancelDelete,
         onDismissMessage = vm::dismissMessage,
+        onRead = onRead,
+        onListen = onListen,
     )
 }
 
@@ -100,76 +127,93 @@ fun LibraryScreen(
     onOpenBook: (Long) -> Unit,
     onAdd: () -> Unit,
     onQuery: (String) -> Unit,
-    onToggleSearch: () -> Unit,
+    onFilter: (LibraryFilter) -> Unit,
     onToggleLayout: () -> Unit,
     onSort: (LibrarySort) -> Unit,
     onLongPress: (Book) -> Unit,
+    onCloseMenu: () -> Unit,
+    onRemove: (Book) -> Unit,
     onConfirmDelete: () -> Unit,
     onCancelDelete: () -> Unit,
     onDismissMessage: () -> Unit,
+    onRead: ((Long) -> Unit)? = null,
+    onListen: ((Long) -> Unit)? = null,
 ) {
     val p = Kp.palette
     var sortSheet by remember { mutableStateOf(false) }
     val haptics = rememberHaptics()
 
-    ScreenRoot {
-        Column(Modifier.fillMaxSize()) {
-            // header: caps count, then the three icon keys
-            Row(Modifier.fillMaxWidth().height(56.dp).padding(start = 24.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                KpCaps(stringResource(R.string.library_caps, ui.total), Modifier.weight(1f))
-                KpIconKey(KpIconKind.Search, stringResource(R.string.search), onToggleSearch)
-                KpIconKey(
-                    if (ui.layout == LibraryLayout.Shelf) KpIconKind.List else KpIconKind.Shelf,
-                    stringResource(if (ui.layout == LibraryLayout.Shelf) R.string.show_list else R.string.show_shelf),
-                    onToggleLayout,
-                )
-                KpIconKey(KpIconKind.Add, stringResource(R.string.add_book), onAdd)
-            }
-            if (ui.searching) {
-                KpInput(
-                    ui.query, onQuery, Modifier.padding(horizontal = 24.dp),
-                    placeholder = stringResource(R.string.search_hint),
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-            if (!ui.isEmpty) {
-                Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    KpTextLink(stringResource(R.string.sort_link, stringResource(ui.sort.label())), { sortSheet = true })
-                    if (ui.importing) {
-                        Spacer(Modifier.weight(1f))
-                        KpCaps(stringResource(R.string.adding), Modifier.padding(end = 4.dp), color = p.accentText)
+    val header: @Composable () -> Unit = {
+        Column {
+            KpLargeTopBar(
+                title = stringResource(R.string.library_title),
+                actions = {
+                    val bookcase = ui.layout == LibraryLayout.Bookcase
+                    KpIconButton(
+                        if (bookcase) KpIcons.Grid else KpIcons.Bookcase,
+                        stringResource(if (bookcase) R.string.show_grid else R.string.show_bookcase),
+                        onToggleLayout, style = KpIconButtonStyle.Tonal,
+                    )
+                    KpIconButton(KpIcons.Add, stringResource(R.string.add_book), onAdd, style = KpIconButtonStyle.Tonal)
+                },
+            )
+            if (!ui.isEmpty && ui.loaded) {
+                SearchPill(ui.query, onQuery, stringResource(R.string.search_hint), Modifier.padding(horizontal = KpSpace.gutter))
+                Spacer(Modifier.height(12.dp))
+                LazyRow(contentPadding = PaddingValues(horizontal = KpSpace.gutter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(LibraryFilter.entries) { f ->
+                        KpChip(stringResource(f.label()), selected = f == ui.filter, onClick = { onFilter(f) })
                     }
                 }
-            }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                when {
-                    !ui.loaded -> Unit
-                    ui.isEmpty -> EmptyShelf(onAdd, ui.importing)
-                    ui.noMatches -> Text(
-                        stringResource(R.string.no_matches, ui.query), color = p.text2, style = KpType.body,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.padding(horizontal = KpSpace.gutter), verticalAlignment = Alignment.CenterVertically) {
+                    KpSectionHeader(
+                        pluralStringResource(R.plurals.library_books, ui.books.size, ui.books.size),
+                        Modifier.weight(1f),
+                        actionLabel = stringResource(R.string.sort_link, stringResource(ui.sort.label())),
+                        onAction = { sortSheet = true },
                     )
-                    ui.layout == LibraryLayout.Shelf -> ShelfView(ui.books, onOpenBook, onLongPress, onAdd, ui.importing)
-                    else -> ListView(ui.books, onOpenBook, onLongPress)
                 }
-                KpToastHost(
-                    message = ui.message?.let { m ->
-                        when (m) {
-                            LibraryMessage.ImportFailed -> stringResource(R.string.import_failed)
-                            is LibraryMessage.Duplicate -> stringResource(R.string.import_duplicate, m.title)
-                            is LibraryMessage.Imported -> stringResource(R.string.import_done, m.title)
-                        }
-                    },
-                    onDismiss = onDismissMessage,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-                )
             }
+        }
+    }
+
+    ScreenRoot {
+        Box(Modifier.fillMaxSize()) {
+            when {
+                !ui.loaded -> Column { header(); LibrarySkeleton() }
+                ui.isEmpty -> Column {
+                    header()
+                    Box(Modifier.fillMaxWidth().padding(top = 72.dp)) {
+                        KpEmptyState(
+                            title = stringResource(R.string.empty_title),
+                            body = stringResource(R.string.empty_body),
+                            actionLabel = stringResource(R.string.add_a_book),
+                            onAction = { if (!ui.importing) onAdd() },
+                            art = { BookObject(CoverRequest(0L, stringResource(R.string.home_empty_cover), "", null), Modifier.height(150.dp)) },
+                        )
+                    }
+                }
+                ui.layout == LibraryLayout.Bookcase -> BookcaseView(ui, header, onOpenBook, onLongPress, onAdd)
+                else -> GridView(ui, header, onOpenBook, onLongPress)
+            }
+            KpToastHost(
+                message = ui.message?.let { m ->
+                    when (m) {
+                        LibraryMessage.ImportFailed -> stringResource(R.string.import_failed)
+                        is LibraryMessage.Duplicate -> stringResource(R.string.import_duplicate, m.title)
+                        is LibraryMessage.Imported -> stringResource(R.string.import_done, m.title)
+                    }
+                },
+                onDismiss = onDismissMessage,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+            )
         }
     }
 
     if (sortSheet) {
         KpSheet(onDismiss = { sortSheet = false }) {
-            KpCaps(stringResource(R.string.sort_by))
+            Text(stringResource(R.string.sort_by), color = p.text, style = KpType.title2)
             Spacer(Modifier.height(8.dp))
             LibrarySort.entries.forEach { s ->
                 SelectableRow(stringResource(s.label()), selected = s == ui.sort) {
@@ -177,6 +221,15 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+    ui.menuFor?.let { b ->
+        BookActionsSheet(
+            b, onDismiss = onCloseMenu,
+            onOpen = { onCloseMenu(); onOpenBook(b.id) },
+            onRead = onRead?.let { r -> { onCloseMenu(); r(b.id) } },
+            onListen = onListen?.let { l -> { onCloseMenu(); l(b.id) } },
+            onRemove = { onRemove(b) },
+        )
     }
     ui.pendingDelete?.let { b -> RemoveBookSheet(b.title, onConfirmDelete, onCancelDelete) }
 }
@@ -187,41 +240,161 @@ private fun LibrarySort.label(): Int = when (this) {
     LibrarySort.Author -> R.string.sort_author
 }
 
+private fun LibraryFilter.label(): Int = when (this) {
+    LibraryFilter.All -> R.string.filter_all
+    LibraryFilter.Reading -> R.string.filter_reading
+    LibraryFilter.Listening -> R.string.filter_listening
+    LibraryFilter.Finished -> R.string.filter_finished
+    LibraryFilter.NonFiction -> R.string.filter_nonfiction
+}
+
+/** The 44 dp search pill (brief v2 section 8). */
+@Composable
+internal fun SearchPill(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier) {
+    val p = Kp.palette
+    Row(
+        modifier.fillMaxWidth().height(44.dp).clip(CircleShape).background(p.surface1)
+            .then(if (!p.isDark) Modifier.border(1.dp, p.hairline, CircleShape) else Modifier)
+            .padding(start = 14.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        KpIconView(KpIcons.Search, p.text2, size = 20.dp)
+        Spacer(Modifier.width(8.dp))
+        Box(Modifier.weight(1f)) {
+            BasicTextField(
+                value, onChange, Modifier.fillMaxWidth(), singleLine = true,
+                textStyle = KpType.body.copy(color = p.text), cursorBrush = SolidColor(p.accent),
+            )
+            if (value.isEmpty()) Text(placeholder, color = p.text2, style = KpType.body, maxLines = 1)
+        }
+        if (value.isNotEmpty()) {
+            val clear = stringResource(R.string.clear)
+            Box(
+                Modifier.size(36.dp).clip(CircleShape).clickable(role = Role.Button) { onChange("") }.semantics { contentDescription = clear },
+                contentAlignment = Alignment.Center,
+            ) { KpIconView(KpIcons.Close, p.text2, size = 18.dp) }
+        }
+    }
+}
+
 @Composable
 internal fun SelectableRow(label: String, selected: Boolean, onClick: () -> Unit) {
     val p = Kp.palette
     Row(Modifier.fillMaxWidth().padding(vertical = 0.dp), verticalAlignment = Alignment.CenterVertically) {
         KpRow(
             label, Modifier.weight(1f), onClick = onClick,
-            leading = { if (selected) KpIcon(KpIconKind.Check, p.accentText) },
+            leading = { if (selected) KpIconView(KpIcons.Check, p.accentText, size = 20.dp) },
         )
     }
 }
 
 @Composable
-private fun EmptyShelf(onAdd: () -> Unit, importing: Boolean) {
-    val p = Kp.palette
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val plankTop = maxHeight * 0.34f
-        ShelfPlank(Modifier.offset(y = plankTop))
-        Column(Modifier.fillMaxWidth().padding(top = plankTop + 56.dp).padding(horizontal = 24.dp)) {
-            Text(stringResource(R.string.empty_title), color = p.text, style = KpType.headline)
-            Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.empty_body), color = p.text2, style = KpType.body)
-            Spacer(Modifier.height(24.dp))
-            KpPrimaryKey(stringResource(R.string.add_a_book), onAdd, enabled = !importing)
+private fun LibrarySkeleton() {
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = KpSpace.gutter)) {
+        val w = (maxWidth - 24.dp) / 3
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            repeat(2) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    repeat(3) { KpSkeleton(Modifier.width(w).height(w * 1.5f), app.kepler.core.designsystem.KpRadius.cover) }
+                }
+            }
         }
     }
 }
 
-// ------------------------------------------------------------------ shelf
+// ------------------------------------------------------------------ grid
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GridView(ui: LibraryUi, header: @Composable () -> Unit, onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit) {
+    val haptics = rememberHaptics()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val columns = if (maxWidth >= 600.dp) 5 else 3
+        val tileDp = ((maxWidth.value - 2 * GUTTER_DP - (columns - 1) * 12f) / columns).toInt()
+        PreloadCovers(ui.books, tileDp)
+        LazyVerticalGrid(
+            GridCells.Fixed(columns), Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = KpSpace.gutter, end = KpSpace.gutter, bottom = KpSpace.l),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }, key = "header") {
+                // The header is laid out edge to edge, so undo the grid's gutter around it.
+                Box(Modifier.layout(outsetGutter)) { header() }
+            }
+            if (ui.noMatches) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "none") {
+                    Text(
+                        stringResource(R.string.no_matches, ui.query), color = Kp.palette.text2, style = KpType.body,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                }
+            }
+            items(ui.books, key = { it.id }) { b ->
+                Box(
+                    Modifier.combinedClickable(
+                        role = Role.Button,
+                        onLongClick = { haptics.play(HapticToken.Confirm); onLongPress(b) },
+                        onClick = { haptics.play(HapticToken.Tap); onOpen(b.id) },
+                    ),
+                ) {
+                    KpCoverTile(
+                        b.coverRequest(), b.positionFraction, sharedElement = true,
+                        badge = when (val badge = ui.badges[b.id]) {
+                            is BookBadge.Narrated -> ({ KpIconView(KpIcons.Headphones, Kp.palette.text, size = 14.dp) })
+                            is BookBadge.Generating -> ({ KpRing(badge.fraction, size = 16.dp, stroke = 2.dp) })
+                            else -> null
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Lets a full-width child ignore the horizontal content padding of its lazy container. */
+private val outsetGutter: androidx.compose.ui.layout.MeasureScope.(androidx.compose.ui.layout.Measurable, androidx.compose.ui.unit.Constraints) -> androidx.compose.ui.layout.MeasureResult =
+    { measurable, constraints ->
+        val extra = (GUTTER_DP * 2).dp.roundToPx()
+        val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + extra, minWidth = constraints.maxWidth + extra))
+        layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+    }
+
+@Composable
+private fun BookActionsSheet(
+    book: Book, onDismiss: () -> Unit, onOpen: () -> Unit, onRead: (() -> Unit)?, onListen: (() -> Unit)?, onRemove: () -> Unit,
+) {
+    val p = Kp.palette
+    KpSheet(onDismiss = onDismiss) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CoverImage(book.coverRequest(), Modifier.size(40.dp, 60.dp), shape = app.kepler.core.designsystem.KpRadius.coverSmall)
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(book.title, color = p.text, style = KpType.title2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (book.authors.isNotBlank()) Text(book.authors, color = p.text2, style = KpType.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        SheetRow(KpIcons.Library, stringResource(R.string.open_book), onOpen)
+        if (onRead != null) SheetRow(KpIcons.Book, stringResource(R.string.read), onRead)
+        if (onListen != null) SheetRow(KpIcons.Headphones, stringResource(R.string.listen), onListen)
+        SheetRow(KpIcons.Trash, stringResource(R.string.remove_from_library), onRemove, color = p.negative)
+    }
+}
+
+@Composable
+private fun SheetRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit, color: androidx.compose.ui.graphics.Color = Kp.palette.text) {
+    KpRow(label, onClick = onClick, titleColor = color, inset = 0.dp, leading = { KpIconView(icon, color, size = 22.dp) })
+}
+
+// ------------------------------------------------------------------ bookcase
 
 /**
- * The bookcase: lit planks every 196 dp fill the viewport whatever the count, books stand at natural heights,
- * the first stands face-out, the last spine leans, and a ghost spine waits where the next book goes.
+ * The bookcase (optional view): lit planks every 196 dp fill the viewport whatever the count, books stand at
+ * natural heights, the first stands face-out, the last spine leans, and a ghost spine waits where the next book goes.
  */
 @Composable
-private fun ShelfView(books: List<Book>, onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit, onAdd: () -> Unit, importing: Boolean) {
+private fun BookcaseView(ui: LibraryUi, header: @Composable () -> Unit, onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit, onAdd: () -> Unit) {
+    val books = ui.books
     val materials = rememberBookMaterials()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val width = maxWidth.value
@@ -229,12 +402,21 @@ private fun ShelfView(books: List<Book>, onOpen: (Long) -> Unit, onLongPress: (B
         val plans = remember(facts, width) { ShelfLayout.plan(facts, width - 2 * GUTTER_DP) }
         val planks = ShelfLayout.plankCount(plans.size, maxHeight.value)
         LazyColumn(Modifier.fillMaxSize()) {
-            items(planks) { r ->
+            item(key = "header") { header() }
+            if (ui.noMatches) {
+                item(key = "none") {
+                    Text(
+                        stringResource(R.string.no_matches, ui.query), color = Kp.palette.text2, style = KpType.body,
+                        modifier = Modifier.padding(horizontal = KpSpace.gutter, vertical = 16.dp),
+                    )
+                }
+            }
+            items(if (ui.noMatches) 0 else planks) { r ->
                 val plan = plans.getOrNull(r)
                 if (plan == null) {
                     Box(Modifier.fillMaxWidth().height(ShelfLayout.ROW.dp)) { ShelfPlank(Modifier.align(Alignment.BottomCenter)) }
                 } else {
-                    ShelfRow(plan, books, materials, width, onOpen, onLongPress, onAdd, importing)
+                    ShelfRow(plan, books, materials, width, onOpen, onLongPress, onAdd, ui.importing)
                 }
             }
         }
@@ -250,15 +432,8 @@ private fun ShelfRow(
     val k = 390f / widthDp                // design units per dp
     val baselineDp = ShelfLayout.ROW - PlankHeight.value + PlankBaseline.value
     val books = plan.books.map { all[it.index] }
-    // small jackets so each spine can wear its jacket's colour; the face-out book shows its jacket
-    // While a jacket decodes (or after the order changed), wear the look the stage last saw for that book,
-    // never the previous occupant's jacket and never a typographic flash.
-    val stage = LocalBookStage.current
-    val covers = plan.books.map {
-        val b = all[it.index]
-        val load = rememberCoverLoad(b.coverPath, if (it.faceOut) 240 else 96)
-        if (load.ready && (load.image != null || b.coverPath == null)) load.image else stage?.knownSpec(b.id)?.cover ?: load.image
-    }
+    // Covers come from the shared cache: a real jacket never shows the generated cover first.
+    val covers = plan.books.map { rememberCoverImage(all[it.index].coverRequest(), if (it.faceOut) 384 else 192) }
     val specs = remember(books, materials, covers) { books.mapIndexed { i, b -> bookSpecFor(b, materials, covers[i]) } }
     val targets = remember(plan, widthDp) {
         plan.books.map { pb ->
@@ -283,8 +458,7 @@ private fun ShelfRow(
                 onLongPress = { i -> haptics.play(HapticToken.Confirm); onLongPress(books[i]) },
                 hitPad = 10f,
                 labels = books.map { listOf(it.title, it.authors).filter { s -> s.isNotBlank() }.joinToString(", ") },
-                stageKeys = books.map { it.id },
-                stageTag = "shelf",
+                keys = books.map { it.id },
                 pressLift = true,
             )
         }
@@ -326,55 +500,3 @@ private fun GhostSpine(modifier: Modifier, widthDp: Float, heightDp: Float, onAd
     }
 }
 
-// ------------------------------------------------------------------ list
-
-@Composable
-private fun ListView(books: List<Book>, onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit) {
-    val materials = rememberBookMaterials()
-    LazyColumn(Modifier.fillMaxSize()) {
-        items(books, key = { it.id }) { b ->
-            val cover = rememberCover(b.coverPath, 120)
-            KpRow(
-                title = b.title,
-                meta = listOfNotNull(b.authors.takeIf { it.isNotBlank() }, progressMeta(b)).joinToString(" · "),
-                onClick = { onOpen(b.id) },
-                onLongClick = { onLongPress(b) },
-                leading = { MiniCover(materialFor(b, materials), cover) },
-            )
-            KpRowSeparator(hasLeading = true)
-        }
-    }
-}
-
-@Composable
-private fun progressMeta(b: Book): String? = when {
-    b.listenFraction > 0.005f && b.listenFraction >= b.readFraction -> stringResource(R.string.pct_listened, percentOf(b.listenFraction))
-    b.readFraction > 0.005f -> stringResource(R.string.pct_read, percentOf(b.readFraction))
-    else -> null
-}
-
-/** 28 x 42 flat cover: the jacket if there is one, otherwise cloth with a title bar. */
-@Composable
-internal fun MiniCover(material: BookMaterial, cover: ImageBitmap?) {
-    Canvas(Modifier.size(28.dp, 42.dp)) {
-        val r = CornerRadius(1.5.dp.toPx())
-        drawRoundRect(material.cloth, Offset.Zero, size, r)
-        if (cover != null) {
-            val wantW = minOf(cover.width, (cover.height * 2f / 3f).toInt())
-            val wantH = minOf(cover.height, (cover.width * 3f / 2f).toInt())
-            drawImage(
-                cover, IntOffset((cover.width - wantW) / 2, (cover.height - wantH) / 2), IntSize(wantW, wantH),
-                IntOffset.Zero, IntSize(size.width.toInt(), size.height.toInt()),
-            )
-        } else {
-            drawRect(material.ink.copy(alpha = 0.85f), Offset(size.width * 0.2f, size.height * 0.22f), Size(size.width * 0.6f, 1.5.dp.toPx()))
-            drawCircle(material.ink.copy(alpha = 0.8f), size.width * 0.16f, Offset(size.width / 2f, size.height * 0.6f), style = androidx.compose.ui.graphics.drawscope.Stroke(1.2.dp.toPx()))
-        }
-        drawRect(
-            Brush.linearGradient(
-                0f to Color.White.copy(alpha = 0.18f), 0.42f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.3f),
-                start = Offset.Zero, end = Offset(size.width, size.height),
-            ),
-        )
-    }
-}

@@ -30,6 +30,10 @@ import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.KpCaps
 import app.kepler.core.designsystem.KpIconKey
 import app.kepler.core.designsystem.KpIconKind
+import app.kepler.core.designsystem.CoverRequest
+import app.kepler.core.designsystem.KpCovers
+import app.kepler.core.designsystem.rememberCoverStyle
+import app.kepler.core.model.Book
 
 @Composable
 internal fun ScreenRoot(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
@@ -75,3 +79,22 @@ fun openBatterySettings(context: Context): Boolean {
     }
     return false
 }
+
+internal fun Book.coverRequest() = CoverRequest(id, title, authors, coverPath)
+
+/** Warms the cover cache the moment a list of books is known, so tiles draw their cover on the first frame. */
+@Composable
+internal fun PreloadCovers(books: List<Book>, widthDp: Int) {
+    val style = rememberCoverStyle()
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val ids = books.map { it.id to it.coverPath }
+    androidx.compose.runtime.LaunchedEffect(ids, style, widthDp) {
+        KpCovers.preload(books.map { it.coverRequest() }, style, (widthDp * density).toInt())
+    }
+}
+
+/** "2h 10m" or "18 min", from minutes. */
+@Composable
+internal fun minutesText(minutes: Int): String =
+    if (minutes >= 60) androidx.compose.ui.res.stringResource(R.string.dur_h_m, minutes / 60, minutes % 60)
+    else androidx.compose.ui.res.stringResource(R.string.dur_min, minutes.coerceAtLeast(1))

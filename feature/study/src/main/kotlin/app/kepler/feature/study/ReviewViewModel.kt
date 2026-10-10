@@ -19,7 +19,11 @@ data class ReviewState(
     val hintShown: Boolean = false,
     val intervals: Map<Rating, Long> = emptyMap(),
     val reviewedThisSession: Int = 0,
+    val againThisSession: Int = 0,
     val week: WeekProgress? = null,
+    /** What the person typed before turning the card, shown beside the answer. Never saved. */
+    val typed: String = "",
+    val titles: Map<Long, String> = emptyMap(),
 ) {
     val current: Card? get() = queue.getOrNull(index)
     val left: Int get() = (queue.size - index).coerceAtLeast(0)
@@ -28,6 +32,9 @@ data class ReviewState(
     val nothingDue: Boolean get() = finished && reviewedThisSession == 0
     val progress: Float get() = if (queue.isEmpty()) 0f else index.toFloat() / queue.size
     val hint: String? get() = current?.takeIf { hintShown && !flipped }?.let { Study.hintFor(it.back) }
+    /** Cards in this sitting, including ones that came back after Again. */
+    val total: Int get() = queue.size
+    val source: String? get() = current?.let { titles[it.bookId] }
 }
 
 class ReviewViewModel(private val deps: StudyDeps) : ViewModel() {
@@ -38,7 +45,8 @@ class ReviewViewModel(private val deps: StudyDeps) : ViewModel() {
         viewModelScope.launch {
             // The queue is a snapshot: grading a card must not reshuffle the cards still waiting.
             val due = deps.cards.dueCards(deps.clock(), 50).first()
-            _state.update { it.copy(loading = false, queue = due) }
+            val titles = runCatching { deps.library.books.first().associate { it.id to it.title } }.getOrDefault(emptyMap())
+            _state.update { it.copy(loading = false, queue = due, titles = titles) }
             refreshIntervals()
             refreshWeek()
         }
@@ -55,6 +63,7 @@ class ReviewViewModel(private val deps: StudyDeps) : ViewModel() {
         _state.update { it.copy(week = weekProgress(today, days, goal)) }
     }
 
+    fun setTyped(v: String) = _state.update { it.copy(typed = v) }
     fun flip() = _state.update { if (it.current == null) it else it.copy(flipped = !it.flipped) }
     fun showHint() = _state.update { if (it.flipped) it else it.copy(hintShown = true) }
 
@@ -71,8 +80,9 @@ class ReviewViewModel(private val deps: StudyDeps) : ViewModel() {
                 val again = rating == Rating.AGAIN && Study.repeatsThisSession(updated.dueAt, now)
                 it.copy(
                     queue = if (again) it.queue + updated else it.queue,
-                    index = it.index + 1, flipped = false, hintShown = false,
+                    index = it.index + 1, flipped = false, hintShown = false, typed = "",
                     reviewedThisSession = it.reviewedThisSession + 1,
+                    againThisSession = it.againThisSession + if (rating == Rating.AGAIN) 1 else 0,
                 )
             }
             refreshIntervals()

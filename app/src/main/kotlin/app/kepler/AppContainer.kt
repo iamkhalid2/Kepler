@@ -4,6 +4,7 @@ import android.app.Application
 import app.kepler.core.database.DataLayer
 import app.kepler.core.model.AiBudget
 import app.kepler.core.model.AiService
+import app.kepler.core.model.AiStreaming
 import app.kepler.core.model.AnnotationRepository
 import app.kepler.core.model.AudioRepository
 import app.kepler.core.model.CardRepository
@@ -93,6 +94,16 @@ class AppContainer(private val app: Application) {
         override val paidCentsPerHour: () -> Double = ::paidCentsPerHour
         override val audio: AudioRepository = data.audio
         override val cards: CardRepository = data.cards
+        override val annotations: AnnotationRepository = data.annotations
+        override val reviewStats: ReviewStatsStore = this@AppContainer.reviewStats
+        override val aiStreaming: AiStreaming = this@AppContainer.ai
+        override val spine: SpineRepository = data.spine
+        override val viewPrefs: app.kepler.feature.library.ViewPrefs = object : app.kepler.feature.library.ViewPrefs {
+            private val prefs = app.getSharedPreferences("view_prefs", android.content.Context.MODE_PRIVATE)
+            override var bookcase: Boolean
+                get() = prefs.getBoolean("library_bookcase", false)
+                set(v) { prefs.edit().putBoolean("library_bookcase", v).apply() }
+        }
         override val verifyFishKey: suspend (String) -> Boolean = { key ->
             try {
                 FishProvider({ key }, maxAttempts = 1).voices(null)

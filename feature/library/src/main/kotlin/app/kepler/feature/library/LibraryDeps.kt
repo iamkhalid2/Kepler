@@ -11,6 +11,10 @@ import app.kepler.core.designsystem.KpTheme
 import app.kepler.core.designsystem.LocalHapticsEnabled
 import app.kepler.core.designsystem.kpPalette
 import app.kepler.core.model.AiBudget
+import app.kepler.core.model.AiStreaming
+import app.kepler.core.model.AnnotationRepository
+import app.kepler.core.model.ReviewStatsStore
+import app.kepler.core.model.SpineRepository
 import app.kepler.core.model.AppSettings
 import app.kepler.core.model.AudioRepository
 import app.kepler.core.model.CardRepository
@@ -58,6 +62,21 @@ interface LibraryDeps {
     val showsBatteryGuide: () -> Boolean get() = { isOppoFamily(Build.MANUFACTURER, Build.BRAND) }
 
     val appVersion: String get() = ""
+
+    /** Highlights for Home's recent-highlights strip. Null hides the strip. */
+    val annotations: AnnotationRepository? get() = null
+
+    /** Review days for Home's week dots. Null shows an empty week. */
+    val reviewStats: ReviewStatsStore? get() = null
+
+    /** Streams the "Previously on" recap. Null hides the card. */
+    val aiStreaming: AiStreaming? get() = null
+
+    /** Chapter titles for the Continue card and the Hub chapter list. Null hides both. */
+    val spine: SpineRepository? get() = null
+
+    /** Small remembered view choices (library grid or bookcase). The default forgets on restart. */
+    val viewPrefs: ViewPrefs get() = MemoryViewPrefs
 
     /** Debug builds only: a developer key to put in an empty key field. Release builds return "". */
     val devKeyPrefill: (KeyKind) -> String get() = { "" }
@@ -118,4 +137,13 @@ suspend fun LibraryDeps.removeBook(id: BookId) {
     } catch (_: Exception) {
     }
     library.delete(id)
+}
+
+/** Per-viewer view choices that outlive the process. */
+interface ViewPrefs {
+    var bookcase: Boolean
+}
+
+internal object MemoryViewPrefs : ViewPrefs {
+    override var bookcase: Boolean = false
 }

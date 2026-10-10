@@ -3,6 +3,7 @@ package app.kepler.feature.study
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.kepler.core.model.AnswerCheck
+import app.kepler.core.model.AskEvent
 import app.kepler.core.model.BookId
 import app.kepler.core.model.CardSuggestion
 import app.kepler.core.model.CardType
@@ -11,6 +12,7 @@ import app.kepler.core.model.RecallResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -23,8 +25,30 @@ data class ExplainState(
     val phase: ExplainPhase = ExplainPhase.LOADING_MODE,
     val studyMode: Boolean = false,
     val prediction: String = "",
+    /** Loading until the first words, then Ready with the text so far while [streaming] stays true. */
     val explanation: Load<String> = Load.Idle,
+    val streaming: Boolean = false,
 )
+
+/** Streams text deltas into a [Load]; the terminal answer replaces what was streamed. */
+internal suspend fun collectProse(
+    flow: kotlinx.coroutines.flow.Flow<AskEvent>,
+    onText: (String) -> Unit,
+): Load<String> {
+    var text = ""
+    var final: String? = null
+    var failure: UiError? = null
+    flow.catch { failure = it.toUiError() }.collect { e ->
+        when (e) {
+            is AskEvent.Delta -> { text += e.text; onText(text) }
+            is AskEvent.Done -> final = e.answer.text
+            is AskEvent.Failed -> failure = e.error.toUiError()
+            is AskEvent.Citations -> Unit
+        }
+    }
+    val shown = (final ?: text).trim()
+    return if (shown.isBlank() && failure != null) Load.Failed(failure!!) else Load.Ready(shown)
+}
 
 /** Study mode asks "why might this be true?" before the explanation is revealed; Light mode shows it straight away. */
 class ExplainViewModel(
@@ -51,14 +75,19 @@ class ExplainViewModel(
     }
 
     fun load() {
-        _state.update { it.copy(explanation = Load.Loading) }
-        viewModelScope.launch { val r = loading { deps.ai.explain(bookId, ordinal, text) }; _state.update { it.copy(explanation = r) } }
+        _state.update { it.copy(explanation = Load.Loading, streaming = true) }
+        viewModelScope.launch {
+            val r = collectProse(deps.streaming.explainStream(bookId, ordinal, text)) { t ->
+                _state.update { it.copy(explanation = Load.Ready(t)) }
+            }
+            _state.update { it.copy(explanation = r, streaming = false) }
+        }
     }
 }
 
 // ---------------------------------------------------------------- Define
 
-data class DefineState(val definition: Load<String> = Load.Loading, val savedAsWord: Boolean = false)
+data class DefineState(val definition: Load<String> = Load.Loading, val streaming: Boolean = true, val savedAsWord: Boolean = false)
 
 class DefineViewModel(
     private val bookId: BookId, private val ordinal: Int, private val term: String, private val deps: StudyDeps,
@@ -69,10 +98,12 @@ class DefineViewModel(
     init { load() }
 
     fun load() {
-        _state.update { it.copy(definition = Load.Loading) }
+        _state.update { it.copy(definition = Load.Loading, streaming = true) }
         viewModelScope.launch {
-            val r = loading { deps.ai.define(bookId, ordinal, term) }
-            _state.update { it.copy(definition = r) }
+            val r = collectProse(deps.streaming.defineStream(bookId, ordinal, term)) { t ->
+                _state.update { it.copy(definition = Load.Ready(t)) }
+            }
+            _state.update { it.copy(definition = r, streaming = false) }
             if (r is Load.Ready) saveWord(r.value)
         }
     }
