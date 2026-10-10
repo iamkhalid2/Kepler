@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -164,6 +165,16 @@ fun SettingsScreen(ui: SettingsUi, onBack: () -> Unit, vm: SettingsViewModel) {
             KpRow(
                 stringResource(R.string.app_name_row),
                 meta = if (ui.version.isBlank()) null else stringResource(R.string.version_x, ui.version),
+            )
+            KpRow(
+                stringResource(R.string.about_tagline_label),
+                meta = stringResource(R.string.about_tagline),
+            )
+            val uriHandler = LocalUriHandler.current
+            KpRow(
+                stringResource(R.string.about_github_label),
+                meta = "iamkhalid2/Kepler",
+                onClick = { uriHandler.openUri("https://github.com/iamkhalid2/Kepler") },
             )
             Text(stringResource(R.string.about_license), color = p.text2, style = KpType.caption, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             Text(stringResource(R.string.about_fonts), color = p.text2, style = KpType.caption, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
