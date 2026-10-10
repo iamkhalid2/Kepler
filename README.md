@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/design/brand/kepler-mark.svg" width="108" height="108" alt="Kepler mark" />
+<img src="art/kepler-mark.svg" width="108" height="108" alt="Kepler mark" />
 
 # Kepler
 
@@ -173,16 +173,6 @@ Or target specific core and engine modules:
           :feature:study:testDebugUnitTest
 ```
 
----
-
-## Documentation
-
-Comprehensive architecture, research, and design specifications are located in the [`docs/`](docs/) directory:
-
-- [Product & Architectural Decisions](docs/decisions.md) — Binding record of technical and product choices (#1–#112).
-- [Master Plan & Roadmap](docs/PLAN.md) — Scope, deliverables, and release phases.
-- [Design Language & Tokens](docs/design/shelf-language.md) — Visual styling, haptic patterns, and motion tokens.
-- [Release Process](docs/RELEASING.md) — Build signing, F-Droid metadata, and release checklist.
 
 ---
 

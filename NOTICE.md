@@ -50,8 +50,8 @@ These fonts are bundled under the SIL Open Font License, Version 1.1 (https://sc
 - **Literata:** Copyright 2017 The Literata Project Authors (https://github.com/googlefonts/literata)
 - **Albert Sans:** Copyright 2021 The Albert Sans Project Authors (https://github.com/usted/Albert-Sans)
 
-The full licence text is in [docs/licenses/OFL-1.1.txt](docs/licenses/OFL-1.1.txt) and is also bundled in the app
-as the asset `OFL-1.1.txt`. Reserved font names, if any, are stated in each font's own name table.
+The full licence text is bundled in the app as the asset `OFL-1.1.txt` (and available at https://scripts.sil.org/OFL).
+Reserved font names, if any, are stated in each font's own name table.
 
 ## Online services
 
