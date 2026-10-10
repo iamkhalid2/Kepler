@@ -112,25 +112,22 @@ jobs:
           fi
 
           # Generate SHA-256 checksums
-          cd "$RUNNER_TEMP/artifacts"
-          sha256sum Kepler-*.apk > checksums.txt
-          cat checksums.txt
+          (cd "$RUNNER_TEMP/artifacts" && sha256sum Kepler-*.apk > checksums.txt && cat checksums.txt)
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ steps.version_info.outputs.tag }}
         run: |
-          cd "$RUNNER_TEMP/artifacts"
-          FILES=(Kepler-*.apk checksums.txt)
+          RELEASE_FILES=("$RUNNER_TEMP/artifacts"/*)
 
           # Check if release already exists
           if gh release view "$TAG_NAME" > /dev/null 2>&1; then
             echo "Release $TAG_NAME already exists; uploading/updating assets..."
-            gh release upload "$TAG_NAME" "${FILES[@]}" --clobber
+            gh release upload "$TAG_NAME" "${RELEASE_FILES[@]}" --clobber
           else
             echo "Creating new release $TAG_NAME..."
-            gh release create "$TAG_NAME" "${FILES[@]}" \
+            gh release create "$TAG_NAME" "${RELEASE_FILES[@]}" \
               --title "Kepler $TAG_NAME" \
               --generate-notes
           fi
