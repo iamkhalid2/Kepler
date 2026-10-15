@@ -21,9 +21,9 @@
 
 Most ebook readers simply display text. Audiobook players stream narration without sentence context. Note apps collect highlights that fade from memory.
 
-**Kepler** is a native Android application built around a single premise: **books should be internalized, not just consumed.** It unites an exquisite reflowable EPUB reader, an AI-powered voice synthesizer with sentence-level read-along, and an active recall study loop powered by the FSRS-6 spaced repetition algorithm and contextual LLMs.
+**Kepler** is a native Android application built around a single premise: **books should be internalized, not just consumed.** It unites an EPUB reader, AI or on-device narration with sentence-level read-along, and an active recall study loop powered by the FSRS-6 spaced repetition algorithm and contextual LLMs.
 
-Non-fiction is treated as a first-class citizen: the app maps out arguments, synthesizes chapter packs, tests your comprehension, and guarantees through strict boundary fencing that AI insights **never spoil content past your current reading position**.
+Non-fiction is treated as a first-class citizen: the app builds a concept map, synthesizes chapter packs, tests your comprehension, and clips every AI prompt at your reading position so AI insights **never spoil content past where you are**.
 
 ---
 
@@ -35,38 +35,38 @@ Non-fiction is treated as a first-class citizen: the app maps out arguments, syn
 ├───────────────────┬────────────────────────────┬───────────────────────┤
 │     1. READ       │         2. LISTEN          │      3. REMEMBER      │
 │  ───────────────  │  ────────────────────────  │  ───────────────────  │
-│  • EPUB & PDF     │  • Fish Audio (S2.1 Pro)   │  • FSRS-6 Flashcards  │
-│  • Geist/Literata │  • Offline System TTS      │  • The AI Fence       │
-│  • Book Map       │  • Synced Read-Along       │  • Chapter Packs      │
+│  • EPUB (Readium) │  • Fish Audio (S2.1 Pro)   │  • FSRS-6 Flashcards  │
+│  • Literata type  │  • Offline System TTS      │  • The AI Fence       │
+│  • Paper themes   │  • Synced Read-Along       │  • Chapter Packs      │
 │  • FTS5 Search    │  • Media3 Playback Engine  │  • Selection AI       │
-│  • Lookups        │  • Auto & Silence Skip     │  • "Previously on..." │
+│  • AI Define      │  • Sleep Timer & Shake     │  • "Previously on..." │
 └───────────────────┴────────────────────────────┴───────────────────────┘
 ```
 
 ### 1. Read
-- **Reflowable & Fixed-Layout EPUB:** Powered by Readium with custom CSS transformations and sentence-span injection.
-- **Editorial Typography:** Bundled with *Geist* and *Literata* typefaces, custom paper themes (Day, Dusk, Night, Sepia), granular margins, and line-height controls.
+- **EPUB Reader:** Powered by Readium 3.4, with Readium CSS styling and decoration-based sentence and highlight marks.
+- **Editorial Typography:** Bundled *Literata* for reading (plus serif, sans-serif and publisher fonts) and *Fraunces* / *Albert Sans* for the interface; page themes (Day, Paper, Sepia, Night, Black, Custom), margins, and line-height controls.
 - **The Text Spine Coordinate System:** Every paragraph and sentence is mapped to deterministic sentence IDs, ensuring that bookmarks, highlights, audio sync, and study cards survive re-pagination and re-flows.
-- **Book Map:** Structural visualization of non-fiction arguments and chapter layouts.
-- **Full-Text In-Book Search:** Instant keyword and passage indexing via SQLite FTS5.
-- **Offline Lookups:** Instant WordNet definitions and Wikipedia integration directly from selected text.
-- **Footnote Popups:** Non-intrusive modal overlays so you never lose your reading position.
+- **Full-Text In-Book Search:** Keyword and passage search via SQLite FTS5.
+- **Notes Handling:** Footnote and endnote sections are detected at import and moved out of the linear reading and narration flow.
+- **Define:** Select a word to get an LLM definition in the book's context (needs an OpenRouter key; not an offline dictionary).
 
 ### 2. Listen
-- **High-Fidelity AI Narration:** Generates natural narration using Fish Audio (S2.1 Pro), with customizable narration styles, full cast voices for fiction, and dedicated quote voices for non-fiction.
+- **High-Fidelity AI Narration:** Generates natural narration using Fish Audio (S2.1 Pro) with a voice you choose.
 - **100% Offline System TTS:** Full support for on-device Android text-to-speech engines without requiring network connectivity or API keys.
 - **Synchronized Read-Along:** Custom `ReadAlongPlayer` highlights sentences in real-time as the narration plays, offering seamless switching between reading and listening.
-- **Professional Playback Controls:** Media3 ExoPlayer engine with speed adjustment (0.5×–3.0×), automatic silence skipping, sleep timer, headset controls, lock screen media notifications, and Android Auto support.
-- **Background Audio Generation:** Generates voice tracks in the background via Android WorkManager with live progress rings, ETA estimation, and cost calculations.
+- **Professional Playback Controls:** Media3 ExoPlayer engine with speed adjustment (0.5×–3.5×), sleep timer with shake-to-extend, headset controls, and lock screen media notifications.
+- **Background Audio Generation:** Generates voice tracks in the background via Android WorkManager with live progress, time-left estimates, and up-front cost estimates.
 
 ### 3. Remember
-- **FSRS-6 Spaced Repetition:** Flashcard review engine implementing the state-of-the-art Free Spaced Repetition Scheduler (FSRS) to guarantee long-term retention with optimal study load.
-- **The AI Fence:** Strict cryptographic-style boundary ensuring LLM prompts only ingest text up to your current reading position, making recaps, questions, and concept cards completely spoiler-free.
-- **Chapter Packs:** Single cached inference per chapter generating comprehensive summaries, core takeaways, active recall check-in questions, X-Ray concept cards, and pronunciation guides.
+- **FSRS-6 Spaced Repetition:** Flashcard review engine implementing the Free Spaced Repetition Scheduler (FSRS-6).
+- **The AI Fence:** Every LLM prompt is clipped to text up to your current reading position, so recaps, answers, and concept cards do not spoil what comes next.
+- **Chapter Packs:** One cached request per chapter producing a gist, key ideas, events, concepts and their relations, takeaways, a check-in question, and card candidates.
+- **Concept Map:** People, places, and ideas from the chapter packs drawn as a map of how they relate, limited to what you have read.
 - **Selection AI:** Select any sentence or paragraph in the reader to instantly **Explain**, **Ask**, or generate targeted study cards.
 - **"Previously on..." Recaps:** When returning to a book after 3 or more days away, Kepler streams a concise recap of preceding events or key concepts before you resume.
-- **Daily Review & Study Habits:** Dedicated home dashboard widgets tracking daily reviews due, active weekly streak dots, and total recall stats.
-- **Open Study Exports:** Export annotations and flashcards to Markdown / Obsidian, Anki, Readwise, and JSON.
+- **Daily Review:** Home shows cards due today with a time estimate and dots for the days you reviewed this week.
+- **Open Exports:** Export highlights and notes as Markdown (Obsidian-friendly, with deep links back to each sentence) or W3C Web Annotation JSON. Flashcards are not exported yet.
 
 ---
 
@@ -89,8 +89,8 @@ Kepler is built with strict privacy and data ownership guarantees:
 - **Bring Your Own Keys (BYOK):**
   - **Fish Audio:** Required only for generated voice models.
   - **OpenRouter:** For AI study features (Ask, Recap, Concepts, Cards). Fully compatible with free `:free` models (e.g. `nvidia/nemotron-3-super-120b-a12b:free`).
-- **Hardware-Backed Encryption:** API keys are encrypted at rest on your device using Android Keystore and `EncryptedSharedPreferences`. Keys are never logged, synced, or included in backups.
-- **Offline Core:** The EPUB reader, WordNet dictionary, FSRS flashcard scheduler, and system TTS function completely offline without internet access.
+- **Hardware-Backed Encryption:** API keys are encrypted at rest with AES-256-GCM using a non-exportable key held in the Android Keystore. App data is excluded from cloud backup and device transfer.
+- **Offline Core:** The EPUB reader, search, FSRS flashcard scheduler, and system TTS work completely offline. Define, Ask, recaps, and chapter packs need OpenRouter; Fish narration needs Fish Audio.
 
 ---
 
@@ -99,8 +99,8 @@ Kepler is built with strict privacy and data ownership guarantees:
 The project is structured into clear modular layers separating domain models, engines, and UI features:
 
 ```
-OpenAudiobook/
-├── app/                      # Application entry point, Nav3 navigation shell, DI container
+Kepler/
+├── app/                      # Application entry point, state-based back stack navigation, DI container
 ├── core/
 │   ├── model/                # Pure Kotlin domain entities, repository interfaces, engines
 │   ├── database/             # Room 3 entities, SQLite FTS5, DataStore, Keystore crypto
