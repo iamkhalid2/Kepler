@@ -173,6 +173,27 @@ Or target specific core and engine modules:
           :feature:study:testDebugUnitTest
 ```
 
+### Release signing
+
+Tagged releases (`v*`) are built and signed by `.github/workflows/release.yml`. Android only installs an update over an existing install when both APKs are signed with the same key, so every release must use one long-lived keystore. The workflow fails before building if any of these repository secrets is missing:
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | The release keystore (`.jks`), base64-encoded |
+| `ANDROID_KEYSTORE_PASSWORD` | The keystore password |
+| `ANDROID_KEY_ALIAS` | Alias of the signing key inside the keystore |
+| `ANDROID_KEY_PASSWORD` | Password of that key |
+
+Create the keystore once, keep it and its passwords backed up outside the repository (losing them means no existing install can ever be updated), and add the secrets under **Settings → Secrets and variables → Actions**:
+
+```bash
+keytool -genkeypair -v -keystore kepler-release.jks -alias kepler \
+        -keyalg RSA -keysize 4096 -validity 10000
+base64 -w0 kepler-release.jks   # value for ANDROID_KEYSTORE_BASE64 (macOS: base64 -i kepler-release.jks)
+```
+
+Never commit the keystore; `*.jks` and `*.keystore` are gitignored.
+
 
 ---
 
