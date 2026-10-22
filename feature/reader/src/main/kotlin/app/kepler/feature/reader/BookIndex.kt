@@ -58,6 +58,35 @@ internal class BookIndex(sentences: List<Sentence>, sections: List<Section>) {
         return words(ordinal, end).toDouble() / wpm
     }
 
+    /**
+     * Where [ordinal] sits inside the innermost section that holds it (the chapter the reader's bottom bar
+     * scrubs, #109). A section's own text ends where its first later subsection starts.
+     */
+    fun sectionProgress(ordinal: Int, wpm: Int = DEFAULT_WPM): SectionProgress? {
+        val s = sectionAt(ordinal) ?: return null
+        val nextChild = included.filter { it.level > s.level && it.startOrdinal in (ordinal + 1)..s.endOrdinal }.minOfOrNull { it.startOrdinal }
+        val range = s.startOrdinal..(nextChild?.minus(1) ?: s.endOrdinal)
+        val total = words(range.first, range.last)
+        if (total <= 0) return SectionProgress(s, range, 0f, 0.0)
+        val done = words(range.first, ordinal - 1)
+        return SectionProgress(s, range, (done.toFloat() / total).coerceIn(0f, 1f), words(ordinal, range.last).toDouble() / wpm)
+    }
+
+    /** The sentence at [fraction] (0..1, by words) of [range]. */
+    fun ordinalInRange(range: IntRange, fraction: Float): Int {
+        if (ordinals.isEmpty()) return range.first
+        val a = indexOf(range.first)
+        val b = indexOf(range.last, upper = true).coerceAtLeast(a)
+        val target = prefix[a] + ((prefix[b + 1] - prefix[a]) * fraction.coerceIn(0f, 1f)).toLong()
+        var lo = a
+        var hi = b
+        while (lo < hi) {
+            val mid = (lo + hi + 1) ushr 1
+            if (prefix[mid] <= target) lo = mid else hi = mid - 1
+        }
+        return ordinals[lo]
+    }
+
     /** Index of the sentence at [ordinal], or of its nearest neighbour when absent. */
     private fun indexOf(ordinal: Int, upper: Boolean = false): Int {
         var lo = 0
@@ -91,3 +120,5 @@ internal class BookIndex(sentences: List<Sentence>, sections: List<Section>) {
         }
     }
 }
+
+internal data class SectionProgress(val section: Section, val range: IntRange, val fraction: Float, val minutesLeft: Double)

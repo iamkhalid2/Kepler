@@ -1,5 +1,6 @@
 package app.kepler.feature.player
 
+import app.kepler.core.model.ChapterMark
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -26,24 +27,35 @@ class PlayerFormatTest {
         assertEquals(3.5f, PlayerFormat.stepSpeed(3.45f, 0.1f), 0.001f)
     }
 
-    @Test fun minutesAheadFollowsSpeed() {
-        assertEquals(10, PlayerFormat.minutesAhead(600_000, 1f))
-        assertEquals(5, PlayerFormat.minutesAhead(600_000, 2f))
-        assertEquals(0, PlayerFormat.minutesAhead(30_000, 1f))
+    @Test fun durationRoundsMinutesUp() {
+        assertEquals(0 to 0, PlayerFormat.durationParts(0))
+        assertEquals(0 to 1, PlayerFormat.durationParts(5_000))
+        assertEquals(0 to 18, PlayerFormat.durationParts(17 * 60_000L + 1))
+        assertEquals(2 to 10, PlayerFormat.durationParts(130 * 60_000L))
     }
 
-    @Test fun scrubberMapsBetweenOrdinalsAndFractions() {
-        assertEquals(0f, PlayerFormat.fractionOf(0, 101), 0f)
-        assertEquals(0.5f, PlayerFormat.fractionOf(50, 101), 0.0001f)
-        assertEquals(1f, PlayerFormat.fractionOf(100, 101), 0f)
-        assertEquals(50, PlayerFormat.ordinalAt(0.5f, 101))
-        assertEquals(100, PlayerFormat.ordinalAt(2f, 101))
-        assertEquals(0, PlayerFormat.ordinalAt(0.5f, 1))
+    private val marks = listOf(
+        ChapterMark(1, "One", 0, 99),
+        ChapterMark(2, "Two", 100, 199),
+        ChapterMark(3, "Three", 200, 299),
+    )
+
+    @Test fun chapterIndexFindsTheHoldingChapter() {
+        assertEquals(0, PlayerFormat.chapterIndex(marks, 0))
+        assertEquals(1, PlayerFormat.chapterIndex(marks, 150))
+        assertEquals(2, PlayerFormat.chapterIndex(marks, 299))
+        assertEquals(-1, PlayerFormat.chapterIndex(emptyList(), 5))
     }
 
-    @Test fun detentsSnapOnlyWhenClose() {
-        val ticks = listOf(0f, 0.25f, 0.6f)
-        assertEquals(0.25f, PlayerFormat.nearestTick(0.26f, ticks, 0.02f)!!, 0f)
-        assertNull(PlayerFormat.nearestTick(0.4f, ticks, 0.02f))
+    @Test fun previousChapterRestartsOnceTheChapterIsUnderway() {
+        assertEquals(100, PlayerFormat.previousChapterTarget(marks, 150, sectionElapsedMs = 60_000))
+        assertEquals(0, PlayerFormat.previousChapterTarget(marks, 101, sectionElapsedMs = 1_000))
+        assertEquals(0, PlayerFormat.previousChapterTarget(marks, 3, sectionElapsedMs = 500))
+    }
+
+    @Test fun nextChapterStopsAtTheLast() {
+        assertEquals(100, PlayerFormat.nextChapterTarget(marks, 0))
+        assertEquals(200, PlayerFormat.nextChapterTarget(marks, 150))
+        assertNull(PlayerFormat.nextChapterTarget(marks, 250))
     }
 }

@@ -145,7 +145,7 @@ class ShelfMathTest {
 
 class OnboardingViewModelTest : VmTest() {
     @Test fun stepsIncludeBatteryOnlyWhenAsked() = runTest {
-        assertEquals(4, OnboardingViewModel(FakeDeps()).state.value.steps.size)
+        assertEquals(3, OnboardingViewModel(FakeDeps()).state.value.steps.size)
         val d = FakeDeps().apply { battery = true }
         val vm = OnboardingViewModel(d)
         assertEquals(OnboardingStep.Battery, vm.state.value.steps.last())

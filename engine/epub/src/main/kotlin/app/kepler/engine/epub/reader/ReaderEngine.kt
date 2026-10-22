@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * A mark painted over the text. [tint] is ARGB. Highlights and underlines use Readium's own opacity;
- * a [band] (the read-along sentence) uses the tint's alpha as given.
+ * a [band] (the read-along sentence, r4 boxes around the words) uses the tint's alpha as given.
  */
 data class TextMark(
     val id: String,
@@ -23,6 +23,8 @@ data class SearchHit(val anchor: TextAnchor, val title: String?)
 sealed interface ReaderEvent {
     /** Tap outside the page-turn zones. */
     data object CenterTap : ReaderEvent
+    /** Two taps close together while read-along is on; [x]/[y] in px relative to the navigator view. */
+    data class DoubleTap(val x: Float, val y: Float) : ReaderEvent
     data class MarkTapped(val group: String, val id: String) : ReaderEvent
     /** An internal link was followed (counts as a jump for consumption). */
     data object LinkJump : ReaderEvent
@@ -48,4 +50,39 @@ interface ReaderEngine {
     suspend fun selection(): TextSelection?
     fun clearSelection()
     suspend fun search(query: String, limit: Int = 100): List<SearchHit>
+
+    /**
+     * Read-along on: a single tap waits briefly for a second one ([ReaderEvent.DoubleTap]) and edge taps no
+     * longer turn pages, so a paragraph can be double-tapped anywhere. Swipes still turn pages.
+     */
+    fun setReadAlong(on: Boolean)
+
+    /**
+     * Lays [tint] (ARGB, or null to clear) behind the paragraph that holds the read-along sentence mark. Call after
+     * the read-along group was applied.
+     */
+    suspend fun markReadAlongParagraph(tint: Int?)
+
+    /** Text of the block element (paragraph, list item, heading) under [x]/[y] in navigator px, or null. */
+    suspend fun blockTextAt(x: Float, y: Float): String?
+}
+
+/**
+ * Tells a double tap from a single one. [onTap] returns true when the tap completes a double tap (the pending
+ * single tap must then be dropped).
+ */
+class DoubleTapDetector(private val windowMs: Long = 300, private val slopPx: Float = 96f) {
+    private var lastAt = Long.MIN_VALUE / 2
+    private var lastX = 0f
+    private var lastY = 0f
+
+    fun onTap(x: Float, y: Float, atMs: Long): Boolean {
+        val double = atMs - lastAt <= windowMs && kotlin.math.abs(x - lastX) <= slopPx && kotlin.math.abs(y - lastY) <= slopPx
+        if (double) {
+            lastAt = Long.MIN_VALUE / 2
+        } else {
+            lastAt = atMs; lastX = x; lastY = y
+        }
+        return double
+    }
 }

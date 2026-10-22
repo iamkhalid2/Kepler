@@ -1,6 +1,5 @@
 package app.kepler.feature.reader
 
-import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.spring
@@ -11,10 +10,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -28,7 +25,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -37,29 +33,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.KpFonts
-import app.kepler.core.designsystem.KpPalette
 import app.kepler.core.designsystem.KpPrimaryKey
 import app.kepler.core.designsystem.KpSecondaryKey
 import app.kepler.core.designsystem.KpSegmented
@@ -184,8 +173,8 @@ internal fun GlyphKey(description: String, onClick: () -> Unit, glyph: Glyph, co
 internal enum class Glyph { Back, Search, Typography, Minus, Plus }
 
 /**
- * Sheet from the brief: `surface1`, top plank lip, 32×3 handle at 12, padding 24, scrim black .5
- * (light .25). Rises with the `settle` spring.
+ * Sheet (brief v2): surface3, top r28, 36x4 handle, padding 20 / bottom 24, scrim black .5 (light .25). Drawn in
+ * Compose over the navigator rather than as a dialog, so the page stays live underneath. Rises on `settle`.
  */
 @Composable
 internal fun ReaderSheet(
@@ -211,21 +200,20 @@ internal fun ReaderSheet(
             enter = slideInVertically(ReaderMotion.settle(reduced)) { it },
             exit = slideOutVertically(ReaderMotion.settle(reduced)) { it },
         ) {
-            val shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+            val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             Column(
                 Modifier
                     .fillMaxWidth()
                     .then(if (tall) Modifier.fillMaxHeight(0.92f) else Modifier.heightIn(max = 640.dp))
                     .clip(shape)
-                    .background(p.surface1)
-                    .drawBehind { sheetLip(p.isDark, p.hairline) }
+                    .background(p.surface3)
                     .clickable(remember { MutableInteractionSource() }, indication = null) {}
                     .navigationBarsPadding(),
             ) {
-                Box(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.TopCenter) {
-                    Box(Modifier.size(32.dp, 3.dp).clip(RoundedCornerShape(1.5.dp)).background(p.hairline))
+                Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.TopCenter) {
+                    Box(Modifier.size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(p.text2.copy(alpha = 0.4f)))
                 }
-                Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 24.dp), content = content)
+                Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 24.dp), content = content)
             }
         }
     }
@@ -250,14 +238,4 @@ internal fun ReaderRow(
         )
         if (separator) Hairline(Modifier.padding(start = indent))
     }
-}
-
-/** Plank lip on a sheet's top edge; in light mode it sits over a 0.5 dp seam so it still reads. */
-internal fun androidx.compose.ui.graphics.drawscope.DrawScope.sheetLip(dark: Boolean, seam: Color) {
-    if (!dark) drawRect(seam, size = Size(size.width, 0.5.dp.toPx()))
-    drawRect(
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) 0.10f else 0.6f), Color.Transparent), endY = 6.dp.toPx()),
-        topLeft = Offset(0f, if (dark) 0f else 0.5.dp.toPx()),
-        size = Size(size.width, 6.dp.toPx()),
-    )
 }

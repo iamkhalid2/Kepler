@@ -1,48 +1,40 @@
 package app.kepler.feature.study
 
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.animation.core.Animatable
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -50,16 +42,38 @@ import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.kepler.core.designsystem.HapticToken
 import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.KpCard
+import app.kepler.core.designsystem.KpCaps
+import app.kepler.core.designsystem.KpChatInput
+import app.kepler.core.designsystem.KpChevron
+import app.kepler.core.designsystem.KpChip
+import app.kepler.core.designsystem.KpIconView
+import app.kepler.core.designsystem.KpIcons
+import app.kepler.core.designsystem.KpRow
+import app.kepler.core.designsystem.KpRowSeparator
+import app.kepler.core.designsystem.KpSectionHeader
+import app.kepler.core.designsystem.KpSegmented
+import app.kepler.core.designsystem.KpSpace
+import app.kepler.core.designsystem.KpStreamingCaret
+import app.kepler.core.designsystem.KpTopBar
+import app.kepler.core.designsystem.KpType
+import app.kepler.core.designsystem.rememberHaptics
 import app.kepler.core.model.AskAnswer
 import app.kepler.core.model.BookId
+import app.kepler.core.model.Citation
 
 enum class LearnTab(val label: Int) {
     ASK(R.string.tab_ask), RECAP(R.string.tab_recap), CONCEPTS(R.string.tab_concepts), MAP(R.string.tab_map), TAKEAWAYS(R.string.tab_takeaways),
 }
 
+/** The four segments, in the brief's order. Takeaways live under Recap. */
+private val SEGMENTS = listOf(LearnTab.ASK, LearnTab.RECAP, LearnTab.MAP, LearnTab.CONCEPTS)
+
 /**
- * Learn for one book: Ask, Recap, Concepts, Map, Takeaways. `onJumpTo(ordinal)` opens the book at a sentence.
+ * Learn for one book: Ask, Recap, Map, Concepts. `onJumpTo(ordinal)` opens the book at a sentence.
  * `onOpenSettings` is offered next to missing or rejected key errors when the host provides it.
  */
 @Composable
@@ -74,39 +88,29 @@ fun LearnRoute(
     val vm = studyViewModel("learn:$bookId") { LearnViewModel(bookId, deps) }
     val s by vm.state.collectAsState()
     val p = Kp.palette
-    var tab by rememberSaveable { mutableStateOf(initialTab) }
+    var tab by rememberSaveable { mutableStateOf(if (initialTab == LearnTab.TAKEAWAYS) LearnTab.RECAP else initialTab) }
     var cardFor by remember { mutableStateOf<Triple<Int, String, String>?>(null) }
     LaunchedEffect(tab) {
         when (tab) {
-            LearnTab.RECAP -> vm.loadRecap()
+            LearnTab.RECAP, LearnTab.TAKEAWAYS -> vm.loadRecap()
             LearnTab.CONCEPTS, LearnTab.MAP -> vm.loadConcepts()
             else -> Unit
         }
     }
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 12.dp, end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                BackKey(onBack)
-                // the budget sits under the caps title so a long book title is never cut to make room for it
-                Column(Modifier.weight(1f).padding(start = 4.dp)) {
-                    CapsLine(stringResource(R.string.learn_caps, s.book?.title.orEmpty()))
-                    s.budget?.let {
-                        BasicText(
-                            stringResource(R.string.requests_left, it.requestsLeftToday),
-                            Modifier.padding(top = 2.dp), style = StudyType.numeral(p.text2, 13f), maxLines = 1,
-                        )
-                    }
-                }
-            }
-            TabStrip(tab) { tab = it }
-            Hairline()
+            KpTopBar(onBack = onBack, title = stringResource(R.string.learn_title), caption = s.book?.title)
+            KpSegmented(
+                SEGMENTS.map { stringResource(it.label) }, SEGMENTS.indexOf(tab).coerceAtLeast(0),
+                { tab = SEGMENTS[it] }, Modifier.padding(horizontal = KpSpace.gutter),
+            )
+            ScopeRow(s, Modifier.padding(horizontal = KpSpace.gutter))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (tab) {
-                    LearnTab.ASK -> AskTab(s, vm, onJumpTo, onOpenSettings)
-                    LearnTab.RECAP -> RecapTab(s, vm, onOpenSettings)
-                    LearnTab.CONCEPTS -> ConceptsTab(s, vm, onJumpTo)
+                    LearnTab.ASK -> AskTab(s, vm, onJumpTo, onOpenSettings) { ord, text, q -> cardFor = Triple(ord, text, q) }
+                    LearnTab.RECAP, LearnTab.TAKEAWAYS -> RecapTab(s, vm, onOpenSettings)
+                    LearnTab.CONCEPTS -> ConceptsTab(s, vm)
                     LearnTab.MAP -> MapTab(s, vm)
-                    LearnTab.TAKEAWAYS -> TakeawaysTab(s, vm)
                 }
             }
         }
@@ -122,31 +126,27 @@ fun LearnRoute(
     }
 }
 
+/** Scope chip ("Up to here" / "Whole book") with where that is, and the day's requests, quietly. */
 @Composable
-private fun CapsLine(text: String, modifier: Modifier = Modifier) {
-    BasicText(text.uppercase(), modifier, style = StudyType.caps(Kp.palette.text2), maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-
-@Composable
-internal fun BackKey(onClick: () -> Unit) =
-    app.kepler.core.designsystem.KpIconKey(app.kepler.core.designsystem.KpIconKind.Back, stringResource(R.string.back), onClick)
-
-/** Scrolling caps tabs; the active one reads `text` with a 12x2 accent rule above. */
-@Composable
-private fun TabStrip(selected: LearnTab, onSelect: (LearnTab) -> Unit) {
+private fun ScopeRow(s: LearnState, modifier: Modifier = Modifier) {
     val p = Kp.palette
-    val haptics = app.kepler.core.designsystem.rememberHaptics()
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
-        LearnTab.entries.forEach { t ->
-            val active = t == selected
-            Box(
-                Modifier.heightIn(min = 48.dp).clickable(role = Role.Tab) {
-                    if (!active) haptics.play(app.kepler.core.designsystem.HapticToken.Tap)
-                    onSelect(t)
-                }.padding(horizontal = 12.dp)
-                    .drawBehind { if (active) drawRect(p.accent, Offset(0f, 6.dp.toPx()), Size(12.dp.toPx(), 2.dp.toPx())) },
-                contentAlignment = Alignment.Center,
-            ) { BasicText(stringResource(t.label).uppercase(), style = StudyType.caps(if (active) p.text else p.text2)) }
+    val f = s.fence
+    Row(modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        KpChip(
+            stringResource(if (f.wholeBook) R.string.scope_whole else R.string.scope_here),
+            icon = if (f.wholeBook) KpIcons.Book else KpIcons.Bookmark,
+        )
+        Spacer(Modifier.padding(start = 8.dp))
+        Text(
+            when {
+                f.wholeBook -> ""
+                f.sectionTitle != null -> stringResource(R.string.fence_upto, f.sectionTitle, f.sectionIndex ?: 0)
+                else -> stringResource(R.string.fence_none)
+            },
+            Modifier.weight(1f), color = p.text2, style = KpType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        s.budget?.let {
+            Text(stringResource(R.string.requests_left, it.requestsLeftToday), color = p.text2, style = KpType.caption, maxLines = 1)
         }
     }
 }
@@ -154,62 +154,55 @@ private fun TabStrip(selected: LearnTab, onSelect: (LearnTab) -> Unit) {
 // ----------------------------------------------------------------------------------------- Ask
 
 @Composable
-private fun AskTab(s: LearnState, vm: LearnViewModel, onJumpTo: (Int) -> Unit, onOpenSettings: (() -> Unit)?) {
-    val p = Kp.palette
+private fun AskTab(
+    s: LearnState, vm: LearnViewModel, onJumpTo: (Int) -> Unit, onOpenSettings: (() -> Unit)?,
+    onMakeCard: (ordinal: Int, text: String, question: String) -> Unit,
+) {
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val haptics = rememberHaptics()
+    // When a question is sent, bring it to the top so the answer grows into the screen below it.
     LaunchedEffect(s.transcript.size, s.asking) {
-        val n = s.transcript.size + if (s.asking) 1 else 0
-        if (n > 0) listState.animateScrollToItem(n - 1)
+        val last = s.transcript.lastIndex + if (s.asking) 1 else 0
+        val questionIndex = s.transcript.indexOfLast { it is AskItem.Question }
+        if (s.asking && questionIndex >= 0) listState.animateScrollToItem(questionIndex)
+        else if (last >= 0) listState.animateScrollToItem(last)
     }
-    val suggestionTexts = vm.suggestions().map { stringResource(suggestionRes(it)) }
-    val sendLabel = stringResource(R.string.send)
-    val haptics = app.kepler.core.designsystem.rememberHaptics()
+    val suggestions = vm.suggestions().map { stringResource(suggestionRes(it)) }
     Column(Modifier.fillMaxSize().imePadding()) {
-        FenceRow(s.fence, Modifier.padding(horizontal = 24.dp))
-        Hairline(Modifier.padding(horizontal = 24.dp))
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(), state = listState,
+            contentPadding = PaddingValues(horizontal = KpSpace.gutter, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             if (s.transcript.isEmpty() && !s.asking) {
-                item {
-                    Column {
-                        BasicText(stringResource(if (s.fence.wholeBook) R.string.ask_intro_whole else R.string.ask_intro), style = StudyType.prose(p.text2))
-                        Spacer(Modifier.height(8.dp))
-                        suggestionTexts.forEach { q ->
-                            ListRow({ vm.ask(q) }) { BasicText(q, Modifier.weight(1f), style = StudyType.quote(p.text)) }
-                        }
-                    }
-                }
+                item { AskIntro(s.fence.wholeBook, suggestions) { vm.ask(it) } }
             }
             items(s.transcript) { item ->
                 when (item) {
-                    is AskItem.Question -> BasicText(item.text, Modifier.fillMaxWidth(), style = StudyType.body(p.text2).copy(textAlign = androidx.compose.ui.text.style.TextAlign.End))
-                    is AskItem.Answer -> AnswerBlock(item.answer, onJumpTo)
-                    is AskItem.Failure -> Column {
+                    is AskItem.Question -> QuestionBubble(item.text)
+                    is AskItem.Answer -> AnswerCard(
+                        item.answer.text, item.answer.citations, streaming = false, onJumpTo = onJumpTo, onStop = null,
+                        onMakeCard = { onMakeCard(item.answer.citations.firstOrNull()?.ordinal ?: s.frontier.coerceAtLeast(0), item.answer.text, item.question) },
+                    )
+                    is AskItem.Failure -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         ErrorNote(item.error, { vm.retry(item) })
-                        if ((item.error.kind == UiErrorKind.NO_KEY || item.error.kind == UiErrorKind.BAD_KEY) && onOpenSettings != null) {
-                            TextLink(stringResource(R.string.open_settings), onOpenSettings)
-                        }
+                        if (item.error.needsSettings() && onOpenSettings != null) GhostKey(stringResource(R.string.open_settings), onOpenSettings)
                     }
                 }
             }
-            if (s.asking) item { WorkingRule(s.fence) }
+            s.live?.let { live ->
+                item {
+                    if (!live.started) WaitingCard(s.fence, vm::stop)
+                    else AnswerCard(live.text, live.citations, streaming = true, onJumpTo = onJumpTo, onStop = vm::stop, onMakeCard = {})
+                }
+            }
         }
-        Hairline()
-        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StudyInput(draft, { draft = it }, Modifier.weight(1f), placeholder = stringResource(R.string.ask_hint), maxLines = 4)
-            val canSend = draft.isNotBlank() && !s.asking
-            Box(
-                Modifier.size(52.dp).drawBehind {
-                    drawRoundRect(if (canSend) p.key else p.surface2, cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
-                    if (canSend) drawRect(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), Offset(4.dp.toPx(), 0f), Size(size.width - 8.dp.toPx(), 1.dp.toPx()))
-                    val c = if (canSend) p.onKey else p.text2
-                    val w = 1.8.dp.toPx(); val cx = size.width / 2; val cy = size.height / 2
-                    drawLine(c, Offset(cx, cy + 8.dp.toPx()), Offset(cx, cy - 8.dp.toPx()), w, StrokeCap.Round)
-                    drawLine(c, Offset(cx, cy - 8.dp.toPx()), Offset(cx - 6.dp.toPx(), cy - 2.dp.toPx()), w, StrokeCap.Round)
-                    drawLine(c, Offset(cx, cy - 8.dp.toPx()), Offset(cx + 6.dp.toPx(), cy - 2.dp.toPx()), w, StrokeCap.Round)
-                }.semantics { contentDescription = sendLabel }.clickable(enabled = canSend, role = Role.Button) {
-                    haptics.play(app.kepler.core.designsystem.HapticToken.Confirm); vm.ask(draft); draft = ""
-                },
+        Box(Modifier.fillMaxWidth().padding(horizontal = KpSpace.gutter, vertical = 12.dp)) {
+            KpChatInput(
+                draft, { draft = it },
+                onSend = { haptics.play(HapticToken.Confirm); vm.ask(draft); draft = "" },
+                placeholder = stringResource(R.string.ask_hint), enabled = !s.asking,
             )
         }
     }
@@ -224,118 +217,239 @@ private fun suggestionRes(q: SuggestedQuestion) = when (q) {
 }
 
 @Composable
-private fun FenceRow(f: FenceInfo, modifier: Modifier = Modifier) {
+private fun AskIntro(wholeBook: Boolean, suggestions: List<String>, onPick: (String) -> Unit) {
     val p = Kp.palette
-    val text = when {
-        f.wholeBook -> stringResource(R.string.fence_whole)
-        f.sectionTitle != null -> stringResource(R.string.fence_upto, f.sectionTitle, f.sectionIndex ?: 0)
-        else -> stringResource(R.string.fence_none)
-    }
-    Row(modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        Caps(stringResource(R.string.fence_label), color = p.text2)
-        Spacer(Modifier.width(12.dp))
-        BasicText(text, Modifier.weight(1f), style = StudyType.body(p.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    KpCard(padding = PaddingValues(0.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                KpIconView(KpIcons.Sparkle, p.accentText, size = 20.dp)
+                Spacer(Modifier.padding(start = 8.dp))
+                KpCaps(stringResource(R.string.ask_suggested), color = p.accentText)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(if (wholeBook) R.string.ask_intro_whole else R.string.ask_intro), color = p.text2, style = KpType.body)
+        }
+        suggestions.forEachIndexed { i, q ->
+            KpRowSeparator(inset = 16.dp)
+            KpRow(q, onClick = { onPick(q) }, trailing = { KpChevron() }, inset = 16.dp)
+            if (i == suggestions.lastIndex) Spacer(Modifier.height(4.dp))
+        }
     }
 }
 
-/** "Reading..." over an accent rule that grows once towards 90%; it never loops. */
 @Composable
-private fun WorkingRule(f: FenceInfo) {
+private fun QuestionBubble(text: String) {
     val p = Kp.palette
-    val reduced = rememberReducedMotion()
-    val frac = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { frac.animateTo(0.9f, tween(if (reduced) 120 else 20_000)) }
-    Column {
-        BasicText(
-            stringResource(if (f.sectionTitle != null && !f.wholeBook) R.string.working_reading_section else R.string.working_reading, f.sectionTitle.orEmpty()),
-            style = StudyType.caption(p.text2),
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        Text(
+            text, Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(20.dp)).background(p.surface2).padding(horizontal = 16.dp, vertical = 12.dp),
+            color = p.text, style = KpType.body,
         )
-        Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth().height(1.dp).background(p.hairline).drawBehind { drawRect(p.accent, size = Size(size.width * frac.value, size.height)) })
     }
 }
 
+/** "Reading the book…" with the caret, from the moment the question is sent until the first words arrive. */
 @Composable
-private fun AnswerBlock(a: AskAnswer, onJumpTo: (Int) -> Unit) {
+private fun WaitingCard(f: FenceInfo, onStop: () -> Unit) {
+    val p = Kp.palette
+    KpCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(if (f.sectionTitle != null && !f.wholeBook) R.string.working_reading_section else R.string.working_reading, f.sectionTitle.orEmpty()),
+                Modifier.weight(1f, fill = false), color = p.text2, style = KpType.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.padding(start = 6.dp))
+            KpStreamingCaret()
+        }
+        Spacer(Modifier.height(4.dp))
+        GhostKey(stringResource(R.string.stop), onStop)
+    }
+}
+
+/** The answer: prose with numbered markers, the caret while it streams, citation chips as they resolve. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AnswerCard(
+    text: String, citations: List<Citation>, streaming: Boolean,
+    onJumpTo: (Int) -> Unit, onStop: (() -> Unit)?, onMakeCard: () -> Unit,
+) {
     val p = Kp.palette
     val accent = p.accentText
-    val styled: AnnotatedString = remember(a, accent) {
-        buildAnnotatedString {
-            // The service marks citations with sentence ordinals ("[3358]"); show them as 1-based numerals
-            // matching the list below, and drop any marker that is not in that list.
-            var last = 0
-            var prevMarkerEnd = -1
-            Regex("\\s*\\[(\\d+)]").findAll(a.text).forEach { m ->
-                append(a.text.substring(last, m.range.first))
-                val n = citationNumber(a, m.groupValues[1].toIntOrNull())
-                if (n != null) {
-                    withStyle(SpanStyle(color = accent, baselineShift = BaselineShift.Superscript, fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp))) {
-                        append(if (prevMarkerEnd == m.range.first) ",$n" else "$n")
-                    }
-                    prevMarkerEnd = m.range.last + 1
-                }
-                last = m.range.last + 1
-            }
-            append(a.text.substring(last))
+    val styled: AnnotatedString = remember(text, citations, accent) { styleAnswer(text, citations, accent) }
+    KpCard(padding = PaddingValues(20.dp)) {
+        Text(styled, color = p.text, style = KpType.prose)
+        if (streaming) {
+            Spacer(Modifier.height(4.dp))
+            KpStreamingCaret()
         }
-    }
-    Column(Modifier.fillMaxWidth()) {
-        BasicText(styled, style = StudyType.prose(p.text))
-        if (a.citations.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            a.citations.forEachIndexed { i, c ->
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { onJumpTo(c.ordinal) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    BasicText("${i + 1}", Modifier.width(28.dp), style = StudyType.numeral(p.accentText, 14f))
-                    BasicText(c.label, Modifier.weight(1f), style = StudyType.caption(p.accentText), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
+        if (citations.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                citations.forEachIndexed { i, c -> KpChip("${i + 1}  ${c.label}", onClick = { onJumpTo(c.ordinal) }) }
             }
+        }
+        if (streaming && onStop != null) {
+            Spacer(Modifier.height(8.dp))
+            GhostKey(stringResource(R.string.stop), onStop)
+        } else if (!streaming) {
+            Spacer(Modifier.height(12.dp))
+            SecondaryKey(stringResource(R.string.make_review_card), onMakeCard, small = true)
         }
     }
 }
+
+/**
+ * The service marks citations with sentence ordinals ("[3358]"); show them as 1-based superscript numerals matching the
+ * chips below, and drop any marker that is not in that list (also one still arriving at the end of a stream).
+ */
+internal fun styleAnswer(text: String, citations: List<Citation>, accent: androidx.compose.ui.graphics.Color): AnnotatedString =
+    buildAnnotatedString {
+        val a = AskAnswer(trimPartialMarker(text), citations)
+        var last = 0
+        var prevMarkerEnd = -1
+        Regex("\\s*\\[(\\d+)]").findAll(a.text).forEach { m ->
+            append(a.text.substring(last, m.range.first))
+            val n = citationNumber(a, m.groupValues[1].toIntOrNull())
+            if (n != null) {
+                withStyle(SpanStyle(color = accent, baselineShift = BaselineShift.Superscript, fontSize = 11.sp)) {
+                    append(if (prevMarkerEnd == m.range.first) ",$n" else "$n")
+                }
+                prevMarkerEnd = m.range.last + 1
+            }
+            last = m.range.last + 1
+        }
+        append(a.text.substring(last))
+    }
+
+/** A citation marker that has only half arrived ("... as shown [33") is hidden until it completes. */
+internal fun trimPartialMarker(text: String): String = text.replace(Regex("\\s*\\[\\d*$"), "")
+
+/** 1-based position of the citation for [ordinal] in [a]'s list, or null when it is not cited. */
+internal fun citationNumber(a: AskAnswer, ordinal: Int?): Int? =
+    ordinal?.let { o -> a.citations.indexOfFirst { it.ordinal == o }.takeIf { it >= 0 }?.plus(1) }
 
 // ----------------------------------------------------------------------------------------- Recap
 
 @Composable
 private fun RecapTab(s: LearnState, vm: LearnViewModel, onOpenSettings: (() -> Unit)?) {
     val p = Kp.palette
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-        Caps(stringResource(R.string.recap_caps))
-        Spacer(Modifier.height(12.dp))
-        LoadView(s.recap, { vm.loadRecap(force = true) }, lines = 5) { text ->
-            if (text.isBlank()) EmptyNote(stringResource(R.string.recap_empty)) else {
-                BasicText(text, style = StudyType.prose(p.text), maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis)
-                TextLink(stringResource(if (expanded) R.string.less else R.string.more), { expanded = !expanded })
+    var open by rememberSaveable { mutableStateOf<Long?>(null) }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = KpSpace.gutter, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(KpSpace.cardGap),
+    ) {
+        KpCard(padding = PaddingValues(20.dp)) {
+            KpCaps(stringResource(R.string.recap_caps), color = p.accentText)
+            Spacer(Modifier.height(12.dp))
+            when (val r = s.recap) {
+                Load.Idle -> LoadingBlocks(4)
+                Load.Loading -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.working_reading), color = p.text2, style = KpType.subhead)
+                    Spacer(Modifier.padding(start = 6.dp))
+                    KpStreamingCaret()
+                }
+                is Load.Failed -> {
+                    ErrorNote(r.error, { vm.loadRecap(force = true) })
+                    if (r.error.needsSettings() && onOpenSettings != null) GhostKey(stringResource(R.string.open_settings), onOpenSettings)
+                }
+                is Load.Ready -> if (r.value.isBlank()) EmptyNote(stringResource(R.string.recap_empty), Modifier.padding(vertical = 0.dp)) else {
+                    Text(r.value.trim(), color = p.text, style = KpType.prose)
+                    if (s.recapStreaming) {
+                        Spacer(Modifier.height(4.dp))
+                        KpStreamingCaret()
+                    }
+                }
+            }
+            if (s.recapStreaming) {
+                Spacer(Modifier.height(8.dp))
+                GhostKey(stringResource(R.string.stop), vm::stopRecap)
+            } else if (s.recap is Load.Ready && (s.recap as Load.Ready<String>).value.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                GhostKey(stringResource(R.string.refresh), { vm.loadRecap(force = true) })
             }
         }
-        val f = s.recap
-        if (f is Load.Failed && (f.error.kind == UiErrorKind.NO_KEY || f.error.kind == UiErrorKind.BAD_KEY) && onOpenSettings != null) {
-            TextLink(stringResource(R.string.open_settings), onOpenSettings)
+        val reached = s.reached
+        if (reached.isNotEmpty()) {
+            KpSectionHeader(stringResource(R.string.tab_takeaways))
+            KpCard(padding = PaddingValues(0.dp)) {
+                reached.forEachIndexed { i, sec ->
+                    if (i > 0) KpRowSeparator(inset = 16.dp)
+                    KpRow(
+                        sec.title.ifBlank { "—" },
+                        onClick = {
+                            open = if (open == sec.id) null else sec.id
+                            if (open == sec.id) vm.loadTakeaways(sec.id)
+                        },
+                        trailing = { KpIconView(if (open == sec.id) KpIcons.ChevronDown else KpIcons.ChevronRight, p.text2, size = 20.dp) },
+                        inset = 16.dp,
+                    )
+                    if (open == sec.id) {
+                        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                            LoadView(s.takeaways[sec.id] ?: Load.Loading, { vm.loadTakeaways(sec.id, force = true) }, lines = 3) { list ->
+                                if (list.isEmpty()) Text(stringResource(R.string.takeaways_none), color = p.text2, style = KpType.body)
+                                else list.forEachIndexed { n, t ->
+                                    Row(Modifier.padding(top = if (n == 0) 0.dp else 12.dp)) {
+                                        Text("${n + 1}", Modifier.widthIn(min = 28.dp), color = p.accentText, style = KpType.numeral)
+                                        Text(t, Modifier.weight(1f), color = p.text, style = KpType.prose.copy(fontSize = 15.sp, lineHeight = 24.sp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
+        Spacer(Modifier.height(8.dp))
     }
 }
 
 // ----------------------------------------------------------------------------------------- Concepts
 
+/** The quiet state while the packs behind Concepts and Map are prepared: a line of copy over skeleton rows. */
 @Composable
-private fun ConceptsTab(s: LearnState, vm: LearnViewModel, onJumpTo: (Int) -> Unit) {
+private fun PreparingCard(text: String, modifier: Modifier = Modifier) {
     val p = Kp.palette
-    LoadView(s.concepts, { vm.loadConcepts(force = true) }, lines = 6, stateModifier = Modifier.padding(24.dp)) { map ->
-        if (map.nodes.isEmpty()) Box(Modifier.padding(24.dp)) { EmptyNote(stringResource(R.string.concepts_empty)) }
-        else {
-            val grouped = map.nodes.sortedBy { it.label.lowercase() }.groupBy { indexLetter(it.label) }.toSortedMap()
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 24.dp, vertical = 8.dp)) {
-                grouped.forEach { (letter, nodes) ->
-                    item(key = "h$letter") { BasicText(letter.toString(), Modifier.padding(top = 24.dp, bottom = 4.dp), style = StudyType.display(p.text)) }
-                    items(nodes, key = { it.id }) { n ->
-                        val where = sectionFor(s.sections, n.firstOrdinal)?.title
-                        ListRow({ vm.selectNode(n.id) }) {
-                            Column(Modifier.weight(1f)) {
-                                BasicText(n.label, style = StudyType.rowTitle(p.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (where != null) BasicText(stringResource(R.string.first_in, where), style = StudyType.caption(p.text2), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    KpCard(modifier.padding(horizontal = KpSpace.gutter, vertical = 12.dp), padding = PaddingValues(20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            KpIconView(KpIcons.Sparkle, p.accentText, size = 20.dp)
+            Spacer(Modifier.padding(start = 8.dp))
+            Text(text, color = p.text2, style = KpType.subhead)
+        }
+        Spacer(Modifier.height(16.dp))
+        LoadingBlocks(4)
+    }
+}
+
+@Composable
+private fun ConceptsTab(s: LearnState, vm: LearnViewModel) {
+    val p = Kp.palette
+    when (val c = s.concepts) {
+        Load.Idle, Load.Loading -> PreparingCard(stringResource(R.string.concepts_preparing))
+        is Load.Failed -> Box(Modifier.padding(horizontal = KpSpace.gutter, vertical = 12.dp)) { ErrorNote(c.error, { vm.loadConcepts(force = true) }) }
+        is Load.Ready -> {
+            val map = c.value
+            if (map.nodes.isEmpty()) Box(Modifier.padding(horizontal = KpSpace.gutter)) { EmptyNote(stringResource(R.string.concepts_empty)) }
+            else {
+                val grouped = map.nodes.sortedBy { it.label.lowercase() }.groupBy { indexLetter(it.label) }.toSortedMap()
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = KpSpace.gutter, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(KpSpace.cardGap),
+                ) {
+                    grouped.forEach { (letter, nodes) ->
+                        item(key = "g$letter") {
+                            Column {
+                                KpCaps(letter.toString(), Modifier.padding(top = 8.dp, bottom = 8.dp))
+                                KpCard(padding = PaddingValues(0.dp)) {
+                                    nodes.forEachIndexed { i, n ->
+                                        if (i > 0) KpRowSeparator(inset = 16.dp)
+                                        val where = sectionFor(s.sections, n.firstOrdinal)?.title?.takeIf { it.isNotBlank() }
+                                        KpRow(
+                                            n.label, meta = where?.let { stringResource(R.string.first_in, it) },
+                                            onClick = { vm.selectNode(n.id) }, trailing = { KpChevron() }, inset = 16.dp,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -354,90 +468,54 @@ private fun ConceptSheet(
     val map = (s.concepts as? Load.Ready)?.value
     val labels = map?.nodes?.associate { it.id to it.label }.orEmpty()
     val edges = map?.edges?.filter { it.from == node.id || it.to == node.id }.orEmpty()
+    val question = stringResource(R.string.what_is, node.label)
     StudySheet(onDismiss) {
         Caps(node.kind)
         Spacer(Modifier.height(8.dp))
-        BasicText(node.label, style = StudyType.display(p.text))
+        Text(node.label, color = p.text, style = KpType.displayTitle)
         Spacer(Modifier.height(16.dp))
-        BasicText(node.description, style = StudyType.prose(p.text))
+        Text(node.description, color = p.text, style = KpType.prose)
         if (edges.isNotEmpty()) {
             Spacer(Modifier.height(24.dp))
             Caps(stringResource(R.string.connections))
+            Spacer(Modifier.height(4.dp))
             edges.forEach { e ->
                 val other = if (e.from == node.id) e.to else e.from
                 ListRow({ onJumpTo(e.evidenceOrdinal) }, minHeight = 48.dp) {
-                    BasicText(e.relation, Modifier.width(112.dp), style = StudyType.caption(p.text2), maxLines = 2)
-                    BasicText(labels[other] ?: other, Modifier.weight(1f), style = StudyType.rowTitle(p.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(e.relation, Modifier.widthIn(min = 112.dp, max = 112.dp), color = p.text2, style = KpType.caption, maxLines = 2)
+                    Text(labels[other] ?: other, Modifier.weight(1f), color = p.text, style = KpType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
         Spacer(Modifier.height(24.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SecondaryKey(stringResource(R.string.first_mention), { onJumpTo(node.firstOrdinal) })
-            Spacer(Modifier.width(8.dp))
-            SecondaryKey(stringResource(R.string.make_a_card), { onMakeCard(node.firstOrdinal, stringResource0(node.label)) })
-        }
-        if (node.id in s.positions) {
-            TextLink(stringResource(if (node.id in s.pinned) R.string.unpin else R.string.pin), { vm.togglePin(node.id) })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            SecondaryKey(stringResource(R.string.first_mention), { onJumpTo(node.firstOrdinal) }, small = true)
+            SecondaryKey(stringResource(R.string.make_a_card), { onMakeCard(node.firstOrdinal, question) }, small = true)
+            if (node.id in s.positions) GhostKey(stringResource(if (node.id in s.pinned) R.string.unpin else R.string.pin), { vm.togglePin(node.id) })
         }
     }
 }
-
-/** The question a concept card starts with. */
-private fun stringResource0(label: String) = "What is $label?"
 
 // ----------------------------------------------------------------------------------------- Map
 
 @Composable
 private fun MapTab(s: LearnState, vm: LearnViewModel) {
-    LoadView(s.concepts, { vm.loadConcepts(force = true) }, lines = 6, stateModifier = Modifier.padding(24.dp)) { map ->
-        if (map.nodes.isEmpty()) Box(Modifier.padding(24.dp)) { EmptyNote(stringResource(R.string.concepts_empty)) }
-        else Column(Modifier.fillMaxSize()) {
-            ConceptMapView(map, s.positions, s.pinned, s.selectedNode, vm::moveNode, vm::selectNode, Modifier.weight(1f).fillMaxWidth())
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                BasicText(stringResource(R.string.map_hint), Modifier.weight(1f).padding(horizontal = 12.dp), style = StudyType.caption(Kp.palette.text2))
-                TextLink(stringResource(R.string.relax), vm::relayout)
-            }
-        }
-    }
-}
-
-// ----------------------------------------------------------------------------------------- Takeaways
-
-@Composable
-private fun TakeawaysTab(s: LearnState, vm: LearnViewModel) {
     val p = Kp.palette
-    val reached = s.reached
-    if (reached.isEmpty()) { Box(Modifier.padding(24.dp)) { EmptyNote(stringResource(R.string.takeaways_empty)) }; return }
-    var open by rememberSaveable { mutableStateOf<Long?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 24.dp, vertical = 8.dp)) {
-        items(reached, key = { it.id }) { sec ->
-            Column {
-                ListRow({
-                    open = if (open == sec.id) null else sec.id
-                    if (open == sec.id) vm.loadTakeaways(sec.id)
-                }, minHeight = 56.dp, separator = open != sec.id) {
-                    BasicText(sec.title.ifBlank { "—" }, Modifier.weight(1f), style = StudyType.rowTitle(p.text), maxLines = 2, overflow = TextOverflow.Ellipsis)
+    when (val c = s.concepts) {
+        Load.Idle, Load.Loading -> PreparingCard(stringResource(R.string.map_preparing))
+        is Load.Failed -> Box(Modifier.padding(horizontal = KpSpace.gutter, vertical = 12.dp)) { ErrorNote(c.error, { vm.loadConcepts(force = true) }) }
+        is Load.Ready -> {
+            val map = c.value
+            if (map.nodes.isEmpty()) Box(Modifier.padding(horizontal = KpSpace.gutter)) { EmptyNote(stringResource(R.string.concepts_empty)) }
+            else Column(Modifier.fillMaxSize().padding(horizontal = KpSpace.gutter, vertical = 12.dp)) {
+                Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(p.surface1)) {
+                    ConceptMapView(map, s.positions, s.pinned, s.selectedNode, vm::moveNode, vm::selectNode, Modifier.fillMaxSize())
                 }
-                if (open == sec.id) {
-                    Column(Modifier.padding(bottom = 16.dp)) {
-                        LoadView(s.takeaways[sec.id] ?: Load.Loading, { vm.loadTakeaways(sec.id, force = true) }, lines = 3) { list ->
-                            if (list.isEmpty()) EmptyNote(stringResource(R.string.takeaways_none))
-                            else list.forEachIndexed { i, t ->
-                                Row(Modifier.padding(top = 12.dp)) {
-                                    BasicText("${i + 1}", Modifier.width(28.dp), style = StudyType.numeral(p.text2, 14f))
-                                    BasicText(t, Modifier.weight(1f), style = StudyType.prose(p.text))
-                                }
-                            }
-                        }
-                    }
-                    Hairline()
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.map_hint), Modifier.weight(1f), color = p.text2, style = KpType.caption)
+                    GhostKey(stringResource(R.string.relax), vm::relayout)
                 }
             }
         }
     }
 }
-
-/** 1-based position of the citation for [ordinal] in [a]'s list, or null when it is not cited. */
-internal fun citationNumber(a: AskAnswer, ordinal: Int?): Int? =
-    ordinal?.let { o -> a.citations.indexOfFirst { it.ordinal == o }.takeIf { it >= 0 }?.plus(1) }

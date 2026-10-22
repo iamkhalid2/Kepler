@@ -1,15 +1,18 @@
 package app.kepler.feature.player
 
-import kotlin.math.abs
+import app.kepler.core.model.ChapterMark
 import kotlin.math.roundToInt
 
-/** Pure helpers for the player screens: time, speed and scrubber maths. */
+/** Pure helpers for the player: time, speed and chapter maths. */
 object PlayerFormat {
     const val MIN_SPEED = 0.5f
     const val MAX_SPEED = 3.5f
-    val SPEED_PRESETS = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f)
+    val SPEED_PRESETS = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
     val SLEEP_MINUTES = listOf(5, 10, 15, 30, 45, 60)
     const val SLEEP_END_OF_SECTION = -1
+
+    /** "Previous chapter" restarts the current one when more than this much of it has played. */
+    const val RESTART_CHAPTER_MS = 3_000L
 
     /** `m:ss`, or `h:mm:ss` from an hour up. */
     fun clock(ms: Long): String {
@@ -33,23 +36,26 @@ object PlayerFormat {
         return stepped.coerceIn(MIN_SPEED, MAX_SPEED)
     }
 
-    /** Whole minutes of listening that [aheadMs] of audio gives at [speed]. */
-    fun minutesAhead(aheadMs: Long, speed: Float): Int =
-        if (speed <= 0f) 0 else ((aheadMs / speed) / 60_000f).toInt()
+    /** (hours, minutes) for a "2h 10m" / "18 min" label; minutes round up so a running chapter never shows 0. */
+    fun durationParts(ms: Long): Pair<Int, Int> {
+        val totalMin = ((ms.coerceAtLeast(0) + 59_999) / 60_000).toInt()
+        return (totalMin / 60) to (totalMin % 60)
+    }
 
-    fun fractionOf(ordinal: Int, count: Int): Float =
-        if (count <= 1) 0f else (ordinal.toFloat() / (count - 1)).coerceIn(0f, 1f)
+    /** Index of the chapter holding [ordinal] in [marks] (book order), or -1. */
+    fun chapterIndex(marks: List<ChapterMark>, ordinal: Int): Int = marks.indexOfLast { it.startOrdinal <= ordinal }
 
-    fun ordinalAt(fraction: Float, count: Int): Int =
-        if (count <= 1) 0 else (fraction.coerceIn(0f, 1f) * (count - 1)).roundToInt()
+    /**
+     * Where "previous chapter" goes: the start of the current chapter once more than [RESTART_CHAPTER_MS] of it
+     * has played (or when it is the first), otherwise the start of the one before.
+     */
+    fun previousChapterTarget(marks: List<ChapterMark>, ordinal: Int, sectionElapsedMs: Long): Int? {
+        val i = chapterIndex(marks, ordinal)
+        if (i < 0) return marks.firstOrNull()?.startOrdinal
+        return if (sectionElapsedMs > RESTART_CHAPTER_MS || i == 0) marks[i].startOrdinal else marks[i - 1].startOrdinal
+    }
 
-    fun tickFractions(starts: List<Int>, count: Int): List<Float> = starts.map { fractionOf(it, count) }
-
-    /** The tick within [window] of [fraction], or null. Gives the scrubber its chapter detents. */
-    fun nearestTick(fraction: Float, ticks: List<Float>, window: Float): Float? =
-        ticks.minByOrNull { abs(it - fraction) }?.takeIf { abs(it - fraction) <= window }
-
-    fun percent(fraction: Float): Int = (fraction.coerceIn(0f, 1f) * 100).toInt()
-
-    fun sleepRemainingLabel(ms: Long): String = clock(ms)
+    /** Start of the chapter after the one holding [ordinal], or null on the last chapter. */
+    fun nextChapterTarget(marks: List<ChapterMark>, ordinal: Int): Int? =
+        marks.getOrNull(chapterIndex(marks, ordinal) + 1)?.startOrdinal
 }

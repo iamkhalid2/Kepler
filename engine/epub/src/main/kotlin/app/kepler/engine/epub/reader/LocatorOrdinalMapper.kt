@@ -136,6 +136,20 @@ class LocatorOrdinalMapper(sentences: List<Sentence>) {
         }
     }
 
+    /**
+     * The sentence where [text] (a paragraph read back from the page) begins in resource [href], the occurrence
+     * nearest [progression] winning; null when the text is not found, so a tap never plays from a guess.
+     */
+    fun ordinalOfText(href: String, text: String, progression: Double? = null): Int? {
+        val run = runFor(href) ?: return null
+        val needle = fold(text).trim().takeIf { it.isNotEmpty() } ?: return null
+        val near = progression?.let { run.starts[run.indexAtProgression(it)] }
+        val at = bestOccurrence(run, needle, null, null, near)
+            ?: needle.takeIf { it.length > PREFIX }?.let { bestOccurrence(run, it.take(PREFIX), null, null, near) }
+            ?: return null
+        return run.sentences[run.indexAtOffset(at)].ordinal
+    }
+
     private fun byTotalProgression(total: Double?): IntRange? {
         if (total == null || runOrder.isEmpty() || bookChars == 0L) return null
         var target = (total.coerceIn(0.0, 1.0) * bookChars).toLong()

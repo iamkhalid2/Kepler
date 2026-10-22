@@ -20,6 +20,7 @@ data class ReaderLocalPrefs(
     val customPage: Int? = null,
     val customInk: Int? = null,
     val lastHighlightColor: Int = 0,
+    val doubleTapHintShown: Boolean = false,
 )
 
 internal class ReaderPrefsStore(context: Context) {
@@ -37,6 +38,7 @@ internal class ReaderPrefsStore(context: Context) {
         customPage = if (sp.contains("customPage")) sp.getInt("customPage", 0) else null,
         customInk = if (sp.contains("customInk")) sp.getInt("customInk", 0) else null,
         lastHighlightColor = sp.getInt("hlColor", 0),
+        doubleTapHintShown = sp.getBoolean("doubleTapHint", false),
     )
 
     fun update(transform: (ReaderLocalPrefs) -> ReaderLocalPrefs) {
@@ -52,6 +54,7 @@ internal class ReaderPrefsStore(context: Context) {
             if (p.customPage != null) putInt("customPage", p.customPage) else remove("customPage")
             if (p.customInk != null) putInt("customInk", p.customInk) else remove("customInk")
             putInt("hlColor", p.lastHighlightColor)
+            putBoolean("doubleTapHint", p.doubleTapHintShown)
         }.apply()
     }
 }
