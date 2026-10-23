@@ -1,5 +1,7 @@
 package app.kepler.feature.reader
 
+import app.kepler.feature.player.faceSwitchWidth
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,8 +62,8 @@ internal fun ReaderTopBar(
     onLearn: () -> Unit,
 ) {
     val p = Kp.palette
-    Column(Modifier.fillMaxWidth().background(p.bg).statusBarsPadding()) {
-        Box(Modifier.fillMaxWidth().height(KpSize.topBar).padding(horizontal = 8.dp)) {
+    Column(Modifier.fillMaxWidth()) {
+        BoxWithConstraints(Modifier.fillMaxWidth().background(p.bg).statusBarsPadding().height(KpSize.topBar).padding(horizontal = 8.dp)) {
             KpIconButton(
                 KpIcons.Back, stringResource(R.string.reader_back), onBack,
                 Modifier.align(Alignment.CenterStart), KpIconButtonStyle.Tonal,
@@ -70,14 +72,15 @@ internal fun ReaderTopBar(
                 options = listOf(stringResource(R.string.reader_face_listen), stringResource(R.string.reader_face_read)),
                 selected = 1,
                 onSelect = { if (it == 0) onListen() },
-                modifier = Modifier.align(Alignment.Center).width(176.dp),
+                modifier = Modifier.align(Alignment.Center).width(faceSwitchWidth(maxWidth)),
             )
             Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
                 TypographyButton(onTypography)
                 KpIconButton(KpIcons.Sparkle, stringResource(R.string.reader_learn), onLearn, style = KpIconButtonStyle.Tonal)
             }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(p.hairline))
+        // A short fade out of the bar instead of a rule, so a line of text passing under it never shows cut in half.
+        Box(Modifier.fillMaxWidth().height(20.dp).background(Brush.verticalGradient(listOf(p.bg, p.bg.copy(alpha = 0f)))))
     }
 }
 
@@ -112,9 +115,9 @@ internal fun ReaderIdleBar(
     onListen: () -> Unit,
 ) {
     val p = Kp.palette
-    Column(Modifier.fillMaxWidth().background(p.bg)) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(p.hairline))
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 20.dp, top = 4.dp, bottom = 8.dp)) {
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(20.dp).background(Brush.verticalGradient(listOf(p.bg.copy(alpha = 0f), p.bg))))
+        Column(Modifier.fillMaxWidth().background(p.bg).padding(start = 16.dp, end = 20.dp, top = 4.dp, bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 ChapterChip(chapter ?: stringResource(R.string.reader_contents), onContents, Modifier.weight(1f, fill = false).padding(end = 12.dp))
                 KpButton(
@@ -132,16 +135,16 @@ internal fun ReaderIdleBar(
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
-        Spacer(Modifier.navigationBarsPadding())
+        Spacer(Modifier.fillMaxWidth().background(p.bg).navigationBarsPadding())
     }
 }
 
-/** The dock's surface: a 32 dp fade out of the page, then the page colour down to the navigation bar. */
+/** The dock's surface: a 32 dp fade out of the page, then the page colour, with 16 dp clear above the navigation bar. */
 @Composable
 internal fun DockSurface(page: Color, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().height(32.dp).background(Brush.verticalGradient(listOf(page.copy(alpha = 0f), page))))
-        Column(Modifier.fillMaxWidth().background(page).navigationBarsPadding().padding(bottom = 4.dp), content = content)
+        Column(Modifier.fillMaxWidth().background(page).navigationBarsPadding().padding(bottom = 16.dp), content = content)
     }
 }
 

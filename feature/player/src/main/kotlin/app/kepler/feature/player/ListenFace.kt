@@ -141,9 +141,16 @@ private fun Hero(cover: CoverRequest, height: Dp) {
     )
 }
 
+/**
+ * Width of the Listen | Read switch. Both faces use it so the switch never moves, and it always clears the Read
+ * face's two right-hand buttons (Aa, Learn): it is centred, so each side gives up room for two buttons and a gap.
+ */
+fun faceSwitchWidth(barInnerWidth: Dp): Dp = (barInnerWidth - (48.dp * 2 + 8.dp) * 2).coerceIn(128.dp, 176.dp)
+
 @Composable
 private fun ListenTopBar(onClose: () -> Unit, onRead: () -> Unit, onLearn: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(KpSize.topBar).padding(horizontal = 8.dp)) {
+    BoxWithConstraints(Modifier.fillMaxWidth().height(KpSize.topBar).padding(horizontal = 8.dp)) {
+        val switchWidth = faceSwitchWidth(maxWidth)
         KpIconButton(
             KpIcons.ChevronDown, stringResource(R.string.player_close), onClose,
             Modifier.align(Alignment.CenterStart), KpIconButtonStyle.Tonal,
@@ -152,7 +159,7 @@ private fun ListenTopBar(onClose: () -> Unit, onRead: () -> Unit, onLearn: () ->
             options = listOf(stringResource(R.string.player_face_listen), stringResource(R.string.player_face_read)),
             selected = 0,
             onSelect = { if (it == 1) onRead() },
-            modifier = Modifier.align(Alignment.Center).width(176.dp),
+            modifier = Modifier.align(Alignment.Center).width(switchWidth),
         )
         KpIconButton(
             KpIcons.Sparkle, stringResource(R.string.player_learn), onLearn,

@@ -1,5 +1,7 @@
 package app.kepler.feature.library
 
+import kotlinx.coroutines.flow.map
+import app.kepler.core.model.ListenPace
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.kepler.core.model.Book
@@ -90,7 +92,8 @@ class HubViewModel(private val deps: LibraryDeps, val bookId: BookId) : ViewMode
         deps.settings.settings,
         deps.cards.cards(bookId),
     ) { book, narration, coverage, settings, cards -> Parts(book, narration, coverage, settings, cards) }
-        .combine(sections) { x, sec ->
+        .combine(sections) { x, sec -> x to sec }
+        .combine(deps.audio.segments(bookId).map(ListenPace::msPerSentence)) { (x, sec), pace ->
         val book = x.book
         val narration = x.narration
         val coverage = x.coverage
@@ -105,7 +108,7 @@ class HubViewModel(private val deps: LibraryDeps, val bookId: BookId) : ViewMode
             voiceName = settings.voice?.name,
             cardCount = cards.size,
             chapters = book?.let { hubChapters(sec, (it.positionFraction * it.sentenceCount).toInt(), hasStarted(it)) }.orEmpty(),
-            minutesToListen = book?.let { minutesLeft(it, settings.speed, listening = true) },
+            minutesToListen = book?.let { minutesLeft(it, settings.speed, listening = true, msPerSentence = pace) },
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HubUi())
 

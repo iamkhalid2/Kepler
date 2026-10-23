@@ -121,11 +121,10 @@ class ConsumeTracker {
 
 /** Book time estimated at 1x from the audio generated so far. */
 object BookTimeline {
-    const val DEFAULT_MS_PER_SENTENCE = 4_000.0
+    const val DEFAULT_MS_PER_SENTENCE = app.kepler.core.model.ListenPace.DEFAULT_MS_PER_SENTENCE
 
     fun msPerSentence(segmentDurationsMs: Long, sentencesCovered: Int): Double =
-        if (sentencesCovered <= 0 || segmentDurationsMs <= 0) DEFAULT_MS_PER_SENTENCE
-        else segmentDurationsMs.toDouble() / sentencesCovered
+        app.kepler.core.model.ListenPace.msPerSentence(segmentDurationsMs, sentencesCovered)
 }
 
 /** Detects a shake from accelerometer samples (m/s^2): two spikes over [threshold] inside [windowMs]. */

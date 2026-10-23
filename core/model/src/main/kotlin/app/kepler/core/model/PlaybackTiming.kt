@@ -30,6 +30,18 @@ object ListenPace {
     /** A typical sentence of running prose. */
     const val WORDS_PER_SENTENCE = 20
 
+    /** Narrated time at 1x of a typical sentence nobody has measured yet. */
+    const val DEFAULT_MS_PER_SENTENCE = WORDS_PER_SENTENCE * DEFAULT_MS_PER_WORD
+
     /** Narrated time at 1x for [sentences] sentences nobody has measured yet. */
-    fun estimateMs(sentences: Int): Long = (sentences.coerceAtLeast(0) * WORDS_PER_SENTENCE * DEFAULT_MS_PER_WORD).toLong()
+    fun estimateMs(sentences: Int): Long = (sentences.coerceAtLeast(0) * DEFAULT_MS_PER_SENTENCE).toLong()
+
+    /** Pace per sentence measured from the audio generated so far, or the default when there is none. */
+    fun msPerSentence(segmentDurationsMs: Long, sentencesCovered: Int): Double =
+        if (sentencesCovered <= 0 || segmentDurationsMs <= 0) DEFAULT_MS_PER_SENTENCE
+        else segmentDurationsMs.toDouble() / sentencesCovered
+
+    /** [msPerSentence] over a book's audio segments. */
+    fun msPerSentence(segments: List<AudioSegment>): Double =
+        msPerSentence(segments.sumOf { it.durationMs }, segments.sumOf { it.endOrdinal - it.startOrdinal + 1 })
 }

@@ -41,9 +41,11 @@ object PromptRegistry {
     )
 
     val ASK = Prompt(
-        "ask", 2,
+        "ask", 3,
         "You answer a reader's question about a book using only the numbered passages below. $COMMON " +
-            "Cite the passages that support each statement inline as [123]. If the passages do not answer the " +
+            "Say the actual content in your own words: name the terms, people, events and ideas, and explain them. " +
+            "A citation only supports a statement and never replaces it. After each statement put one citation of " +
+            "a single passage number, such as [123]; never cite ranges or lists. If the passages do not answer the " +
             "question, say so briefly. The reader has only read part of the book, so never reveal or hint at " +
             "anything beyond the passages. Answer directly in at most 120 words; plain prose, no headings, no preamble.",
     )
