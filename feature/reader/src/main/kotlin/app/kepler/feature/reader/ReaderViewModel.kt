@@ -10,6 +10,7 @@ import app.kepler.core.model.Book
 import app.kepler.core.model.BookId
 import app.kepler.core.model.Bookmark
 import app.kepler.core.model.PositionKind
+import app.kepler.core.model.latestPosition
 import app.kepler.core.model.Section
 import app.kepler.engine.epub.reader.ConsumptionTracker
 import app.kepler.engine.epub.reader.LocatorOrdinalMapper
@@ -115,7 +116,7 @@ internal class ReaderViewModel(
         val publication = PublicationLoader(app).open(book.epubPath)
             .getOrElse { _load.value = ReaderLoad.Failed(it.message); return }
         val engine = ReadiumReaderEngine(publication)
-        val saved = deps.positions.position(bookId, PositionKind.READING).first()?.ordinal
+        val saved = deps.positions.latestPosition(bookId, PositionKind.READING)?.ordinal
         _ordinal.value = saved
         tracker = ConsumptionTracker(words = index::words)
         _load.value = ReaderLoad.Ready(book, engine, mapper, index, sections, saved?.let(mapper::anchorFor))
@@ -154,8 +155,16 @@ internal class ReaderViewModel(
     /** Where the navigator should open after its view is recreated. */
     fun currentAnchor(): TextAnchor? {
         val r = ready() ?: return null
-        return _ordinal.value?.let(r.mapper::anchorFor) ?: r.initial
+        // While narration follows this book and the page has not been moved away, the page opens on the spoken
+        // sentence at once; opening on the saved page and turning to it later is a visible jump.
+        val spoken = spokenOrdinal.takeIf { !_detached.value }
+        return (spoken ?: _ordinal.value)?.let(r.mapper::anchorFor) ?: r.initial
     }
+
+    @Volatile private var spokenOrdinal: Int? = null
+
+    /** The sentence being narrated for this book now, or null when narration is elsewhere. */
+    fun setSpoken(ordinal: Int?) { spokenOrdinal = ordinal }
 
     /** Paints saved highlights; [tints] are the six ARGB highlight colours from the palette. */
     suspend fun paintHighlights(list: List<Annotation>, tints: List<Int>) {

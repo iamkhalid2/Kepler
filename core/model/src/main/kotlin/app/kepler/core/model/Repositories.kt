@@ -1,6 +1,7 @@
 package app.kepler.core.model
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 sealed interface ImportResult {
     data class Imported(val book: Book) : ImportResult
@@ -98,3 +99,16 @@ interface AiStore {
 
 /** Reader chrome modes. */
 enum class ReaderMode { READ, READ_LISTEN }
+
+/** The most recently saved position of either kind (decision #111); on a tie [prefer] wins. Null when never saved. */
+suspend fun PositionRepository.latestPosition(bookId: BookId, prefer: PositionKind): Position? {
+    val listening = position(bookId, PositionKind.LISTENING).first()
+    val reading = position(bookId, PositionKind.READING).first()
+    if (listening == null || reading == null) return listening ?: reading
+    return when {
+        listening.updatedAt > reading.updatedAt -> listening
+        reading.updatedAt > listening.updatedAt -> reading
+        prefer == PositionKind.LISTENING -> listening
+        else -> reading
+    }
+}

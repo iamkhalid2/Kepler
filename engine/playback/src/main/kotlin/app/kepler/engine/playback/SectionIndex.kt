@@ -13,6 +13,8 @@ class SectionIndex(sections: List<Section>, private val sentenceCount: Int, book
     private val runEnds: IntArray
     val marks: List<ChapterMark>
     private val markStarts: IntArray
+    private val leafStarts: IntArray
+    private val leafTitles: List<String>
 
     init {
         val included = sections.filter { it.included && it.startOrdinal <= it.endOrdinal }
@@ -34,6 +36,8 @@ class SectionIndex(sections: List<Section>, private val sentenceCount: Int, book
                 o.id != s.id && or.first >= r.first && or.last <= r.last && (or != r || o.level > s.level)
             }
         }.sortedBy { it.second.first }
+        leafStarts = IntArray(leaves.size) { leaves[it].second.first }
+        leafTitles = leaves.map { it.first.title }
         val minGap = (sentenceCount / 100).coerceAtLeast(1)
         val thinned = ArrayList<ChapterMark>()
         for ((s, r) in leaves) {
@@ -122,6 +126,17 @@ class SectionIndex(sections: List<Section>, private val sentenceCount: Int, book
         val i = markStarts.binarySearch(ordinal)
         val idx = if (i >= 0) i else (-i - 2).coerceAtLeast(0)
         return marks[idx]
+    }
+
+    /**
+     * The title of the innermost chapter at [ordinal]. Unlike [chapterAt] it is not thinned, so a short Introduction
+     * right after a title page keeps its own name instead of showing the previous mark's.
+     */
+    fun titleAt(ordinal: Int): String? {
+        if (leafStarts.isEmpty()) return chapterAt(ordinal)?.title
+        val i = leafStarts.binarySearch(ordinal)
+        val idx = if (i >= 0) i else (-i - 2).coerceAtLeast(0)
+        return leafTitles[idx]
     }
 
     private fun runIndexFor(ordinal: Int): Int {

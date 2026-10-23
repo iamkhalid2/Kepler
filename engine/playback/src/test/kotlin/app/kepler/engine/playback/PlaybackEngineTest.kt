@@ -49,6 +49,7 @@ private val voice = VoiceRef("fish", "ava", "Ava")
 private class Fakes(segments: List<AudioSegment>, val rows: List<SyncRow>) {
     val segmentFlow = MutableStateFlow(segments)
     val saved = mutableListOf<Int>()
+    val stored = mutableMapOf<PositionKind, Position>()
     val consumed = mutableListOf<IntRange>()
     val ensured = mutableListOf<Int>()
     var blocked: PauseReason? = null
@@ -78,7 +79,7 @@ private class Fakes(segments: List<AudioSegment>, val rows: List<SyncRow>) {
         override suspend fun search(bookId: Long, query: String, maxOrdinal: Int?, limit: Int) = emptyList<Sentence>()
     }
     val positions = object : PositionRepository {
-        override fun position(bookId: Long, kind: PositionKind): Flow<Position?> = flowOf(null)
+        override fun position(bookId: Long, kind: PositionKind): Flow<Position?> = flowOf(stored[kind])
         override suspend fun savePosition(bookId: Long, kind: PositionKind, ordinal: Int) { saved += ordinal }
         override suspend fun markConsumed(bookId: Long, fromOrdinal: Int, toOrdinal: Int, via: PositionKind) {
             consumed += fromOrdinal..toOrdinal
@@ -163,6 +164,14 @@ class PlaybackEngineTest {
         assertEquals(40, info.sentenceCount)
     }
 
+    @Test fun listenResumesFromTheNewerReadingPosition() {
+        // Listened to sentence 3, then read on to 12: Listen continues at 12.
+        fakes.stored[PositionKind.LISTENING] = Position(1, PositionKind.LISTENING, 3, 100)
+        fakes.stored[PositionKind.READING] = Position(1, PositionKind.READING, 12, 200)
+        engine.play(1)
+        assertEquals(12, engine.state.value.ordinal)
+    }
+
     @Test fun seekAndSkipMoveBySentence() {
         engine.play(1, 0)
         idle()
@@ -245,11 +254,11 @@ class PlaybackEngineTest {
     @Test fun seekWithinSectionLandsOnTheMatchingSentence() {
         engine.play(1, 0)
         idle()
+        // Read before the main looper runs: the nonexistent test files make ExoPlayer post an error that
+        // would otherwise skip to the next item and race the assertions.
         engine.seekWithinSection(0.5f) // 15_450 ms: 5 s into the second segment, sentence 7
-        idle()
         assertEquals(7, engine.state.value.ordinal)
         engine.seekWithinSection(0f)
-        idle()
         assertEquals(0, engine.state.value.ordinal)
     }
 

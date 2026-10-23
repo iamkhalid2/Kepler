@@ -185,3 +185,39 @@ class SectionIndexTimingTest {
         assertNotNull(index.marks.getOrNull(1))
     }
 }
+
+class ChapterTitleTest {
+    private fun sec(id: Long, title: String, from: Int, to: Int) =
+        Section(id, 1, null, id.toInt(), 0, title, "h$id", SectionKind.BODY, from, to, true)
+
+    @Test fun aShortFrontSectionDoesNotHideTheNextChaptersName() {
+        val index = SectionIndex(listOf(sec(1, "Meditations", 0, 2), sec(2, "Introduction", 3, 300), sec(3, "Book One", 301, 999)), 1000, "Meditations")
+        // The scrubber marks are thinned (a mark within 1% of the previous one is dropped) ...
+        assertEquals("Meditations", index.chapterAt(100)?.title)
+        // ... but the name shown to the listener is the real chapter.
+        assertEquals("Introduction", index.titleAt(100))
+        assertEquals("Meditations", index.titleAt(1))
+        assertEquals("Book One", index.titleAt(500))
+    }
+}
+
+class RemainingClockTest {
+    @Test fun neverRisesWhilePlayingAndFallsWithTheAudio() {
+        val c = RemainingClock()
+        assertEquals(23_000_000L, c.next(23_000_000, 1, 0))
+        // The estimate was rebuilt lower, then higher again as segments landed.
+        assertEquals(22_999_000L, c.next(23_300_000, 1, 1_000)) // up-noise ignored, falls with the audio
+        val low = c.next(22_000_000, 1, 2_000)
+        assertEquals(22_000_000L, low)
+        assertEquals("a jump up in the raw figure is ignored", low - 1_000, c.next(23_500_000, 1, 3_000))
+    }
+
+    @Test fun aSeekTrustsTheNewFigure() {
+        val c = RemainingClock()
+        c.next(1_000_000, 1, 0)
+        c.reset()
+        assertEquals(2_000_000L, c.next(2_000_000, 1, 0))
+        assertEquals("a far jump in the playhead is a seek", 3_000_000L, c.next(3_000_000, 1, 600_000))
+        assertEquals("so is a jump back", 3_100_000L, c.next(3_100_000, 1, 10_000))
+    }
+}

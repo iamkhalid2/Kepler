@@ -28,9 +28,16 @@ jobs:
 
       - name: Determine version tag
         id: version_info
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG_NAME="${{ github.event.inputs.version }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG_NAME="$INPUT_VERSION"
+            if ! printf '%s' "$TAG_NAME" | grep -Eq '^v[0-9A-Za-z._-]+$'; then
+              echo "Invalid version tag" >&2
+              exit 1
+            fi
           else
             TAG_NAME="${GITHUB_REF_NAME}"
           fi
@@ -54,8 +61,8 @@ jobs:
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --console=plain
 
-      - name: Build Release and Debug APKs
-        run: ./gradlew :app:assembleRelease :app:assembleDebug --console=plain
+      - name: Build Release APK
+        run: ./gradlew :app:assembleRelease --console=plain
 
       - name: Sign Release APK
         env:
@@ -69,47 +76,22 @@ jobs:
           RELEASE_UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
           OUT_APK="$RUNNER_TEMP/artifacts/Kepler-${TAG_NAME}.apk"
 
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Signing with provided repository secret keystore..."
-            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-            "$ANDROID_HOME/build-tools/37.0.0/apksigner" sign \
-              --ks "$RUNNER_TEMP/release.jks" \
-              --ks-key-alias "$KEY_ALIAS" \
-              --ks-pass "pass:$KEYSTORE_PASSWORD" \
-              --key-pass "pass:$KEY_PASSWORD" \
-              --out "$OUT_APK" \
-              "$RELEASE_UNSIGNED"
-            rm -f "$RUNNER_TEMP/release.jks"
-          else
-            echo "No custom keystore secret found; signing with self-signed release key for immediate installation..."
-            keytool -genkeypair -v \
-              -keystore "$RUNNER_TEMP/kepler-auto.jks" \
-              -alias kepler \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass "kepler-release" \
-              -keypass "kepler-release" \
-              -dname "CN=Kepler, OU=OpenAudiobook, O=Kepler, C=US"
-
-            "$ANDROID_HOME/build-tools/37.0.0/apksigner" sign \
-              --ks "$RUNNER_TEMP/kepler-auto.jks" \
-              --ks-key-alias kepler \
-              --ks-pass "pass:kepler-release" \
-              --key-pass "pass:kepler-release" \
-              --out "$OUT_APK" \
-              "$RELEASE_UNSIGNED"
-            rm -f "$RUNNER_TEMP/kepler-auto.jks"
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "ANDROID_KEYSTORE_BASE64 is not set. Refusing to publish a release signed with a throwaway key: every update would carry a different signature." >&2
+            exit 1
           fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" sign \
+            --ks "$RUNNER_TEMP/release.jks" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --out "$OUT_APK" \
+            "$RELEASE_UNSIGNED"
+          rm -f "$RUNNER_TEMP/release.jks"
 
           echo "Verifying APK signature..."
           "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify "$OUT_APK"
-
-          # Copy debug APK as well
-          DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
-          if [ -f "$DEBUG_APK" ]; then
-            cp "$DEBUG_APK" "$RUNNER_TEMP/artifacts/Kepler-${TAG_NAME}-debug.apk"
-          fi
 
           # Generate SHA-256 checksums
           (cd "$RUNNER_TEMP/artifacts" && sha256sum Kepler-*.apk > checksums.txt && cat checksums.txt)

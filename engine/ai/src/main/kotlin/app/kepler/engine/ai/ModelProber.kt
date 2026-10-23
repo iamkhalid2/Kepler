@@ -50,6 +50,8 @@ class ModelProber internal constructor(
     /** On first use an Ask waits at most this long for the first probe to answer. */
     private val firstUseWaitMs: Long = 6_000,
     private val maxSamples: Int = 5,
+    /** A round in which no model answered (offline, bad key, spent budget) is retried after this, not after a day. */
+    private val retryAfterFailedRoundMs: Long = 30 * 60_000L,
 ) {
     private val mutex = Mutex()
     private var state: ProbeState? = null
@@ -114,12 +116,12 @@ class ModelProber internal constructor(
     private suspend fun runProbe(apiKey: String, pool: List<ModelInfo>, firstOk: CompletableDeferred<Unit>) {
         val targets = mutex.withLock { pickTargets(pool, load()) }
         if (targets.isEmpty()) return
-        var aborted = false
+        var answered = 0
         coroutineScope {
             targets.map { m ->
                 async {
                     try {
-                        budgeter.acquire(Priority.INTERACTIVE)
+                        budgeter.acquire(Priority.BACKGROUND)
                         val t0 = System.nanoTime()
                         val first = client.chatStream(
                             apiKey, m.id,
@@ -129,6 +131,7 @@ class ModelProber internal constructor(
                         ).firstOrNull { it.isNotBlank() }
                         if (first == null) recordFailure(m.id, "empty") else {
                             recordSuccess(m.id, (System.nanoTime() - t0) / 1_000_000)
+                            synchronized(this@ModelProber) { answered++ }
                             firstOk.complete(Unit)
                         }
                     } catch (e: CancellationException) {
@@ -143,15 +146,18 @@ class ModelProber internal constructor(
                         recordFailure(m.id, "invalid")
                     } catch (e: AiError.BudgetExhausted) {
                         // Limit 0 = the provider's own per-model or per-day 429, not our budget running out.
-                        if (e.dailyLimit == 0) recordFailure(m.id, "429-daily") else aborted = true
+                        if (e.dailyLimit == 0) recordFailure(m.id, "429-daily")
                     } catch (e: AiError) {
-                        // Offline, bad key, spent budget: not the model's fault, and no reason to wait a day to retry.
-                        aborted = true
+                        // One model's network error, 401 or 402 is that model's failure only; it never aborts the round.
+                        recordFailure(m.id, "error")
                     }
                 }
             }.awaitAll()
         }
-        if (!aborted) mutex.withLock { state = ProbeState(clock(), load().models); save() }
+        // The attempt time is always saved, so a flaky network or a bad key cannot start a new round on every Ask.
+        // A round where nothing answered is due again after a short back-off instead of after a full day.
+        val stamp = if (answered > 0) clock() else clock() - refreshMs + retryAfterFailedRoundMs
+        mutex.withLock { state = ProbeState(stamp, load().models); save() }
     }
 
     /** The fastest known models (to keep their numbers fresh) plus unmeasured ones, skipping recent failures. */

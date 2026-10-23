@@ -18,3 +18,18 @@ val PlaybackState.sectionElapsedWallMs: Long
 /** Narrated time left in the book, in wall-clock milliseconds at the current speed. */
 val PlaybackState.bookRemainingWallMs: Long
     get() = (bookRemainingMs / speed.coerceAtLeast(0.1f)).toLong()
+
+/**
+ * The one narration pace used wherever a time-left figure has no measured audio behind it yet (the player, Home and
+ * the book hub). The player replaces it with the calibrated pace of the voice once it has audio to measure.
+ */
+object ListenPace {
+    /** About 2.6 words per second at 1x, matching the narration planner. */
+    const val DEFAULT_MS_PER_WORD = 385.0
+
+    /** A typical sentence of running prose. */
+    const val WORDS_PER_SENTENCE = 20
+
+    /** Narrated time at 1x for [sentences] sentences nobody has measured yet. */
+    fun estimateMs(sentences: Int): Long = (sentences.coerceAtLeast(0) * WORDS_PER_SENTENCE * DEFAULT_MS_PER_WORD).toLong()
+}

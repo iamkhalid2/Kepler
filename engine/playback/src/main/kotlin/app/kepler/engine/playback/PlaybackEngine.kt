@@ -30,6 +30,7 @@ import app.kepler.core.model.PlaybackInfo
 import app.kepler.core.model.PlaybackInfoSource
 import app.kepler.core.model.PlaybackState
 import app.kepler.core.model.PositionKind
+import app.kepler.core.model.latestPosition
 import app.kepler.core.model.VoiceRef
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -125,6 +126,7 @@ class PlaybackEngine(
     private var timeline = ChapterTimeline.EMPTY
     private var timelineKey: Pair<Long, Int>? = null
     private var bookTiming = BookTiming.EMPTY
+    private val remainingClock = RemainingClock()
     private val chapterText = LinkedHashMap<Long, List<SentenceInfo>>()
     private var chapterTextJob: Job? = null
     private var msPerWord = SpeechRate.DEFAULT_MS_PER_WORD
@@ -231,6 +233,7 @@ class PlaybackEngine(
     override fun seekToSentence(ordinal: Int) = seekTo(ordinal, intendedPlay)
 
     private fun seekTo(ordinal: Int, play: Boolean) {
+        remainingClock.reset()
         val id = bookId ?: return
         val target = sections.firstNarratedFrom(ordinal.coerceIn(0, maxOf(sections.lastNarrated, 0))) ?: sections.lastNarrated
         if (seekInPlan(target)) {
@@ -387,8 +390,7 @@ class PlaybackEngine(
         updateAverage(SegmentPicker.active(all, voice))
 
         val saved = from
-            ?: deps.positions.position(id, PositionKind.LISTENING).first()?.ordinal
-            ?: deps.positions.position(id, PositionKind.READING).first()?.ordinal
+            ?: deps.positions.latestPosition(id, PositionKind.LISTENING)?.ordinal
             ?: 0
         val start = sections.firstNarratedFrom(saved) ?: sections.firstNarrated
         observe(id)
@@ -396,6 +398,7 @@ class PlaybackEngine(
     }
 
     private fun resetPlayer() {
+        remainingClock.reset()
         ticker?.cancel()
         observeJob?.cancel()
         inner.stop()
@@ -709,6 +712,7 @@ class PlaybackEngine(
     }
 
     private fun seekGlobal(globalMs: Long) {
+        remainingClock.reset()
         val (index, offset) = plan.locate(globalMs.coerceAtLeast(0))
         inner.seekTo(index, offset)
         jumpedTo(plan.ordinalAt(index, offset, ::lookupFor))
@@ -769,9 +773,11 @@ class PlaybackEngine(
         val chapter = sections.chapterAt(o)
         if (chapter?.sectionId != chapterId) {
             chapterId = chapter?.sectionId
-            chapterTitle = chapter?.title
             chapter?.let(::loadChapterText)
             discrete = true
+        }
+        sections.titleAt(o).let { title ->
+            if (title != chapterTitle) { chapterTitle = title; discrete = true }
         }
         if (index != spanIndex || discrete) {
             span = plan.chapterSpan(index) { ord -> sections.chapterAt(ord)?.sectionId?.toInt() ?: 0 }
@@ -906,7 +912,7 @@ class PlaybackEngine(
             sectionElapsedMs = timing.sectionElapsedMs,
             sectionDurationMs = timing.sectionDurationMs,
             sectionDurationEstimated = timing.sectionEstimated,
-            bookRemainingMs = timing.bookRemainingMs,
+            bookRemainingMs = if (timing.sectionId == null) timing.bookRemainingMs else remainingClock.next(timing.bookRemainingMs, timing.sectionId, timing.sectionElapsedMs),
             bookRemainingEstimated = timing.bookRemainingEstimated,
         )
         val count = sentenceCount
