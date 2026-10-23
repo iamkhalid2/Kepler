@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.kepler.core.model.AppSettings
 import app.kepler.core.model.Book
+import app.kepler.core.model.ListenPace
 import app.kepler.core.model.BookId
 import app.kepler.core.model.ImportResult
 import app.kepler.core.model.NarrationState
@@ -92,11 +93,11 @@ fun daysAway(book: Book?, nowMs: Long): Int? {
 /** Review time estimate shown on Home: about 30 s a card, at least a minute. */
 fun reviewMinutes(due: Int): Int = ((due + 1) / 2).coerceAtLeast(1)
 
-/** Minutes left from the saved position: the rest of the sentences at reading pace, scaled by speed when listening. */
+/** Minutes left from the saved position: reading pace, or the player's narration pace scaled by speed when listening. */
 fun minutesLeft(book: Book, speed: Float, listening: Boolean): Int {
     val left = (book.sentenceCount * (1f - book.positionFraction.coerceIn(0f, 1f))).toInt()
-    val minutes = readMinutes(left)
-    return if (listening) (minutes / speed.coerceIn(0.5f, 3f)).toInt().coerceAtLeast(1) else minutes
+    if (!listening) return readMinutes(left)
+    return (ListenPace.estimateMs(left) / 60_000f / speed.coerceIn(0.5f, 3f)).toInt().coerceAtLeast(1)
 }
 
 /** The seven days of the week containing [today], Monday first. */
