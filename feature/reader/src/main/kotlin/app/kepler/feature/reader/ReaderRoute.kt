@@ -515,12 +515,9 @@ private fun ReaderScreen(
             exit = fadeOut(ReaderMotion.snap(reduced)),
         ) {
             ReaderTopBar(
-                chapter = chapterTitle,
-                book = ready.book.title,
                 onBack = onClose,
-                onContents = { sheet = Sheet.Contents },
+                onListen = onShowListen,
                 onTypography = { sheet = Sheet.Typography },
-                onSearch = { sheet = Sheet.Search },
                 onLearn = onOpenLearn,
             )
         }
@@ -603,6 +600,7 @@ private fun ReaderScreen(
                 annotations = annotations, bookmarks = bookmarks,
                 onJump = { o, href -> vm.jumpTo(o, href); sheet = Sheet.None; chrome = false },
                 onDeleteBookmark = vm::deleteBookmark,
+                onSearch = { sheet = Sheet.Search },
             )
         }
         ReaderSheet(sheet == Sheet.Search, onDismiss = { sheet = Sheet.None }, reduced = reduced, tall = true) {

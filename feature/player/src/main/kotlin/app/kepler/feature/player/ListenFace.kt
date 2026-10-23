@@ -1,5 +1,7 @@
 package app.kepler.feature.player
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,12 +17,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,6 +35,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
@@ -41,11 +48,14 @@ import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.KpIconButton
 import app.kepler.core.designsystem.KpIconButtonStyle
 import app.kepler.core.designsystem.KpIcons
+import app.kepler.core.designsystem.KpMotion
 import app.kepler.core.designsystem.KpSegmented
 import app.kepler.core.designsystem.KpSize
+import app.kepler.core.designsystem.KpSkeleton
 import app.kepler.core.designsystem.KpType
 import app.kepler.core.model.BookId
 import app.kepler.core.model.PlaybackController
+import kotlinx.coroutines.delay
 
 /**
  * The Listen face of the read + listen screen (#112): the book as a 3D object on light tinted from its cover,
@@ -104,7 +114,8 @@ fun ListenFace(
                 val bookHeight = when {
                     screenHeight < 640.dp -> 180.dp
                     screenHeight < 700.dp -> 220.dp
-                    else -> 260.dp
+                    // Tall phones: the book grows with the screen so it holds the space instead of floating in it.
+                    else -> (screenHeight * 0.34f).coerceIn(260.dp, 330.dp)
                 }
                 Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Spacer(Modifier.weight(1f).heightIn(min = 8.dp))
@@ -141,7 +152,7 @@ private fun ListenTopBar(onClose: () -> Unit, onRead: () -> Unit, onLearn: () ->
             options = listOf(stringResource(R.string.player_face_listen), stringResource(R.string.player_face_read)),
             selected = 0,
             onSelect = { if (it == 1) onRead() },
-            modifier = Modifier.align(Alignment.Center).width(200.dp),
+            modifier = Modifier.align(Alignment.Center).width(176.dp),
         )
         KpIconButton(
             KpIcons.Sparkle, stringResource(R.string.player_learn), onLearn,
@@ -173,6 +184,19 @@ private fun ColumnScope.Details(
     val marks by controller.selectInfo { it.marks }
     val ordinal by controller.select { it.ordinal }
 
+    // While narration for this book is still being prepared, the engine reports interim chapters, times, speed and
+    // voice. They stay invisible and fade in once, when playback has settled (or failed, or after a grace period),
+    // so the chip never reads "Chapters", then the page's chapter, then the spoken one.
+    val settled by controller.select {
+        it.bookId == bookId && (it.error != null || (it.currentSectionId != null && !(it.buffering && it.playing)))
+    }
+    var waited by remember(bookId) { mutableStateOf(false) }
+    LaunchedEffect(bookId) { delay(REVEAL_GRACE_MS); waited = true }
+    val reveal by animateFloatAsState(
+        if (settled || waited) 1f else 0f, tween(KpMotion.FACE_SWITCH_MS), label = "reveal",
+    )
+    val revealed = Modifier.graphicsLayer { alpha = reveal }
+
     Text(
         title, color = p.text, style = KpType.displayTitle, textAlign = TextAlign.Center,
         maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
@@ -185,12 +209,18 @@ private fun ColumnScope.Details(
         )
     }
     Spacer(Modifier.height(12.dp))
-    ChapterChip(
-        title = section.takeIf { current } ?: chapter ?: stringResource(R.string.player_chapters),
-        onClick = { openSheet(PlayerSheet.Chapters) },
-    )
+    // Skeletons hold the chip's and the voice pill's places while they are hidden (brief section 9).
+    val waiting = Modifier.graphicsLayer { alpha = 1f - reveal }
+    Box(contentAlignment = Alignment.Center) {
+        if (reveal < 1f) KpSkeleton(waiting.size(168.dp, 36.dp), CircleShape)
+        ChapterChip(
+            title = section.takeIf { current } ?: chapter ?: stringResource(R.string.player_chapters),
+            onClick = { openSheet(PlayerSheet.Chapters) },
+            modifier = revealed,
+        )
+    }
     Spacer(Modifier.height(8.dp))
-    PlaybackScrubber(controller, Modifier.padding(horizontal = 4.dp))
+    PlaybackScrubber(controller, revealed.padding(horizontal = 4.dp))
     StatusLine(controller)
     TransportRow(
         controller,
@@ -210,8 +240,11 @@ private fun ColumnScope.Details(
     Spacer(Modifier.height(16.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         SleepButton(sleepRemaining, sleepAtSectionEnd, { openSheet(PlayerSheet.Sleep) })
-        SpeedButton(speed, { openSheet(PlayerSheet.Speed) })
-        VoicePill(voice.takeIf { current }, onVoice, Modifier.weight(1f, fill = false))
+        Box(revealed) { SpeedButton(speed, { openSheet(PlayerSheet.Speed) }) }
+        Box(Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) {
+            if (reveal < 1f) KpSkeleton(waiting.size(144.dp, 40.dp), CircleShape)
+            VoicePill(voice.takeIf { current }, onVoice, revealed)
+        }
         BookmarkButton(bookmarked, onBookmark, enabled = current)
     }
 }
@@ -237,6 +270,8 @@ private fun StatusLine(controller: PlaybackController) {
 }
 
 internal enum class PlayerSheet { Speed, Sleep, Chapters }
+
+private const val REVEAL_GRACE_MS = 2_500L
 
 /** Speed, sleep and chapter sheets for one controller. */
 @Composable

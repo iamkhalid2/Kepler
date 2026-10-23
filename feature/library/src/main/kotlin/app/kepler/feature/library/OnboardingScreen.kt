@@ -114,14 +114,23 @@ fun OnboardingScreen(
                         }
                     }
                 }
-                Footer(ui, onNext, onFinish)
+                // Continue keeps what was typed on the keys page: it verifies any key not yet checked (and stores it
+                // once accepted) instead of silently dropping it. "Skip for now" still leaves them out.
+                val onContinue = {
+                    if (ui.step == OnboardingStep.Keys) {
+                        if (fishKey.isNotBlank() && ui.fish != KeyCheck.Connected && ui.fish != KeyCheck.Checking) onVerify(KeyKind.Fish, fishKey)
+                        if (orKey.isNotBlank() && ui.openRouter != KeyCheck.Connected && ui.openRouter != KeyCheck.Checking) onVerify(KeyKind.OpenRouter, orKey)
+                    }
+                    onNext()
+                }
+                Footer(ui, onContinue, onNext, onFinish)
             }
         }
     }
 }
 
 @Composable
-private fun Footer(ui: OnboardingUi, onNext: () -> Unit, onFinish: () -> Unit) {
+private fun Footer(ui: OnboardingUi, onContinue: () -> Unit, onNext: () -> Unit, onFinish: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = KpSpace.gutter).padding(top = 8.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Dots(ui.steps.size, ui.index)
         Spacer(Modifier.height(16.dp))
@@ -133,7 +142,7 @@ private fun Footer(ui: OnboardingUi, onNext: () -> Unit, onFinish: () -> Unit) {
                     else -> R.string.continue_label
                 },
             ),
-            if (ui.isLast) onFinish else onNext,
+            if (ui.isLast) onFinish else onContinue,
             Modifier.fillMaxWidth(), fullWidth = true,
         )
         // Skip is always one tap away, except on the last page where Done is the way out.
@@ -209,6 +218,27 @@ private fun Body(text: String) {
 private fun Welcome() {
     Headline(stringResource(R.string.welcome_line))
     Body(stringResource(R.string.welcome_sub))
+    // What the three words mean in practice, so the page explains the app instead of ending in empty space.
+    Spacer(Modifier.height(24.dp))
+    KpCard(padding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+        FeatureRow(KpIcons.Book, stringResource(R.string.welcome_read_title), stringResource(R.string.welcome_read_body))
+        FeatureRow(KpIcons.Headphones, stringResource(R.string.welcome_listen_title), stringResource(R.string.welcome_listen_body))
+        FeatureRow(KpIcons.Sparkle, stringResource(R.string.welcome_remember_title), stringResource(R.string.welcome_remember_body))
+    }
+    Spacer(Modifier.height(16.dp))
+}
+
+@Composable
+private fun FeatureRow(icon: ImageVector, title: String, body: String) {
+    val p = Kp.palette
+    Row(Modifier.padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
+        KpIconView(icon, p.accentText, size = 22.dp, modifier = Modifier.padding(top = 1.dp))
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(title, color = p.text, style = KpType.rowTitle)
+            Text(body, color = p.text2, style = KpType.subhead)
+        }
+    }
 }
 
 @Composable

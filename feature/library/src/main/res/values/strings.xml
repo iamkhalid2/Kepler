@@ -213,6 +213,7 @@
         <string name="home_start">Start</string>
         <string name="home_empty_title">Add your first book</string>
     <string name="home_title">Welcome back</string>
+    <string name="home_title_new">Welcome</string>
     <string name="home_caption">%1$s %2$s</string>
     <string name="part_morning">morning</string>
     <string name="part_afternoon">afternoon</string>
@@ -290,4 +291,15 @@
     <string name="privacy_2">Only the text you narrate or ask about goes to the services you chose.</string>
     <string name="privacy_3">Free tiers of those services may use what you send to train their models.</string>
     <string name="privacy_4">No account and no analytics.</string>
+    <string name="welcome_read_title">Read</string>
+    <string name="welcome_read_body">Your EPUBs on a calm, typeset page.</string>
+    <string name="welcome_listen_title">Listen</string>
+    <string name="welcome_listen_body">Any book as an audiobook, with the text following the voice.</string>
+    <string name="welcome_remember_title">Remember</string>
+    <string name="welcome_remember_body">Ask the book, catch up with recaps, review what matters.</string>
+    <string name="voice_standard">Standard voice</string>
+    <string name="voice_on_device">on this phone</string>
+    <string name="voice_online">online</string>
+    <string name="voice_variant">Variant %1$s · %2$s</string>
+    <string name="slip_characters_line">%1$s characters</string>
 </resources>

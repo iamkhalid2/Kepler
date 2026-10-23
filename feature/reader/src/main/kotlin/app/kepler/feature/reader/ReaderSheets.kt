@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -53,6 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.KpIconView
+import app.kepler.core.designsystem.KpIcons
 import app.kepler.core.model.Annotation
 import app.kepler.core.model.Bookmark
 import app.kepler.core.model.Section
@@ -78,6 +81,22 @@ private fun Caps(text: String, modifier: Modifier = Modifier) {
 
 internal enum class ContentsTab { Contents, Highlights, Bookmarks }
 
+/** A search pill that opens the search sheet: the same h44 pill as the Library's search. */
+@Composable
+private fun SearchEntry(onClick: () -> Unit) {
+    val p = Kp.palette
+    val label = stringResource(R.string.reader_search)
+    Row(
+        Modifier.fillMaxWidth().height(44.dp).clip(CircleShape).background(p.surface1)
+            .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        KpIconView(KpIcons.Search, p.text2, size = 20.dp)
+        Spacer(Modifier.width(12.dp))
+        BasicText(label, style = ReaderType.body(p.text2))
+    }
+}
+
 @Composable
 internal fun ContentsSheetBody(
     index: BookIndex,
@@ -87,9 +106,14 @@ internal fun ContentsSheetBody(
     bookmarks: List<Bookmark>,
     onJump: (ordinal: Int, href: String?) -> Unit,
     onDeleteBookmark: (Long) -> Unit,
+    onSearch: (() -> Unit)? = null,
 ) {
     val p = Kp.palette
     var tab by rememberSaveable { mutableStateOf(ContentsTab.Contents) }
+    if (onSearch != null) {
+        SearchEntry(onSearch)
+        Spacer(Modifier.height(12.dp))
+    }
     Segmented(
         options = listOf(
             stringResource(R.string.reader_tab_contents),

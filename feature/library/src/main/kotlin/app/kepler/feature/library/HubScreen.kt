@@ -2,6 +2,12 @@ package app.kepler.feature.library
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -102,10 +108,14 @@ fun HubScreen(
     val p = Kp.palette
     val book = ui.book
     var confirmRemove by remember { mutableStateOf(false) }
-    ScreenRoot {
+    // Edge to edge at the top: the hero's cover light runs up under the status bar instead of stopping at a band.
+    Box(
+        Modifier.fillMaxSize().background(p.bg)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)),
+    ) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             if (book == null) {
-                KpTopBar(onBack = onBack)
+                KpTopBar(onBack = onBack, modifier = Modifier.statusBarsPadding())
                 if (ui.loaded) Text(
                     stringResource(R.string.book_missing), color = p.text2, style = KpType.body,
                     modifier = Modifier.padding(KpSpace.xxl),
@@ -145,6 +155,7 @@ fun HubScreen(
 @Composable
 private fun Hero(book: Book, ui: HubUi, onBack: () -> Unit) {
     val p = Kp.palette
+    val bg = p.bg
     val request = remember(book.id, book.title, book.authors, book.coverPath) { book.coverRequest() }
     val tint = rememberCoverTint(request)
     Column(
@@ -157,7 +168,9 @@ private fun Hero(book: Book, ui: HubUi, onBack: () -> Unit) {
                     radius = size.width * 0.85f,
                 ),
             )
-        },
+            // The light dies out before the hero ends, so the stat tiles never sit under a hard edge.
+            drawRect(Brush.verticalGradient(0.55f to Color.Transparent, 1f to bg))
+        }.statusBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         KpTopBar(onBack = onBack, actions = { KpChip(typeLabel(book)); Spacer(Modifier.width(12.dp)) })

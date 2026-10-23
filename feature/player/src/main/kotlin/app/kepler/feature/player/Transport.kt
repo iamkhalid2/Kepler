@@ -336,7 +336,11 @@ fun PlaybackScrubber(controller: PlaybackController, modifier: Modifier = Modifi
         fraction = fraction,
         onSeek = { controller.seekWithinSection(it) },
         elapsed = PlayerFormat.clock(elapsedSec * 1000),
-        remaining = if (hasChapter) estimated("−" + PlayerFormat.clock(remainingSec * 1000), estimatedChapter) else "−0:00",
+        // One "~" per row: when the book time in the middle is already marked as estimated, "~−12:40" beside it only
+        // adds noise, so the chapter time drops its own mark.
+        remaining = if (hasChapter) {
+            estimated("−" + PlayerFormat.clock(remainingSec * 1000), estimatedChapter && !(middle != null && estimatedBook))
+        } else "−0:00",
         middle = middle,
         contentDescription = stringResource(R.string.player_scrubber_description),
         modifier = modifier,

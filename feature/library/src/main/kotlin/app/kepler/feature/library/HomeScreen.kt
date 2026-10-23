@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -117,7 +118,8 @@ fun HomeScreen(
     ScreenRoot {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             KpLargeTopBar(
-                title = stringResource(R.string.home_title),
+                // "Welcome back" only once there is something to come back to.
+                title = stringResource(if (ui.loaded && book == null) R.string.home_title_new else R.string.home_title),
                 caption = remember { todayCaption() }.let { (day, part) -> stringResource(R.string.home_caption, day, stringResource(part)) },
                 actions = {
                     if (onSettings != null) KpIconButton(KpIcons.Tune, stringResource(R.string.settings_caps), onSettings, style = KpIconButtonStyle.Tonal)
@@ -198,33 +200,36 @@ private fun ContinueCard(ui: HomeUi, book: Book, onOpenBook: (Long) -> Unit, onR
     // The book rises 24 dp above the card, as in the MidnightReads dashboard shot.
     Box(Modifier.padding(top = 24.dp)) {
         KpCard(onClick = { onOpenBook(book.id) }, padding = PaddingValues(20.dp)) {
-            Row {
+            // The text column is at least as tall as the part of the book inside the card (132 - 24 - 20 padding),
+            // so the position bar and its caption always sit beside the book, never under it.
+            Row(Modifier.heightIn(min = 88.dp)) {
                 Spacer(Modifier.width(88.dp + 16.dp))
                 Column(Modifier.weight(1f)) {
                     val mode = stringResource(if (listening) R.string.home_listening else R.string.home_reading)
                     KpCaps(
                         listOfNotNull(mode, ui.chapterTitle).joinToString(" · "),
                         color = p.accentText,
+                        maxLines = 1,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(book.title, color = p.text, style = KpType.title2, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (book.authors.isNotBlank()) {
                         Text(book.authors, color = p.text2, style = KpType.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    Spacer(Modifier.height(12.dp))
+                    KpProgressBar(book.positionFraction, Modifier.fillMaxWidth(), height = 4.dp)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (ui.started) {
+                            val left = ui.minutesLeft
+                            if (left != null) stringResource(R.string.home_position_left, percentOf(book.positionFraction), minutesText(left))
+                            else stringResource(R.string.home_through, percentOf(book.positionFraction))
+                        } else stringResource(R.string.home_not_started),
+                        color = p.text2, style = KpType.caption,
+                    )
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            KpProgressBar(book.positionFraction, Modifier.fillMaxWidth(), height = 4.dp)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (ui.started) {
-                    val left = ui.minutesLeft
-                    if (left != null) stringResource(R.string.home_position_left, percentOf(book.positionFraction), minutesText(left))
-                    else stringResource(R.string.home_through, percentOf(book.positionFraction))
-                } else stringResource(R.string.home_not_started),
-                color = p.text2, style = KpType.caption,
-            )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(KpSpace.s)) {
                 val listenButton = @Composable { primary: Boolean ->
                     KpButton(

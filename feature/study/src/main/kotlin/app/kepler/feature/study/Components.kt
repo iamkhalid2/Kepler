@@ -182,7 +182,13 @@ internal fun EmptyNote(text: String, modifier: Modifier = Modifier) {
 
 /** A typed AI failure in plain words: what happened and what still works. [onRetry] only appears when retrying can help. */
 @Composable
-internal fun ErrorNote(error: UiError, onRetry: (() -> Unit)?, modifier: Modifier = Modifier) {
+internal fun ErrorNote(
+    error: UiError,
+    onRetry: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     val haptics = rememberHaptics()
     LaunchedEffect(error) { haptics.play(HapticToken.Reject) }
     KpErrorCard(
@@ -190,6 +196,8 @@ internal fun ErrorNote(error: UiError, onRetry: (() -> Unit)?, modifier: Modifie
         message = stringResource(errorText(error.kind)),
         modifier = modifier,
         onRetry = if (error.retryable) onRetry else null,
+        actionLabel = actionLabel,
+        onAction = onAction,
     )
 }
 

@@ -181,7 +181,8 @@ fun CardFromSelectionSheet(
             Text(stringResource(R.string.cap_reached, Study.DAILY_NEW_CARD_CAP), color = p.text2, style = KpType.body)
             Spacer(Modifier.height(16.dp))
         } else {
-            Caps(stringResource(R.string.suggested_questions)); Spacer(Modifier.height(4.dp))
+            // With a question already given (from Ask) no suggestions are fetched: no empty heading either.
+            if (s.suggestions != Load.Idle) { Caps(stringResource(R.string.suggested_questions)); Spacer(Modifier.height(4.dp)) }
             when (val sg = s.suggestions) {
                 Load.Idle -> Unit
                 Load.Loading -> LoadingBlocks(2, Modifier.padding(vertical = 8.dp))
@@ -193,7 +194,7 @@ fun CardFromSelectionSheet(
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            if (s.suggestions != Load.Idle) Spacer(Modifier.height(16.dp))
             StudyInput(s.question, vm::setQuestion, label = stringResource(R.string.front_label), placeholder = stringResource(R.string.front_hint), minLines = 2, inCard = true)
             Spacer(Modifier.height(16.dp))
             StudyInput(s.answer, vm::setAnswer, label = stringResource(R.string.your_answer_label), placeholder = stringResource(R.string.your_answer_hint), minLines = 3, inCard = true)
@@ -212,7 +213,7 @@ fun CardFromSelectionSheet(
                 Spacer(Modifier.height(16.dp))
                 Caps(stringResource(R.string.preview_caps)); Spacer(Modifier.height(8.dp))
                 IndexCard(Modifier.fillMaxWidth().heightIn(min = 120.dp), scroll = false) {
-                    Text(s.question, color = p.readText, style = KpType.title2)
+                    Text(s.question, color = Kp.palette.readText, style = KpType.title2)
                 }
             }
             Spacer(Modifier.height(24.dp))

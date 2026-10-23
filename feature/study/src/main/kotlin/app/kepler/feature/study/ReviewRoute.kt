@@ -4,10 +4,10 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,16 +60,18 @@ import app.kepler.core.designsystem.KpSpace
 import app.kepler.core.designsystem.KpStatTile
 import app.kepler.core.designsystem.KpTopBar
 import app.kepler.core.designsystem.KpType
+import app.kepler.core.designsystem.LocalBbPalette
+import app.kepler.core.designsystem.kpPalette
 import app.kepler.core.designsystem.rememberHaptics
 import app.kepler.core.model.Rating
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import java.time.format.TextStyle as DayStyle
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 
 /** The geometry of the single-plane flip (design brief v2 section 7). Angle runs 0..180. */
 object FlipModel {
@@ -135,29 +138,29 @@ private fun ReviewCardStage(s: ReviewState, vm: ReviewViewModel, modifier: Modif
                     onSwipe = { r -> if (s.flipped) vm.grade(r) },
                     front = {
                         Column(Modifier.fillMaxSize()) {
-                            Text(card.front, color = p.readText, style = KpType.title2)
+                            Text(card.front, color = Kp.palette.readText, style = KpType.title2)
                             s.hint?.let {
                                 Spacer(Modifier.height(16.dp))
-                                Text(stringResource(R.string.hint_label, it), color = p.readText.copy(alpha = 0.6f), style = StudyType.quote(p.readText.copy(alpha = 0.6f)))
+                                Text(stringResource(R.string.hint_label, it), color = Kp.palette.readText.copy(alpha = 0.6f), style = StudyType.quote(Kp.palette.readText.copy(alpha = 0.6f)))
                             }
                         }
                     },
                     footer = s.source?.let { src ->
                         {
-                            Text(src, color = p.readText.copy(alpha = 0.55f), style = KpType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(src, color = Kp.palette.readText.copy(alpha = 0.55f), style = KpType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     },
                     back = {
                         Column(Modifier.fillMaxSize()) {
-                            Text(card.front.lineSequence().first().take(90), color = p.readText.copy(alpha = 0.55f), style = KpType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(card.front.lineSequence().first().take(90), color = Kp.palette.readText.copy(alpha = 0.55f), style = KpType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Spacer(Modifier.height(12.dp))
-                            Text(card.back, color = p.readText, style = KpType.title2.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal))
+                            Text(card.back, color = Kp.palette.readText, style = KpType.title2.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal))
                             val typed = s.typed.ifBlank { card.userAnswer.orEmpty() }
                             if (typed.isNotBlank()) {
                                 Spacer(Modifier.height(16.dp))
-                                Caps(stringResource(R.string.in_your_words), color = p.readText.copy(alpha = 0.55f))
+                                Caps(stringResource(R.string.in_your_words), color = Kp.palette.readText.copy(alpha = 0.55f))
                                 Spacer(Modifier.height(4.dp))
-                                Text(typed, color = p.readText.copy(alpha = 0.8f), style = KpType.body)
+                                Text(typed, color = Kp.palette.readText.copy(alpha = 0.8f), style = KpType.body)
                             }
                         }
                     },
@@ -276,12 +279,16 @@ internal fun IndexCard(
     modifier: Modifier = Modifier, scroll: Boolean = true, footer: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val p = Kp.palette
+    // The card is a real object (section 7), so it stays paper in dark mode too: everything on it is drawn with the
+    // light palette, and in dark mode the paper is dimmed a little so it does not glare against the night page.
+    val screen = Kp.palette
+    val p = remember(screen.seed) { kpPalette(screen.seed, dark = false) }
+    val dim = if (screen.isDark) Color.Black.copy(alpha = 0.1f) else Color.Transparent
     val shape = RoundedCornerShape(6.dp)
-    Box(
+    CompositionLocalProvider(LocalBbPalette provides p) { Box(
         modifier
             .shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.35f))
-            .clip(shape).background(p.page)
+            .clip(shape).background(p.page).background(dim)
             .drawBehind {
                 val rule = 40.dp.toPx()
                 var y = rule + 30.dp.toPx()
@@ -297,7 +304,7 @@ internal fun IndexCard(
             content = content,
         )
         if (footer != null) Box(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 20.dp, bottom = 14.dp), content = footer)
-    }
+    } }
 }
 
 @Composable

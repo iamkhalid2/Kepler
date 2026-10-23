@@ -183,11 +183,14 @@ private fun AskTab(
                     is AskItem.Question -> QuestionBubble(item.text)
                     is AskItem.Answer -> AnswerCard(
                         item.answer.text, item.answer.citations, streaming = false, onJumpTo = onJumpTo, onStop = null,
-                        onMakeCard = { onMakeCard(item.answer.citations.firstOrNull()?.ordinal ?: s.frontier.coerceAtLeast(0), item.answer.text, item.question) },
+                        onMakeCard = { onMakeCard(item.answer.citations.firstOrNull()?.ordinal ?: s.frontier.coerceAtLeast(0), plainAnswer(item.answer.text), item.question) },
                     )
-                    is AskItem.Failure -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        ErrorNote(item.error, { vm.retry(item) })
-                        if (item.error.needsSettings() && onOpenSettings != null) GhostKey(stringResource(R.string.open_settings), onOpenSettings)
+                    is AskItem.Failure -> {
+                        val settings = onOpenSettings.takeIf { item.error.needsSettings() }
+                        ErrorNote(
+                            item.error, { vm.retry(item) },
+                            actionLabel = settings?.let { stringResource(R.string.open_settings) }, onAction = settings,
+                        )
                     }
                 }
             }
@@ -304,7 +307,7 @@ private fun AnswerCard(
  */
 internal fun styleAnswer(text: String, citations: List<Citation>, accent: androidx.compose.ui.graphics.Color): AnnotatedString =
     buildAnnotatedString {
-        val a = AskAnswer(trimPartialMarker(text), citations)
+        val a = AskAnswer(trimPartialMarker(text).replace(RAW_MARKER_LIST, ""), citations)
         var last = 0
         var prevMarkerEnd = -1
         Regex("\\s*\\[(\\d+)]").findAll(a.text).forEach { m ->
@@ -321,8 +324,18 @@ internal fun styleAnswer(text: String, citations: List<Citation>, accent: androi
         append(a.text.substring(last))
     }
 
-/** A citation marker that has only half arrived ("... as shown [33") is hidden until it completes. */
-internal fun trimPartialMarker(text: String): String = text.replace(Regex("\\s*\\[\\d*$"), "")
+/** A citation marker that has only half arrived ("... as shown [33", "[556-558, 18") is hidden until it completes. */
+internal fun trimPartialMarker(text: String): String = text.replace(Regex("\\s*\\[[\\d\\s,;\\-–s]*$"), "")
+
+/**
+ * A list of passage numbers the service passed through unresolved ("[556-558, 1827-1830]"): raw sentence
+ * ordinals mean nothing to a reader, so they are hidden rather than printed in the answer.
+ */
+/** The answer without passage markers, for text that leaves the answer card (a review card's back). */
+internal fun plainAnswer(text: String): String =
+    text.replace(RAW_MARKER_LIST, "").replace(Regex("\\s*\\[\\d+]"), "").replace(Regex("[ \\t]+([.,;:])"), "$1").trim()
+
+private val RAW_MARKER_LIST = Regex("\\s*\\[\\s*s?\\d+(?:\\s*[,;\\-–]\\s*s?\\d+)+\\s*]")
 
 /** 1-based position of the citation for [ordinal] in [a]'s list, or null when it is not cited. */
 internal fun citationNumber(a: AskAnswer, ordinal: Int?): Int? =
@@ -349,8 +362,11 @@ private fun RecapTab(s: LearnState, vm: LearnViewModel, onOpenSettings: (() -> U
                     KpStreamingCaret()
                 }
                 is Load.Failed -> {
-                    ErrorNote(r.error, { vm.loadRecap(force = true) })
-                    if (r.error.needsSettings() && onOpenSettings != null) GhostKey(stringResource(R.string.open_settings), onOpenSettings)
+                    val settings = onOpenSettings.takeIf { r.error.needsSettings() }
+                    ErrorNote(
+                        r.error, { vm.loadRecap(force = true) },
+                        actionLabel = settings?.let { stringResource(R.string.open_settings) }, onAction = settings,
+                    )
                 }
                 is Load.Ready -> if (r.value.isBlank()) EmptyNote(stringResource(R.string.recap_empty), Modifier.padding(vertical = 0.dp)) else {
                     Text(r.value.trim(), color = p.text, style = KpType.prose)

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -36,6 +37,7 @@ import app.kepler.core.designsystem.KpIconButton
 import app.kepler.core.designsystem.KpIconButtonStyle
 import app.kepler.core.designsystem.KpIcons
 import app.kepler.core.designsystem.KpScrubber
+import app.kepler.core.designsystem.KpSegmented
 import app.kepler.core.designsystem.KpSize
 import app.kepler.core.designsystem.KpType
 import app.kepler.core.designsystem.rememberHaptics
@@ -45,39 +47,35 @@ import kotlin.math.roundToInt
 // The Read face's chrome (brief v2, #112). It is drawn inside the page's paper palette, so on a sepia page the
 // bars are sepia too and the text never sits next to a foreign surface.
 
-/** Top bar: back, chapter title over the book title (opens the contents), Aa, search, Learn. */
+/**
+ * Top bar: back, the Listen | Read segmented control centred exactly where the Listen face has it (so switching
+ * faces never moves it), then Aa and Learn. The chapter title lives in the page header and the dock's chip; search
+ * lives at the top of the contents sheet.
+ */
 @Composable
 internal fun ReaderTopBar(
-    chapter: String?,
-    book: String,
     onBack: () -> Unit,
-    onContents: () -> Unit,
+    onListen: () -> Unit,
     onTypography: () -> Unit,
-    onSearch: () -> Unit,
     onLearn: () -> Unit,
 ) {
     val p = Kp.palette
-    val haptics = rememberHaptics()
-    val contents = stringResource(R.string.reader_contents)
     Column(Modifier.fillMaxWidth().background(p.bg).statusBarsPadding()) {
-        Row(
-            Modifier.fillMaxWidth().height(KpSize.topBar).padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            KpIconButton(KpIcons.Back, stringResource(R.string.reader_back), onBack, style = KpIconButtonStyle.Tonal)
-            Column(
-                Modifier.weight(1f).heightIn(min = 48.dp)
-                    .clickable(role = Role.Button) { haptics.play(HapticToken.Tap); onContents() }
-                    .semantics { contentDescription = "$contents, ${chapter ?: book}" }
-                    .padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(chapter ?: book, color = p.text, style = KpType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (chapter != null) Text(book, color = p.text2, style = KpType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(Modifier.fillMaxWidth().height(KpSize.topBar).padding(horizontal = 8.dp)) {
+            KpIconButton(
+                KpIcons.Back, stringResource(R.string.reader_back), onBack,
+                Modifier.align(Alignment.CenterStart), KpIconButtonStyle.Tonal,
+            )
+            KpSegmented(
+                options = listOf(stringResource(R.string.reader_face_listen), stringResource(R.string.reader_face_read)),
+                selected = 1,
+                onSelect = { if (it == 0) onListen() },
+                modifier = Modifier.align(Alignment.Center).width(176.dp),
+            )
+            Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
+                TypographyButton(onTypography)
+                KpIconButton(KpIcons.Sparkle, stringResource(R.string.reader_learn), onLearn, style = KpIconButtonStyle.Tonal)
             }
-            TypographyButton(onTypography)
-            KpIconButton(KpIcons.Search, stringResource(R.string.reader_search), onSearch, style = KpIconButtonStyle.Tonal)
-            KpIconButton(KpIcons.Sparkle, stringResource(R.string.reader_learn), onLearn, style = KpIconButtonStyle.Tonal)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(p.hairline))
     }

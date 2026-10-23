@@ -1,10 +1,11 @@
 package app.kepler.feature.player
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.Color
@@ -13,16 +14,13 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kepler.core.designsystem.CoverRequest
-import app.kepler.core.designsystem.Kp
 import app.kepler.core.designsystem.rememberCoverImage
 import app.kepler.core.model.PlaybackController
 import app.kepler.core.model.PlaybackInfo
 import app.kepler.core.model.PlaybackInfoSource
 import app.kepler.core.model.PlaybackState
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.withContext
 
 /**
  * Observes one derived field of the playback state. Playback state updates about four times a second;
@@ -54,16 +52,21 @@ internal fun durationLabel(ms: Long): String {
 internal fun estimated(text: String, estimated: Boolean): String =
     if (estimated) stringResource(R.string.player_estimated, text) else text
 
-/** The cover's average colour (for the ambient light behind the Listen face), or the accent while it is unknown. */
+/**
+ * The cover's average colour (for the ambient light behind the Listen face). It is worked out on the frame the
+ * image is there (a 6x9 average costs well under a millisecond), so a cached cover lights the first frame in its
+ * own colour; with no image yet there is no light at all rather than an accent-coloured flash, and a later
+ * change (generated cover to jacket) glides instead of jumping.
+ */
 @Composable
 internal fun rememberCoverTint(request: CoverRequest?): Color {
-    val fallback = Kp.palette.accent
-    if (request == null) return fallback
-    val image = rememberCoverImage(request, COVER_TINT_PX)
-    val tint by produceState<Color?>(null, image) { value = image?.let { withContext(Dispatchers.Default) { averageColor(it) } } }
-    return tint ?: fallback
+    val image = request?.let { rememberCoverImage(it, COVER_TINT_PX) }
+    val target = remember(image) { image?.let(::averageColor) } ?: Color.Transparent
+    val tint by animateColorAsState(target, tween(TINT_GLIDE_MS), label = "coverTint")
+    return tint
 }
 
+private const val TINT_GLIDE_MS = 240
 private const val COVER_TINT_PX = 192
 
 private fun averageColor(image: ImageBitmap): Color? = runCatching {

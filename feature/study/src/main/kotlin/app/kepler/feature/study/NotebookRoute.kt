@@ -178,7 +178,7 @@ private fun ReviewBanner(d: NotebookData, onStart: () -> Unit) {
                 if (d.dueCount > 0) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text("${d.dueCount}", color = p.text, style = KpType.bigStat)
-                        Text(stringResource(R.string.cards_due), color = p.text2, style = KpType.subhead, modifier = Modifier.padding(start = 6.dp, bottom = 6.dp))
+                        Text(pluralStringResource(R.plurals.cards_due, d.dueCount), color = p.text2, style = KpType.subhead, modifier = Modifier.padding(start = 6.dp, bottom = 6.dp))
                     }
                     Text(stringResource(R.string.about_minutes, ((d.dueCount + 1) / 2).coerceAtLeast(1)), color = p.text2, style = KpType.caption)
                 } else {
