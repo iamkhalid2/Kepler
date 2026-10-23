@@ -37,6 +37,17 @@ android {
             buildConfigField("String", "FISH_API_KEY", "\"\"")
             buildConfigField("String", "OPENROUTER_API_KEY", "\"\"")
         }
+        // Release-optimised but debug-signed under the debug id, so it installs over a dev build and keeps its data
+        // while giving real frame timings (debuggable Compose is several times slower).
+        create("benchmark") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isProfileable = true
+            buildConfigField("String", "FISH_API_KEY", devKey("FISH_API_KEY"))
+            buildConfigField("String", "OPENROUTER_API_KEY", devKey("OPENROUTER_API_KEY"))
+        }
     }
 
     buildFeatures {
