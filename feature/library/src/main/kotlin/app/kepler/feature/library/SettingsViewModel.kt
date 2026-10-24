@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.kepler.core.designsystem.KpSeed
 import app.kepler.core.model.AiBudget
 import app.kepler.core.model.AppSettings
+import app.kepler.core.model.ScrubberScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,7 @@ data class SettingsUi(
     val models: List<String> = emptyList(),
     val version: String = "",
     val paid: PaidUi = PaidUi(),
+    val modelSpeed: ModelSpeed? = null,
 ) {
     val seed: KpSeed get() = KpSeed.fromName(app.seed)
 }
@@ -55,9 +57,10 @@ class SettingsViewModel(private val deps: LibraryDeps) : ViewModel() {
             if (or) {
                 val budget = runCatching { deps.aiBudget() }.getOrNull()
                 val models = runCatching { deps.freeModels() }.getOrDefault(emptyList())
-                _state.update { it.copy(budget = budget, models = models) }
+                val speed = runCatching { deps.modelSpeed() }.getOrNull()
+                _state.update { it.copy(budget = budget, models = models, modelSpeed = speed) }
             } else {
-                _state.update { it.copy(budget = null, models = emptyList()) }
+                _state.update { it.copy(budget = null, models = emptyList(), modelSpeed = null) }
             }
         }
     }
@@ -119,6 +122,8 @@ class SettingsViewModel(private val deps: LibraryDeps) : ViewModel() {
     fun setFontScale(scale: Float) = edit { it.copy(fontScale = scale) }
     fun setLineHeight(h: Float) = edit { it.copy(lineHeight = h) }
     fun setFontFamily(f: String) = edit { it.copy(fontFamily = f) }
+    fun setSpeed(speed: Float) = edit { it.copy(speed = speed) }
+    fun setScrubberScope(scope: ScrubberScope) = edit { it.copy(scrubberScope = scope) }
 
     private fun edit(t: (AppSettings) -> AppSettings) {
         viewModelScope.launch { deps.settings.update(t) }

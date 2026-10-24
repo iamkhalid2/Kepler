@@ -336,7 +336,7 @@ class ShakeDetectorTest {
     }
 
     @Test fun bookTimelineEstimate() {
-        assertEquals(4_000.0, BookTimeline.msPerSentence(0, 0), 0.0)
+        assertEquals(app.kepler.core.model.ListenPace.DEFAULT_MS_PER_SENTENCE, BookTimeline.msPerSentence(0, 0), 0.0)
         assertEquals(2_500.0, BookTimeline.msPerSentence(25_000, 10), 0.0)
     }
 }

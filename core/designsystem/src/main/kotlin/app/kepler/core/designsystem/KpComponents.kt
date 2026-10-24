@@ -484,8 +484,12 @@ fun KpSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Mod
             .semantics { if (label != null) contentDescription = label; stateDescription = if (checked) on else off },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(52.dp, 32.dp).background(if (checked) p.accent else p.surface2, CircleShape)) {
-            Box(Modifier.offset(x, 4.dp).size(24.dp).background(if (checked) p.onAccent else p.text2, CircleShape))
+        Box(
+            Modifier.size(52.dp, 32.dp).background(if (checked) p.accent else p.surface2, CircleShape)
+                // On a white light-mode card the off track (surface2) all but vanishes: give it the card's hairline.
+                .then(if (!checked && !p.isDark) Modifier.border(1.dp, p.hairline, CircleShape) else Modifier),
+        ) {
+            Box(Modifier.offset(x, 4.dp).size(24.dp).background(if (checked) Color.White else p.text2, CircleShape))
         }
     }
 }
@@ -661,8 +665,9 @@ fun KpScrubber(
                 val cy = size.height / 2f
                 val h = track.toPx()
                 val r = CornerRadius(h / 2f)
-                drawRoundRect(p.surface2, Offset(0f, cy - h / 2f), Size(size.width, h), r)
-                drawRoundRect(p.text, Offset(0f, cy - h / 2f), Size((size.width * shown).coerceAtLeast(h), h), r)
+                // Hairline, not surface2: the scrubber often sits on a cover-tinted background where surface2 vanishes.
+                drawRoundRect(p.hairline, Offset(0f, cy - h / 2f), Size(size.width, h), r)
+                drawRoundRect(p.accent, Offset(0f, cy - h / 2f), Size((size.width * shown).coerceAtLeast(h), h), r)
                 if (preview != null) drawCircle(p.key, 7.dp.toPx(), Offset(size.width * shown, cy))
             }
         }
@@ -808,13 +813,24 @@ fun KpEmptyState(
 
 /** Inline error: headline, one plain sentence, small "Try again". */
 @Composable
-fun KpErrorCard(title: String, message: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
+fun KpErrorCard(
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+    onRetry: (() -> Unit)? = null,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     val p = Kp.palette
     KpCard(modifier) {
         Text(title, color = p.text, style = KpType.rowTitle)
         Spacer(Modifier.height(4.dp))
         Text(message, color = p.text2, style = KpType.body)
-        if (onRetry != null) {
+        // A fixing action (open Settings) replaces "Try again": retrying cannot help until it is done.
+        if (actionLabel != null && onAction != null) {
+            Spacer(Modifier.height(12.dp))
+            KpButton(actionLabel, onAction, style = KpButtonStyle.Secondary, small = true)
+        } else if (onRetry != null) {
             Spacer(Modifier.height(12.dp))
             KpButton(stringResource(R.string.kp_try_again), onRetry, style = KpButtonStyle.Secondary, small = true, icon = KpIcons.Retry)
         }

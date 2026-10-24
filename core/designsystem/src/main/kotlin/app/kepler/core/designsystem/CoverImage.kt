@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The cover of [request] at roughly [widthPx], from [KpCovers]. Returns the cached cover on the first
- * composition when there is one (generated covers are rendered on the spot, once per book), then upgrades to
+ * composition when there is one (preloaded lists always are; nothing is rendered on the main thread), then upgrades to
  * the exact size bucket in the background. Null only while a jacket is decoded for the very first time.
  */
 @Composable
@@ -51,7 +51,7 @@ fun rememberCoverImage(request: CoverRequest, widthPx: Int): ImageBitmap? {
     val style = rememberCoverStyle()
     val bucket = CoverKeys.bucketFor(widthPx)
     var image by remember(request, style, bucket) {
-        mutableStateOf(KpCovers.peek(request, style, bucket) ?: KpCovers.generatedNow(request, style, bucket))
+        mutableStateOf(KpCovers.peek(request, style, bucket))
     }
     LaunchedEffect(request, style, bucket) {
         if (!KpCovers.hasExact(request, style, bucket)) KpCovers.load(request, style, bucket)?.let { image = it }

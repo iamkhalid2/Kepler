@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class OnboardingStep { Welcome, Pillars, Keys, Privacy, Battery }
+/** Three short steps; the battery step only follows on OPPO, OnePlus and realme phones. */
+enum class OnboardingStep { Welcome, Keys, Privacy, Battery }
 
 enum class KeyCheck {
     Idle, Checking, Connected,
@@ -38,7 +39,7 @@ class OnboardingViewModel(private val deps: LibraryDeps) : ViewModel() {
     private val _state = MutableStateFlow(
         OnboardingUi(
             buildList {
-                add(OnboardingStep.Welcome); add(OnboardingStep.Pillars); add(OnboardingStep.Keys); add(OnboardingStep.Privacy)
+                add(OnboardingStep.Welcome); add(OnboardingStep.Keys); add(OnboardingStep.Privacy)
                 if (deps.showsBatteryGuide()) add(OnboardingStep.Battery)
             },
         ),

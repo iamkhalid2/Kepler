@@ -65,7 +65,6 @@ internal class LlmRunner(
             }
             val sys = if (format is ResponseFormat.Schema) system else system + "\n\n" + jsonInstruction(spec)
             val messages = mutableListOf(ChatMessage("system", sys), ChatMessage("user", user))
-            budgeter.acquire(priority)
             val first = chatTimed(priority, key, model, messages, format, maxTokens)
             val (value, problem) = parseReply(first.content, spec)
             if (value != null) return@attempt value
@@ -101,21 +100,26 @@ internal class LlmRunner(
     /**
      * Streams a plain-text answer. The first candidate that produces a token wins; one that errors, is rate limited or
      * stays silent for the first-token limit is skipped at once. After the first token a failure is thrown (the
-     * caller already showed text), except the total time limit, which just ends the stream with what arrived.
+     * caller already showed text), except the total time limit, which just ends the stream with what arrived and
+     * clears [outcome]'s complete flag so the caller does not cache the cut answer.
      */
-    fun textStream(priority: Priority, system: String, user: String, maxTokens: Int = 700): Flow<String> = flow {
+    fun textStream(
+        priority: Priority, system: String, user: String, maxTokens: Int = 700, outcome: StreamOutcome? = null,
+    ): Flow<String> = flow {
         val key = apiKey()
         val models = candidates(key, interactive = true).take(maxModelAttempts)
+        // One logical request is charged once; a model that answered 429 or never connected is not charged again.
+        budgeter.acquire(priority)
         var last: AiError? = null
         for (m in models) {
-            budgeter.acquire(priority)
             val started = System.nanoTime()
             val strip = ThinkStripper()
             var emitted = false
+            outcome?.complete = true
             try {
                 client.chatStream(
                     key, m.id, listOf(ChatMessage("system", system), ChatMessage("user", user)),
-                    maxTokens, temperature = 0.4, reasoning = m.reasoningRequest(), limits = limits,
+                    maxTokens, temperature = 0.4, reasoning = m.reasoningRequest(), limits = limits, outcome = outcome,
                 ).collect { raw ->
                     val piece = strip.feed(raw)
                     if (piece.isEmpty()) return@collect
@@ -158,6 +162,8 @@ internal class LlmRunner(
     private suspend fun <R> attempt(priority: Priority, block: suspend (ModelInfo, String) -> R): R {
         val key = apiKey()
         val models = candidates(key).take(maxModelAttempts)
+        // One logical request is charged once; falling back to the next model after a failure is not charged again.
+        budgeter.acquire(priority)
         var last: AiError? = null
         for (m in models) {
             try {

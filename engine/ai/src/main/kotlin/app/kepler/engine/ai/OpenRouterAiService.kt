@@ -156,14 +156,15 @@ class OpenRouterAiService(
             sections.firstOrNull { o in it.startOrdinal..it.endOrdinal }?.title.orEmpty()
         }
         val text = StringBuilder()
-        runner.textStream(Priority.INTERACTIVE, prompt.system, user, maxTokens = ASK_MAX_TOKENS).collect { raw ->
+        val outcome = StreamOutcome()
+        runner.textStream(Priority.INTERACTIVE, prompt.system, user, maxTokens = ASK_MAX_TOKENS, outcome = outcome).collect { raw ->
             val clean = cites.feed(raw)
             if (clean.isNotEmpty()) { text.append(clean); emit(AskEvent.Delta(clean)) }
             if (cites.takeChanged()) emit(AskEvent.Citations(cites.citations))
         }
         cites.finish().takeIf { it.isNotEmpty() }?.let { text.append(it); emit(AskEvent.Delta(it)) }
         val answer = AskAnswer(text.toString().trim(), cites.citations)
-        aiStore.put("ask", cacheKey, AiJson.encodeToString(StoredAnswer.serializer(), StoredAnswer.of(answer)))
+        if (outcome.complete) aiStore.put("ask", cacheKey, AiJson.encodeToString(StoredAnswer.serializer(), StoredAnswer.of(answer)))
         emit(AskEvent.Done(answer))
     }
 
@@ -224,7 +225,8 @@ class OpenRouterAiService(
             val cites = CitationStream(emptySet(), Int.MAX_VALUE) { "" }
             val sb = StringBuilder()
             var first = true
-            runner.textStream(Priority.INTERACTIVE, PromptRegistry.RECAP_SECTION.system, user, maxTokens = RECAP_MAX_TOKENS).collect { raw ->
+            val outcome = StreamOutcome()
+            runner.textStream(Priority.INTERACTIVE, PromptRegistry.RECAP_SECTION.system, user, maxTokens = RECAP_MAX_TOKENS, outcome = outcome).collect { raw ->
                 val clean = cites.feed(raw)
                 if (clean.isEmpty()) return@collect
                 emit(if (first) "$lead$title: ${clean.trimStart()}" else clean)
@@ -233,7 +235,10 @@ class OpenRouterAiService(
             }
             cites.finish().takeIf { it.isNotEmpty() }?.let { sb.append(it); emit(it) }
             val summary = stripOrdinalMarkers(sb.toString())
-            if (summary.isNotBlank()) { aiStore.put("recap", key, summary); emitted = true }
+            if (summary.isNotBlank()) {
+                if (outcome.complete) aiStore.put("recap", key, summary)
+                emitted = true
+            }
         }
         if (!emitted) throw AiError.InvalidResponse("no summaries available yet")
     }.catch { e -> throw if (e is AiError || e is CancellationException) e else AiError.Unexpected(e) }
@@ -396,13 +401,14 @@ class OpenRouterAiService(
         }
         val noMarkers = CitationStream(emptySet(), Int.MAX_VALUE) { "" }
         val sb = StringBuilder()
-        runner.textStream(Priority.INTERACTIVE, prompt.system, user, maxTokens).collect { raw ->
+        val outcome = StreamOutcome()
+        runner.textStream(Priority.INTERACTIVE, prompt.system, user, maxTokens, outcome).collect { raw ->
             val clean = noMarkers.feed(raw)
             if (clean.isNotEmpty()) { sb.append(clean); emit(AskEvent.Delta(clean)) }
         }
         noMarkers.finish().takeIf { it.isNotEmpty() }?.let { sb.append(it); emit(AskEvent.Delta(it)) }
         val text = stripOrdinalMarkers(sb.toString())
-        aiStore.put(kind, key, text)
+        if (outcome.complete) aiStore.put(kind, key, text)
         emit(AskEvent.Done(AskAnswer(text, emptyList())))
     }
 

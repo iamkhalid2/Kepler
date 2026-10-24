@@ -45,4 +45,21 @@ class BookIndexTest {
         assertEquals(1.0, index.minutesLeftInChapter(7, wpm = 15), 1e-9)
         assertEquals(50.0 / 10, index.minutesLeftInChapter(10, wpm = 10), 1e-9)
     }
+
+    @Test fun sectionProgressStopsAtTheFirstSubsection() {
+        // "One" holds 0..4 of its own text before "One B" (5..9) starts.
+        val p = index.sectionProgress(2)!!
+        assertEquals("One", p.section.title)
+        assertEquals(0..4, p.range)
+        assertEquals(0.4f, p.fraction, 1e-6f)
+        val b = index.sectionProgress(7)!!
+        assertEquals(5..9, b.range)
+        assertEquals(1.0, index.sectionProgress(7, wpm = 15)!!.minutesLeft, 1e-9)
+    }
+
+    @Test fun ordinalInRangeMapsWordsBack() {
+        assertEquals(5, index.ordinalInRange(5..9, 0f))
+        assertEquals(7, index.ordinalInRange(5..9, 0.5f))
+        assertEquals(9, index.ordinalInRange(5..9, 1f))
+    }
 }

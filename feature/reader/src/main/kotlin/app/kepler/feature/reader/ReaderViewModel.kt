@@ -10,6 +10,7 @@ import app.kepler.core.model.Book
 import app.kepler.core.model.BookId
 import app.kepler.core.model.Bookmark
 import app.kepler.core.model.PositionKind
+import app.kepler.core.model.latestPosition
 import app.kepler.core.model.Section
 import app.kepler.engine.epub.reader.ConsumptionTracker
 import app.kepler.engine.epub.reader.LocatorOrdinalMapper
@@ -62,6 +63,9 @@ internal class ReaderViewModel(
     private val prefsStore = ReaderPrefsStore(app)
     val localPrefs: StateFlow<ReaderLocalPrefs> = prefsStore.prefs
 
+    /** The book's row, available long before the EPUB is open (the Listen face draws from it at once). */
+    val book: StateFlow<Book?> = deps.library.book(bookId).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val _load = MutableStateFlow<ReaderLoad>(ReaderLoad.Loading)
     val load: StateFlow<ReaderLoad> = _load.asStateFlow()
 
@@ -112,10 +116,11 @@ internal class ReaderViewModel(
         val publication = PublicationLoader(app).open(book.epubPath)
             .getOrElse { _load.value = ReaderLoad.Failed(it.message); return }
         val engine = ReadiumReaderEngine(publication)
-        val saved = deps.positions.position(bookId, PositionKind.READING).first()?.ordinal
+        val saved = deps.positions.latestPosition(bookId, PositionKind.READING)?.ordinal
         _ordinal.value = saved
         tracker = ConsumptionTracker(words = index::words)
         _load.value = ReaderLoad.Ready(book, engine, mapper, index, sections, saved?.let(mapper::anchorFor))
+        engine.setReadAlong(listening)
         runCatching { deps.library.markOpened(bookId) }
         refreshFrontier()
 
@@ -150,8 +155,16 @@ internal class ReaderViewModel(
     /** Where the navigator should open after its view is recreated. */
     fun currentAnchor(): TextAnchor? {
         val r = ready() ?: return null
-        return _ordinal.value?.let(r.mapper::anchorFor) ?: r.initial
+        // While narration follows this book and the page has not been moved away, the page opens on the spoken
+        // sentence at once; opening on the saved page and turning to it later is a visible jump.
+        val spoken = spokenOrdinal.takeIf { !_detached.value }
+        return (spoken ?: _ordinal.value)?.let(r.mapper::anchorFor) ?: r.initial
     }
+
+    @Volatile private var spokenOrdinal: Int? = null
+
+    /** The sentence being narrated for this book now, or null when narration is elsewhere. */
+    fun setSpoken(ordinal: Int?) { spokenOrdinal = ordinal }
 
     /** Paints saved highlights; [tints] are the six ARGB highlight colours from the palette. */
     suspend fun paintHighlights(list: List<Annotation>, tints: List<Int>) {
@@ -163,12 +176,26 @@ internal class ReaderViewModel(
         r.engine.applyMarks(ReadiumReaderEngine.GROUP_HIGHLIGHTS, marks)
     }
 
-    /** Paints the band on the sentence being spoken, or clears it when [ordinal] is null. */
-    suspend fun paintReadAlong(ordinal: Int?, tint: Int) {
+    /**
+     * Paints the read-along marks for the sentence being spoken: a band behind its paragraph and a stronger mark on
+     * the sentence itself. Clears both when [ordinal] is null.
+     */
+    suspend fun paintReadAlong(ordinal: Int?, paragraphTint: Int, sentenceTint: Int) {
         val r = ready() ?: return
         val anchor = ordinal?.let(r.mapper::anchorFor)
-        val marks = if (anchor == null) emptyList() else listOf(TextMark("s$ordinal", anchor, tint, band = true))
-        r.engine.applyMarks(ReadiumReaderEngine.GROUP_READ_ALONG, marks)
+        r.engine.applyMarks(
+            ReadiumReaderEngine.GROUP_READ_ALONG,
+            listOfNotNull(anchor?.let { TextMark("s$ordinal", it, sentenceTint, band = true) }),
+        )
+        r.engine.markReadAlongParagraph(if (anchor != null) paragraphTint else null)
+    }
+
+    /** The first sentence of the paragraph under a navigator point, or null when it cannot be told for sure. */
+    suspend fun ordinalAtPoint(x: Float, y: Float): Int? {
+        val r = ready() ?: return null
+        val text = r.engine.blockTextAt(x, y) ?: return null
+        val at = r.engine.location.value ?: return null
+        return r.mapper.ordinalOfText(at.href, text, at.progression)
     }
 
     /** The current selection mapped onto the spine, or null when nothing usable is selected. */
@@ -212,14 +239,23 @@ internal class ReaderViewModel(
         r.engine.go(anchor, animated = true)
     }
 
+    /** The page is about to reflow (rotation, window or dock size): the moves that follow are not the reader's. */
+    fun expectReflow() {
+        programmaticUntil = System.currentTimeMillis() + REFLOW_WINDOW_MS
+    }
+
     fun reattach() {
         _detached.value = false
     }
 
+    /** Read-along on or off: a moved page then detaches from the narration, and double taps play from a paragraph. */
     fun setListening(on: Boolean) {
         listening = on
         if (!on) _detached.value = false
+        ready()?.engine?.setReadAlong(on)
     }
+
+    fun markDoubleTapHintShown() = prefsStore.update { it.copy(doubleTapHintShown = true) }
 
     fun pauseTracking() = tracker?.pause()
     fun resumeTracking() = tracker?.resume(System.currentTimeMillis())
@@ -256,8 +292,13 @@ internal class ReaderViewModel(
         viewModelScope.launch { deps.annotations.delete(id) }
     }
 
-    fun toggleBookmark(pageOrdinal: Int) {
-        val existing = bookmarks.value.firstOrNull { it.ordinal in pageOrdinal..pageOrdinal + BOOKMARK_SLACK }
+    /**
+     * Adds or removes the bookmark at [pageOrdinal]. A page bookmark covers the sentences just below the top of the
+     * page; with [around] (the sentence being spoken) it covers a few sentences either side.
+     */
+    fun toggleBookmark(pageOrdinal: Int, around: Boolean = false) {
+        val range = if (around) pageOrdinal - BOOKMARK_SLACK..pageOrdinal + BOOKMARK_SLACK else pageOrdinal..pageOrdinal + BOOKMARK_SLACK
+        val existing = bookmarks.value.firstOrNull { it.ordinal in range }
         viewModelScope.launch {
             if (existing != null) {
                 deps.annotations.deleteBookmark(existing.id)
@@ -293,6 +334,7 @@ internal class ReaderViewModel(
 
     companion object {
         private const val PROGRAMMATIC_WINDOW_MS = 1_200L
+        private const val REFLOW_WINDOW_MS = 2_000L
         const val BOOKMARK_SLACK = 2
     }
 }

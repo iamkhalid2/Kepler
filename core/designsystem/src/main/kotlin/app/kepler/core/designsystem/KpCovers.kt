@@ -152,13 +152,19 @@ object KpCovers {
 
     /** Forgets every cached cover of [bookId] (cover replaced, book deleted). */
     fun invalidate(bookId: Long) = synchronized(lock) {
+        // A replaced or re-imported jacket gets another decode attempt.
+        broken.clear()
         cache.keys().filter { CoverKeys.bookOf(it) == bookId }.forEach { cache.remove(it) }
     }
 
     /** Call from `onTrimMemory`. */
     fun trim(level: Int) = synchronized(lock) {
         // Keep the most recent half in the background so returning to the app still draws covers on frame one.
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) cache.trimTo(cache.size / 2)
+        when {
+            level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> cache.trimTo(0)
+            level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE -> cache.trimTo(cache.size / 4)
+            level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> cache.trimTo(cache.size / 2)
+        }
     }
 
     private fun keyFor(r: CoverRequest, style: CoverStyle, bucket: Int): String {

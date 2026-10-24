@@ -6,20 +6,22 @@
     <string name="reader_search">Search in book</string>
     <string name="reader_bookmark_add">Add bookmark</string>
     <string name="reader_bookmark_remove">Remove bookmark</string>
+    <string name="reader_bookmark_saved">Bookmark saved</string>
+    <string name="reader_bookmark_removed">Bookmark removed</string>
     <string name="reader_learn">Learn</string>
+    <string name="reader_face_listen">Listen</string>
+    <string name="reader_face_read">Read</string>
     <string name="reader_open_failed">This file can\'t be opened. It may be damaged or encrypted.</string>
     <string name="reader_loading">Opening book</string>
 
-    <string name="reader_mode_read">Read</string>
-    <string name="reader_mode_read_listen">Read + Listen</string>
-    <string name="reader_play_here">Play from here</string>
-    <string name="reader_return">Return</string>
-    <string name="reader_progress">%1$d%% through · %2$s</string>
-    <string name="reader_min_left_in">%1$d min left in %2$s</string>
-    <string name="reader_under_min_in">Under a minute left in %1$s</string>
-    <string name="reader_this_chapter">this chapter</string>
     <string name="reader_percent">%1$d%%</string>
-    <string name="reader_progress_track">Reading progress</string>
+    <string name="reader_book_percent">%1$d%% of book</string>
+    <string name="reader_min_left">%1$d min left</string>
+    <string name="reader_under_min_left">Under a minute left</string>
+    <string name="reader_chapter_track">Position in this chapter</string>
+    <string name="reader_listen">Listen</string>
+    <string name="reader_back_to_narration">Back to narration</string>
+    <string name="reader_double_tap_hint">Double-tap a paragraph to play from there</string>
 
     <string name="reader_sel_highlight">Highlight</string>
     <string name="reader_sel_explain">Explain</string>

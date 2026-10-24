@@ -35,6 +35,8 @@ data class LiveAnswer(
     val citations: List<Citation> = emptyList(),
     /** `System.nanoTime()` when the question was sent, for the time-to-first-words measurement. */
     val startedNs: Long = 0L,
+    /** Milliseconds from sending the question to the first words on screen; null until they arrive. */
+    val firstWordsMs: Long? = null,
 ) {
     val started: Boolean get() = text.isNotEmpty()
 }
@@ -102,7 +104,12 @@ class LearnViewModel(private val bookId: BookId, private val deps: StudyDeps) : 
             var failure: UiError? = null
             deps.streaming.askStream(bookId, q).catch { failure = it.toUiError() }.collect { e ->
                 when (e) {
-                    is AskEvent.Delta -> _state.update { s -> s.live?.let { s.copy(live = it.copy(text = it.text + e.text)) } ?: s }
+                    is AskEvent.Delta -> _state.update { s ->
+                        s.live?.let {
+                            val first = it.firstWordsMs ?: if (e.text.isNotBlank()) elapsedMs(it.startedNs).also(::logFirstWords) else null
+                            s.copy(live = it.copy(text = it.text + e.text, firstWordsMs = first))
+                        } ?: s
+                    }
                     is AskEvent.Citations -> _state.update { s -> s.live?.let { s.copy(live = it.copy(citations = e.citations)) } ?: s }
                     is AskEvent.Done -> final = e.answer
                     is AskEvent.Failed -> failure = e.error.toUiError()
@@ -110,6 +117,13 @@ class LearnViewModel(private val bookId: BookId, private val deps: StudyDeps) : 
             }
             finishAsk(q, final, failure)
         }
+    }
+
+    private fun elapsedMs(startNs: Long) = (System.nanoTime() - startNs) / 1_000_000
+
+    /** Debug aid: the time-to-first-words figure the owner asked for. Never carries question text. */
+    private fun logFirstWords(ms: Long) {
+        try { android.util.Log.d("KeplerAsk", "first words after $ms ms") } catch (_: Throwable) { }
     }
 
     private fun finishAsk(q: String, final: AskAnswer?, failure: UiError?) {
@@ -142,6 +156,16 @@ class LearnViewModel(private val bookId: BookId, private val deps: StudyDeps) : 
             if (i < 0) s else s.copy(transcript = s.transcript.filterIndexed { j, _ -> j != i && !(j == i - 1 && s.transcript[j] is AskItem.Question) })
         }
         ask(failure.question)
+    }
+
+    /** Stops a recap that is still writing; what arrived stays. */
+    fun stopRecap() {
+        recapJob?.cancel()
+        recapJob = null
+        _state.update { s ->
+            val text = (s.recap as? Load.Ready)?.value.orEmpty()
+            s.copy(recapStreaming = false, recap = if (s.recap is Load.Loading) Load.Idle else Load.Ready(text))
+        }
     }
 
     fun loadRecap(force: Boolean = false) {

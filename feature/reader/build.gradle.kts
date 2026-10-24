@@ -22,6 +22,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(project(":core:designsystem"))
     implementation(project(":engine:epub"))
+    implementation(project(":feature:player"))
     implementation(libs.readium.shared)
     implementation(libs.readium.navigator)
     implementation(libs.androidx.fragment.compose)

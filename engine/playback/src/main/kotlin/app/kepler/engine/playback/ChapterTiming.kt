@@ -7,8 +7,8 @@ import app.kepler.core.model.ChapterMark
 class SentenceInfo(val ordinal: Int, val words: Int, val paragraph: Int)
 
 object SpeechRate {
-    /** About 2.6 words per second at 1x, matching the narration planner. */
-    const val DEFAULT_MS_PER_WORD = 385.0
+    /** About 2.6 words per second at 1x, matching the narration planner (shared with Home and the hub). */
+    const val DEFAULT_MS_PER_WORD = app.kepler.core.model.ListenPace.DEFAULT_MS_PER_WORD
 
     /** Fewer known words than this say nothing reliable about the pace of a voice. */
     const val MIN_CALIBRATION_WORDS = 40
@@ -289,5 +289,31 @@ class BookTiming private constructor(
             }
             return BookTiming(marks, ms, est, prefix)
         }
+    }
+}
+
+/**
+ * Keeps the book's "time left" from wobbling. The raw figure is an estimate that is rebuilt whenever a segment lands or
+ * the calibrated pace changes, so it jumps both ways. While playback moves forward, the shown value falls with the audio
+ * that has played and takes a lower raw figure at once, but never rises. A seek or a new book calls [reset].
+ */
+class RemainingClock(private val maxStepMs: Long = 5_000) {
+    private var shown = -1L
+    private var sectionId: Long? = null
+    private var elapsedMs = 0L
+
+    fun reset() { shown = -1 }
+
+    fun next(rawRemainingMs: Long, sectionId: Long?, sectionElapsedMs: Long): Long {
+        val step = if (sectionId == this.sectionId) sectionElapsedMs - elapsedMs else 0L
+        this.sectionId = sectionId
+        elapsedMs = sectionElapsedMs
+        if (shown < 0 || step < 0 || step > maxStepMs) {
+            // Nothing shown yet, or the playhead jumped (a seek): trust the new figure.
+            shown = rawRemainingMs
+            return shown
+        }
+        shown = minOf(rawRemainingMs, (shown - step).coerceAtLeast(0))
+        return shown
     }
 }

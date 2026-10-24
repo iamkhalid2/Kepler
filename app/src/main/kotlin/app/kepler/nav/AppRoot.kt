@@ -90,8 +90,6 @@ import app.kepler.feature.library.NarrationSetupRoute
 import app.kepler.feature.library.OnboardingRoute
 import app.kepler.feature.library.ProvideLibraryDeps
 import app.kepler.feature.library.SettingsRoute
-import app.kepler.feature.player.FullPlayerRoute
-import app.kepler.feature.player.ReadAlongTransport
 import app.kepler.feature.reader.ReaderRoute
 import app.kepler.feature.study.CardFromSelectionSheet
 import app.kepler.feature.study.DefineSheet
@@ -443,9 +441,8 @@ private fun storeOwner(store: ViewModelStore): ViewModelStoreOwner = object : Vi
 }
 
 /**
- * The one read + listen destination (#112). The Listen face is the full player for now and the Read face the
- * reader with its docked transport; both live in the same back-stack entry and crossfade into each other.
- * The unified screen replaces both bodies next stage without touching navigation.
+ * The one read + listen destination (#112): the reader with the Listen face over it, in one back-stack entry.
+ * Turning the face only rewrites the entry's route, so the screen and its reader are never recreated.
  */
 @Composable
 private fun ReadListenHost(
@@ -455,81 +452,22 @@ private fun ReadListenHost(
     onListenPermission: () -> Unit,
     openSheet: (SheetReq) -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
-    val reduced = rememberReducedMotion()
-    AnimatedContent(
-        targetState = route.face,
-        transitionSpec = { KpMotion.crossfade(if (reduced) KpMotion.REDUCED_MS else KpMotion.FACE_SWITCH_MS) },
-        label = "face",
-    ) { face ->
-        when (face) {
-            ReaderFace.LISTEN -> FullPlayerRoute(
-                controller = container.playback,
-                narration = container.narration,
-                annotations = container.data.annotations,
-                bookId = route.bookId,
-                onReadAlong = { ordinal ->
-                    scope.launch {
-                        container.data.positions.savePosition(route.bookId, PositionKind.READING, ordinal)
-                        stack.setFace(route.bookId, ReaderFace.READ, ReaderMode.READ_LISTEN)
-                    }
-                },
-                onClose = { stack.pop() },
-            )
-            ReaderFace.READ -> ReaderHost(container, route, stack, onListenPermission, openSheet)
-        }
-    }
-}
-
-@Composable
-private fun ReaderHost(
-    container: AppContainer,
-    route: Route.Reader,
-    stack: BackStack,
-    onListenPermission: () -> Unit,
-    openSheet: (SheetReq) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val playback = container.playback
     val bookId = route.bookId
-    val readAlong = remember(bookId) {
-        playback.state.map { if (it.bookId == bookId) it.ordinal else null }.distinctUntilChanged()
-    }
-    fun setMode(mode: ReaderMode) = stack.setFace(bookId, ReaderFace.READ, mode)
     ReaderRoute(
         deps = container.readerDeps,
+        playback = container.playback,
         bookId = bookId,
-        readAlongOrdinal = readAlong,
-        mode = route.mode,
-        onModeChange = { mode ->
-            setMode(mode)
-            if (mode == ReaderMode.READ_LISTEN) {
-                onListenPermission()
-                val st = playback.state.value
-                if (st.bookId != bookId) {
-                    scope.launch {
-                        val from = container.data.positions.position(bookId, PositionKind.READING).first()?.ordinal
-                        playback.play(bookId, from)
-                    }
-                } else if (!st.playing) {
-                    playback.resume()
-                }
-            } else if (playback.state.value.bookId == bookId && playback.state.value.playing) {
-                playback.pause()
-            }
-        },
-        onPlayFromSentence = { ordinal ->
-            onListenPermission()
-            setMode(ReaderMode.READ_LISTEN)
-            playback.play(bookId, ordinal)
-        },
+        listenFace = route.face == ReaderFace.LISTEN,
+        onFaceChange = { listen -> stack.setFace(bookId, if (listen) ReaderFace.LISTEN else ReaderFace.READ) },
+        onListenStart = onListenPermission,
+        onSectionChange = { ordinal -> container.ai.prefetch(bookId, ordinal) },
         onExplain = { o, t -> openSheet(SheetReq.Explain(bookId, o, t)) },
         onAsk = { _, _ -> stack.push(Route.Learn(bookId, LearnTab.ASK)) },
         onCard = { o, t -> openSheet(SheetReq.Card(bookId, o, t)) },
         onDefine = { o, t -> openSheet(SheetReq.Define(bookId, o, t)) },
         onOpenLearn = { stack.push(Route.Learn(bookId)) },
+        onVoice = { stack.push(Route.Setup(bookId)) },
         onClose = { stack.pop() },
-        transport = { ReadAlongTransport(playback) },
     )
 }
 

@@ -31,6 +31,8 @@ import app.kepler.engine.tts.NarrationEngine
 import app.kepler.engine.tts.TtsException
 import app.kepler.feature.library.KeyKind
 import app.kepler.feature.library.LibraryDeps
+import app.kepler.feature.library.ModelSpeed
+import app.kepler.feature.library.parseModelSpeed
 import app.kepler.feature.reader.ReaderDeps
 import app.kepler.feature.study.StudyDeps
 import kotlinx.coroutines.CoroutineScope
@@ -127,6 +129,9 @@ class AppContainer(private val app: Application) {
         }
         override val freeModels: suspend () -> List<String> = {
             runCatching { ai.freeModels().map { it.id } }.getOrDefault(emptyList())
+        }
+        override val modelSpeed: suspend () -> ModelSpeed? = {
+            parseModelSpeed(runCatching { data.aiStore.get("model-probe", "v1") }.getOrNull())
         }
         override val spentThisMonthCents: () -> Int = { this@AppContainer.narration.spentThisMonthCents().toInt() }
         override val appVersion: String = BuildConfig.VERSION_NAME

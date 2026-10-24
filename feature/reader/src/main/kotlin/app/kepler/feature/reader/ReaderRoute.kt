@@ -11,6 +11,7 @@ import android.view.MenuItem
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -18,10 +19,9 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,29 +37,35 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -67,63 +73,68 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.compose.AndroidFragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.CoverRequest
 import app.kepler.core.designsystem.HapticToken
+import app.kepler.core.designsystem.Kp
+import app.kepler.core.designsystem.KpMotion
+import app.kepler.core.designsystem.KpToastHost
+import app.kepler.core.designsystem.LocalBbPalette
 import app.kepler.core.designsystem.SilkRibbon
+import app.kepler.core.designsystem.paperPalette
 import app.kepler.core.designsystem.rememberHaptics
 import app.kepler.core.designsystem.rememberRibbonSwing
-import app.kepler.core.designsystem.LocalBbPalette
-import app.kepler.core.designsystem.paperPalette
-import androidx.compose.runtime.CompositionLocalProvider
 import app.kepler.core.model.BookId
-import app.kepler.core.model.ReaderMode
+import app.kepler.core.model.PlaybackController
 import app.kepler.engine.epub.reader.ReaderEvent
 import app.kepler.engine.epub.reader.ReaderFragmentFactory
+import app.kepler.engine.epub.reader.ReaderStyle
 import app.kepler.engine.epub.reader.ReadiumReaderEngine
+import app.kepler.engine.epub.reader.compositeOver
+import app.kepler.feature.player.ListenFace
+import app.kepler.feature.player.PlaybackDock
+import app.kepler.feature.player.select
+import app.kepler.feature.player.selectInfo
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
-import app.kepler.core.designsystem.bookPageSlot
-import app.kepler.engine.epub.reader.ReaderStyle
-import app.kepler.engine.epub.reader.compositeOver
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 
 /**
- * The reading screen for [bookId].
+ * The one read + listen screen for [bookId] (#112). The Read face (the Readium reader) is always composed; the
+ * Listen face (the full player) lies over it and crossfades in and out, so switching faces never reloads the page
+ * and both stay on the same sentence ordinal: while narration runs, the hidden page follows the spoken sentence.
  *
- * Host requirements: the activity must be a [FragmentActivity] (the Readium navigator is a fragment),
- * should call [ReaderFragmentFactory.install] before `super.onCreate` so the navigator survives
- * recreation, and should forward volume keys through [ReaderKeys.dispatch].
+ * Host requirements: the activity must be a [FragmentActivity] (the Readium navigator is a fragment), should
+ * call [ReaderFragmentFactory.install] before `super.onCreate` so the navigator survives recreation, and should
+ * forward volume keys through [ReaderKeys.dispatch].
  *
- * [readAlongOrdinal] is the sentence being spoken; in [ReaderMode.READ_LISTEN] it is banded and
- * followed. [transport] is shown above the bottom bar in that mode.
+ * [onFaceChange] turns the screen to the Listen face (true) or the Read face (false) in place. [onListenStart]
+ * runs before this screen starts narration (the host asks for the notification permission). [onSectionChange]
+ * fires with the current ordinal whenever the reader or the voice enters another section.
  */
 @Composable
 fun ReaderRoute(
     deps: ReaderDeps,
+    playback: PlaybackController,
     bookId: BookId,
-    readAlongOrdinal: Flow<Int?>,
-    mode: ReaderMode,
-    onModeChange: (ReaderMode) -> Unit,
-    onPlayFromSentence: (Int) -> Unit,
+    listenFace: Boolean,
+    onFaceChange: (listen: Boolean) -> Unit,
+    onListenStart: () -> Unit,
+    onSectionChange: (ordinal: Int) -> Unit,
     onExplain: (ordinal: Int, text: String) -> Unit,
     onAsk: (ordinal: Int, text: String) -> Unit,
     onCard: (ordinal: Int, text: String) -> Unit,
     onDefine: (ordinal: Int, term: String) -> Unit,
     onOpenLearn: () -> Unit,
+    onVoice: () -> Unit,
     onClose: () -> Unit,
-    transport: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val vm: ReaderViewModel = viewModel(key = "reader-$bookId") {
@@ -131,20 +142,125 @@ fun ReaderRoute(
     }
     val load by vm.load.collectAsStateWithLifecycle()
     val style by vm.style.collectAsStateWithLifecycle()
+    val book by vm.book.collectAsStateWithLifecycle()
+    val bookmarks by vm.bookmarks.collectAsStateWithLifecycle()
+    val audioHere by playback.select { it.bookId == bookId }
+    val spoken by playback.select { if (it.bookId == bookId) it.ordinal else null }
+    val reduced = rememberReducedMotion()
+    var toast by remember { mutableStateOf<String?>(null) }
+
+    // Until the book row arrives, a book that is already playing is described by the player (in memory), so the
+    // shared cover from the mini player lands on the first frame.
+    val playingCover by playback.selectInfo {
+        if (it.bookId == bookId) CoverRequest(bookId, it.bookTitle.orEmpty(), it.author.orEmpty(), it.coverPath) else null
+    }
+    val cover = remember(book, playingCover) { book?.let { CoverRequest(it.id, it.title, it.authors, it.coverPath) } ?: playingCover }
+
+    // Opened on the Listen face for a book that is not playing: start it (once per entry, not on rotation).
+    var started by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!started) {
+            started = true
+            if (listenFace && playback.state.value.bookId != bookId) {
+                onListenStart()
+                playback.play(bookId)
+            }
+        }
+    }
+    SideEffect { vm.setSpoken(spoken) }
+    LaunchedEffect(audioHere) { vm.setListening(audioHere) }
+
+    /** Starts narration at [ordinal], reusing the loaded book when it is this one. */
+    fun playFrom(ordinal: Int?) {
+        val st = playback.state.value
+        if (st.bookId == bookId && ordinal != null) {
+            playback.seekToSentence(ordinal)
+            if (!st.playing) playback.resume()
+        } else if (st.bookId == bookId) {
+            if (!st.playing) playback.resume()
+        } else {
+            onListenStart()
+            playback.play(bookId, ordinal)
+        }
+    }
+
+    fun showListen() {
+        if (playback.state.value.bookId != bookId) playFrom(vm.ordinal.value)
+        onFaceChange(true)
+    }
+
+    fun showRead() {
+        vm.reattach()
+        spoken?.let(vm::follow)
+        onFaceChange(false)
+    }
+
+    val savedLabel = stringResource(R.string.reader_bookmark_saved)
+    val removedLabel = stringResource(R.string.reader_bookmark_removed)
+    val spokenMarked = spoken?.let { o -> bookmarks.any { it.ordinal in o - ReaderViewModel.BOOKMARK_SLACK..o + ReaderViewModel.BOOKMARK_SLACK } } == true
+
+    val pageOrdinal by vm.ordinal.collectAsStateWithLifecycle()
+    val pageChapter = (load as? ReaderLoad.Ready)?.index?.let { idx -> pageOrdinal?.let { idx.sectionAt(it)?.title } }
+
+    // Once the Listen face has fully faded in, the page under it stops drawing (it still lays out and follows).
+    var covered by remember { mutableStateOf(listenFace) }
+    LaunchedEffect(listenFace, reduced) {
+        if (listenFace) {
+            delay((if (reduced) KpMotion.REDUCED_MS else KpMotion.FACE_SWITCH_MS) + 40L)
+            covered = true
+        } else {
+            covered = false
+        }
+    }
+
     val page = Color(style.pageColor)
-    // The landing place of the shared book: the cover opens over this page and fades as soon as the first
-    // screen of text has a location. Published while loading too, so the book never waits for the EPUB.
-    val engine = (load as? ReaderLoad.Ready)?.engine
-    val located by remember(engine) { engine?.location?.map { it != null } ?: flowOf(false) }.collectAsStateWithLifecycle(false)
-    Box(Modifier.fillMaxSize().bookPageSlot(bookId, page, ready = located || load is ReaderLoad.Failed)) {
+    Box(Modifier.fillMaxSize().background(if (listenFace) Kp.palette.bg else page)) {
         when (val l = load) {
             ReaderLoad.Loading -> ReaderLoading(page, Color(style.inkColor), style.isDark)
-            is ReaderLoad.Failed -> ReaderFailed(page, Color(style.inkColor), onClose)
+            is ReaderLoad.Failed -> if (!listenFace) ReaderFailed(page, Color(style.inkColor), onClose)
             is ReaderLoad.Ready -> ReaderScreen(
-                vm, l, readAlongOrdinal, mode, onModeChange, onPlayFromSentence,
-                onExplain, onAsk, onCard, onDefine, onOpenLearn, onClose, transport,
+                vm = vm, ready = l, playback = playback, audioHere = audioHere, spoken = spoken,
+                visible = !listenFace, covered = covered, cover = cover,
+                onShowListen = ::showListen,
+                onPlayFrom = { o -> playFrom(o) },
+                onSectionChange = onSectionChange,
+                onExplain = onExplain, onAsk = onAsk, onCard = onCard, onDefine = onDefine,
+                onOpenLearn = onOpenLearn, onClose = onClose,
+                onToast = { toast = it },
             )
         }
+
+        AnimatedVisibility(
+            listenFace,
+            enter = fadeIn(tween(if (reduced) KpMotion.REDUCED_MS else KpMotion.FACE_SWITCH_MS)),
+            exit = fadeOut(tween(if (reduced) KpMotion.REDUCED_MS else KpMotion.FACE_SWITCH_MS)),
+        ) {
+            BackHandler(onBack = onClose)
+            ListenFace(
+                controller = playback,
+                bookId = bookId,
+                cover = cover,
+                title = book?.title ?: cover?.title.orEmpty(),
+                author = book?.authors ?: cover?.author.orEmpty(),
+                chapter = pageChapter,
+                bookmarked = spokenMarked,
+                onBookmark = {
+                    val o = playback.state.value.ordinal
+                    toast = if (spokenMarked) removedLabel else savedLabel
+                    vm.toggleBookmark(o, around = true)
+                },
+                onRead = ::showRead,
+                onLearn = onOpenLearn,
+                onVoice = onVoice,
+                onClose = onClose,
+            )
+        }
+
+        KpToastHost(
+            toast, { toast = null },
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                .padding(bottom = if (listenFace) 88.dp else if (audioHere) 200.dp else 16.dp),
+        )
     }
 }
 
@@ -164,17 +280,22 @@ private sealed interface Sheet {
 private fun ReaderScreen(
     vm: ReaderViewModel,
     ready: ReaderLoad.Ready,
-    readAlongOrdinal: Flow<Int?>,
-    mode: ReaderMode,
-    onModeChange: (ReaderMode) -> Unit,
-    onPlayFromSentence: (Int) -> Unit,
+    playback: PlaybackController,
+    audioHere: Boolean,
+    spoken: Int?,
+    visible: Boolean,
+    covered: Boolean,
+    cover: CoverRequest?,
+    onShowListen: () -> Unit,
+    onPlayFrom: (Int) -> Unit,
+    onSectionChange: (Int) -> Unit,
     onExplain: (Int, String) -> Unit,
     onAsk: (Int, String) -> Unit,
     onCard: (Int, String) -> Unit,
     onDefine: (Int, String) -> Unit,
     onOpenLearn: () -> Unit,
     onClose: () -> Unit,
-    transport: @Composable () -> Unit,
+    onToast: (String) -> Unit,
 ) {
     val p = Kp.palette
     val context = LocalContext.current
@@ -182,6 +303,7 @@ private fun ReaderScreen(
     val reduced = rememberReducedMotion()
     val engine = ready.engine
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
 
     val baseStyle by vm.style.collectAsStateWithLifecycle()
     val selectionMark = remember(p.seed, baseStyle.pageColor, baseStyle.inkColor, baseStyle.isDark) {
@@ -190,33 +312,36 @@ private fun ReaderScreen(
     val style = remember(baseStyle, selectionMark) { baseStyle.withPaletteSelection(selectionMark) }
     val local by vm.localPrefs.collectAsStateWithLifecycle()
     val ordinal by vm.ordinal.collectAsStateWithLifecycle()
-    val frontier by vm.frontier.collectAsStateWithLifecycle()
     val detached by vm.detached.collectAsStateWithLifecycle()
     val annotations by vm.annotations.collectAsStateWithLifecycle()
     val bookmarks by vm.bookmarks.collectAsStateWithLifecycle()
     val search by vm.search.collectAsStateWithLifecycle()
     val location by engine.location.collectAsStateWithLifecycle()
-    val spoken by readAlongOrdinal.collectAsStateWithLifecycle(initialValue = null)
 
     var chrome by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<Sheet>(Sheet.None) }
     var selectionActive by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<ReaderSelection?>(null) }
     var navigatorTop by remember { mutableFloatStateOf(0f) }
-    var transportPx by remember { mutableFloatStateOf(0f) }
-    val listening = mode == ReaderMode.READ_LISTEN
+    var dockPx by remember { mutableIntStateOf(0) }
+
+    val page = Color(style.pageColor)
+    val ink = Color(style.inkColor)
+    // Chrome, sheets and the dock are cut from the page's own paper.
+    val paper = remember(p.seed, page, ink, style.isDark) { paperPalette(p.seed, page, ink, style.isDark) }
 
     // ------------------------------------------------------------- navigator host
 
     val activity = remember(context) { context.findFragmentActivity() }
-    // System bar icons follow the page, not the app theme: a paper page under a dark-theme app needs dark icons.
+    // System bar icons follow the page while it shows, not the app theme: a paper page needs dark icons.
     val view = LocalView.current
     val appDark = p.isDark
-    DisposableEffect(activity, style.isDark, appDark) {
+    DisposableEffect(activity, style.isDark, appDark, visible) {
         val window = activity?.window
         val bars = window?.let { WindowCompat.getInsetsController(it, view) }
-        bars?.isAppearanceLightStatusBars = !style.isDark
-        bars?.isAppearanceLightNavigationBars = !style.isDark
+        val dark = if (visible) style.isDark else appDark
+        bars?.isAppearanceLightStatusBars = !dark
+        bars?.isAppearanceLightNavigationBars = !dark
         onDispose {
             bars?.isAppearanceLightStatusBars = !appDark
             bars?.isAppearanceLightNavigationBars = !appDark
@@ -224,7 +349,7 @@ private fun ReaderScreen(
     }
     val selectionCallback = remember(engine) {
         object : ActionMode.Callback {
-            // The system menu stays empty; the Shelf selection strip is drawn in Compose instead.
+            // The system menu stays empty; the selection strip is drawn in Compose instead.
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
                 menu.clear()
                 selectionActive = true
@@ -250,7 +375,6 @@ private fun ReaderScreen(
     DisposableEffect(engine) { onDispose { engine.detach() } }
 
     LaunchedEffect(engine, style) { engine.submit(style) }
-    LaunchedEffect(listening) { vm.setListening(listening) }
 
     LaunchedEffect(selectionActive) {
         if (selectionActive) {
@@ -266,11 +390,13 @@ private fun ReaderScreen(
     val tints = highlightTints().map { it.toArgb() }
     LaunchedEffect(engine, annotations, tints) { vm.paintHighlights(annotations, tints) }
 
-    // Read-along band and follow.
-    val bandTint = p.accent.copy(alpha = if (p.isDark) 0.12f else 0.09f).toArgb()
-    LaunchedEffect(engine, spoken, listening, bandTint) {
-        val o = spoken.takeIf { listening }
-        vm.paintReadAlong(o, bandTint)
+    // Read-along: paragraph band + sentence mark, and the page follows the voice unless the reader moved away.
+    // The hidden page follows too, so turning to the Read face lands on the spoken sentence with no jump.
+    val paragraphTint = paper.readAlong.toArgb()
+    val sentenceTint = paper.readAlongLine.toArgb()
+    LaunchedEffect(engine, spoken, audioHere, paragraphTint, sentenceTint) {
+        val o = spoken.takeIf { audioHere }
+        vm.paintReadAlong(o, paragraphTint, sentenceTint)
         if (o != null && !vm.detached.value) {
             val top = vm.ordinal.value
             val visibleEnough = style.scroll && top != null && o in top..top + SCROLL_FOLLOW_WINDOW
@@ -278,11 +404,26 @@ private fun ReaderScreen(
         }
     }
 
+    // Study packs are prepared in the background as the reader or the voice enters a section (#108).
+    val focus = (spoken.takeIf { audioHere } ?: ordinal)
+    val focusSection = focus?.let { ready.index.sectionAt(it)?.id }
+    val sectionCallback by rememberUpdatedState(onSectionChange)
+    LaunchedEffect(focusSection) { if (focusSection != null && focus != null) sectionCallback(focus) }
+
     val currentOnClose by rememberUpdatedState(onClose)
+    val currentPlayFrom by rememberUpdatedState(onPlayFrom)
+    val currentVisible by rememberUpdatedState(visible)
     LaunchedEffect(engine) {
         engine.events.collect { e ->
             when (e) {
-                ReaderEvent.CenterTap -> if (sheet == Sheet.None) chrome = !chrome
+                ReaderEvent.CenterTap -> if (sheet == Sheet.None && currentVisible) chrome = !chrome
+                is ReaderEvent.DoubleTap -> scope.launch {
+                    vm.ordinalAtPoint(e.x, e.y)?.let { o ->
+                        haptics.play(HapticToken.Confirm)
+                        vm.reattach()
+                        currentPlayFrom(o)
+                    }
+                }
                 is ReaderEvent.MarkTapped -> if (e.group == ReadiumReaderEngine.GROUP_HIGHLIGHTS) {
                     e.id.toLongOrNull()?.let { sheet = Sheet.Note(it) }
                 }
@@ -295,37 +436,46 @@ private fun ReaderScreen(
         }
     }
 
+    // One-time hint the first time narration runs under the text.
+    val hint = stringResource(R.string.reader_double_tap_hint)
+    LaunchedEffect(audioHere, visible, local.doubleTapHintShown) {
+        if (audioHere && visible && !local.doubleTapHintShown) {
+            delay(900)
+            onToast(hint)
+            vm.markDoubleTapHintShown()
+        }
+    }
+
     // Volume keys, forwarded by the host activity.
-    DisposableEffect(engine, local.volumeKeys) {
+    DisposableEffect(engine, local.volumeKeys, visible) {
         val handler: (Boolean) -> Unit = { forward -> if (forward) engine.goForward() else engine.goBackward() }
-        if (local.volumeKeys) ReaderKeys.handler = handler
+        if (local.volumeKeys && visible) ReaderKeys.handler = handler
         onDispose { if (ReaderKeys.handler === handler) ReaderKeys.handler = null }
     }
 
+    // Reading time only counts while the page shows and nothing covers it.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.pauseTracking() }
-    LifecycleEventEffect(Lifecycle.Event.ON_START) { if (sheet == Sheet.None) vm.resumeTracking() }
-    LaunchedEffect(sheet) { if (sheet == Sheet.None) vm.resumeTracking() else vm.pauseTracking() }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { if (sheet == Sheet.None && visible) vm.resumeTracking() }
+    LaunchedEffect(sheet, visible) { if (sheet == Sheet.None && visible) vm.resumeTracking() else vm.pauseTracking() }
+    LaunchedEffect(visible) { if (!visible) { chrome = false; sheet = Sheet.None } }
 
-    BackHandler(enabled = sheet != Sheet.None) { sheet = Sheet.None }
-    BackHandler(enabled = sheet == Sheet.None) { currentOnClose() }
+    BackHandler(enabled = visible && sheet != Sheet.None) { sheet = Sheet.None }
+    BackHandler(enabled = visible && sheet == Sheet.None) { currentOnClose() }
 
     // ------------------------------------------------------------- layout
 
-    val page = Color(style.pageColor)
-    val ink = Color(style.inkColor)
-    val chapter = ordinal?.let(ready.index::chapterAt)
+    val chapterTitle = ordinal?.let { ready.index.sectionAt(it)?.title ?: ready.index.chapterAt(it)?.title }
 
-    // Chrome, sheets and the transport are cut from the page's own paper.
-    val paper = remember(p.seed, page, ink, style.isDark) { paperPalette(p.seed, page, ink, style.isDark) }
     CompositionLocalProvider(LocalBbPalette provides paper) {
-    Box(Modifier.fillMaxSize().background(page)) {
+    BoxWithConstraints(Modifier.fillMaxSize().graphicsLayer { alpha = if (covered) 0f else 1f }.background(page)) {
+        val compactDock = maxHeight < 560.dp
         // Running head and folio sit outside the WebView and are never transformed.
         Row(
-            Modifier.fillMaxWidth().statusBarsPadding().padding(start = 26.dp, end = 26.dp, top = 24.dp),
+            Modifier.fillMaxWidth().statusBarsPadding().padding(start = 26.dp, end = 26.dp, top = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             BasicText(
-                (chapter?.title ?: ready.book.title).uppercase(), Modifier.weight(1f),
+                (chapterTitle ?: ready.book.title).uppercase(), Modifier.weight(1f),
                 style = ReaderType.caps(ink.copy(alpha = 0.55f), size = 10.5f, tracking = 0.16f),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
@@ -335,13 +485,19 @@ private fun ReaderScreen(
             }
         }
 
+        // The page ends above the dock while narration runs. In paginated mode it also clears the dock's fade so
+        // no line sits under it; in scroll mode the text runs softly into the fade.
+        val fade = with(density) { 32.dp.roundToPx() }
+        val dockInset = with(density) { (if (audioHere) (if (style.scroll) dockPx - fade else dockPx) else 0).coerceAtLeast(0).toDp() }
+        // Rotation, a resized window or the dock appearing reflow the page; that must not read as the reader
+        // paging away from the narration.
+        LaunchedEffect(maxWidth, maxHeight, dockInset) { vm.expectReflow() }
         AndroidFragment<EpubNavigatorFragment>(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                // In Read + Listen the transport stays up, so the page must end above it.
-                .padding(top = 48.dp, bottom = 24.dp + with(density) { if (listening) transportPx.toDp() else 0.dp })
+                .padding(top = 44.dp)
+                .then(if (audioHere) Modifier.padding(bottom = dockInset) else Modifier.navigationBarsPadding().padding(bottom = 24.dp))
                 .onGloballyPositioned { navigatorTop = it.positionInRoot().y },
             onUpdate = { fragment -> engine.attach(fragment, scope) },
         )
@@ -350,7 +506,7 @@ private fun ReaderScreen(
             marked = ordinal?.let { o -> bookmarks.any { it.ordinal in o..o + ReaderViewModel.BOOKMARK_SLACK } } == true,
             chrome = chrome,
             reduced = reduced,
-            onToggle = { ordinal?.let(vm::toggleBookmark) },
+            onToggle = { ordinal?.let { vm.toggleBookmark(it) } },
         )
 
         // Top chrome.
@@ -360,61 +516,51 @@ private fun ReaderScreen(
             enter = fadeIn(ReaderMotion.snap(reduced)),
             exit = fadeOut(ReaderMotion.snap(reduced)),
         ) {
-            TopBar(
-                title = ready.book.title,
+            ReaderTopBar(
                 onBack = onClose,
+                onListen = onShowListen,
                 onTypography = { sheet = Sheet.Typography },
-                onSearch = { sheet = Sheet.Search },
-                onContents = { sheet = Sheet.Contents },
                 onLearn = onOpenLearn,
             )
         }
 
-        // Bottom: detach prompts, transport, chrome.
+        // Bottom: back-to-narration pill, then the dock (narration) or the idle bar (with the chrome).
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             AnimatedVisibility(
-                listening && detached,
-                enter = slideInVertically(ReaderMotion.settle(reduced)) { it } + fadeIn(ReaderMotion.settle(reduced)),
-                exit = slideOutVertically(ReaderMotion.settle(reduced)) { it } + fadeOut(ReaderMotion.settle(reduced)),
+                audioHere && detached,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                enter = slideInVertically(ReaderMotion.settle(reduced)) { it / 2 } + fadeIn(ReaderMotion.settle(reduced)),
+                exit = slideOutVertically(ReaderMotion.settle(reduced)) { it / 2 } + fadeOut(ReaderMotion.settle(reduced)),
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextLink(stringResource(R.string.reader_return), onClick = {
+                BackToNarrationPill(
+                    onClick = {
                         vm.reattach()
                         spoken?.let(vm::follow)
-                    })
-                    Spacer(Modifier.width(8.dp))
-                    SecondaryKey(stringResource(R.string.reader_play_here), onClick = {
-                        ordinal?.let(onPlayFromSentence)
-                        vm.reattach()
-                    })
-                }
-            }
-            if (listening) {
-                Column(Modifier.fillMaxWidth().background(page)) {
-                    Column(Modifier.onGloballyPositioned { transportPx = it.size.height.toFloat() }) {
-                        Hairline()
-                        transport()
-                    }
-                    if (!chrome) Spacer(Modifier.navigationBarsPadding())
-                }
-            }
-            AnimatedVisibility(
-                chrome,
-                enter = fadeIn(ReaderMotion.snap(reduced)),
-                exit = fadeOut(ReaderMotion.snap(reduced)),
-            ) {
-                BottomBar(
-                    ready = ready,
-                    ordinal = ordinal,
-                    frontier = frontier,
-                    mode = mode,
-                    onModeChange = onModeChange,
-                    onSeek = { f -> vm.jumpTo(ready.index.ordinalAt(f)) },
+                    },
+                    modifier = Modifier.padding(bottom = 4.dp),
                 )
+            }
+            if (audioHere) {
+                DockSurface(page, Modifier.onSizeChanged { dockPx = it.height }) {
+                    PlaybackDock(playback, cover, onShowListen, compact = compactDock)
+                }
+            } else {
+                AnimatedVisibility(
+                    chrome,
+                    enter = fadeIn(ReaderMotion.snap(reduced)),
+                    exit = fadeOut(ReaderMotion.snap(reduced)),
+                ) {
+                    val o = ordinal ?: ready.index.firstOrdinal
+                    val progress = remember(o, ready.index) { ready.index.sectionProgress(o) }
+                    ReaderIdleBar(
+                        chapter = chapterTitle,
+                        progress = progress,
+                        bookFraction = ready.index.fraction(o),
+                        onSeek = { f -> progress?.let { vm.jumpTo(ready.index.ordinalInRange(it.range, f)) } },
+                        onContents = { sheet = Sheet.Contents },
+                        onListen = { chrome = false; onPlayFrom(o) },
+                    )
+                }
             }
         }
 
@@ -456,6 +602,7 @@ private fun ReaderScreen(
                 annotations = annotations, bookmarks = bookmarks,
                 onJump = { o, href -> vm.jumpTo(o, href); sheet = Sheet.None; chrome = false },
                 onDeleteBookmark = vm::deleteBookmark,
+                onSearch = { sheet = Sheet.Search },
             )
         }
         ReaderSheet(sheet == Sheet.Search, onDismiss = { sheet = Sheet.None }, reduced = reduced, tall = true) {
@@ -492,127 +639,6 @@ private fun ReaderScreen(
 }
 
 private const val SCROLL_FOLLOW_WINDOW = 6
-
-@Composable
-private fun TopBar(
-    title: String,
-    onBack: () -> Unit,
-    onTypography: () -> Unit,
-    onSearch: () -> Unit,
-    onContents: () -> Unit,
-    onLearn: () -> Unit,
-) {
-    val p = Kp.palette
-    Column(Modifier.fillMaxWidth().background(p.bg).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            GlyphKey(stringResource(R.string.reader_back), onBack, Glyph.Back, p.text)
-            // The title opens the contents: the brief's top bar has no separate contents key.
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clickable(role = Role.Button, onClick = onContents)
-                    .semantics { contentDescription = title },
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                BasicText(title, style = ReaderType.title(p.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            GlyphKey(stringResource(R.string.reader_typography), onTypography, Glyph.Typography, p.text)
-            GlyphKey(stringResource(R.string.reader_search), onSearch, Glyph.Search, p.text)
-            TextLink(stringResource(R.string.reader_learn), onClick = onLearn)
-        }
-        Hairline()
-    }
-}
-
-@Composable
-private fun BottomBar(
-    ready: ReaderLoad.Ready,
-    ordinal: Int?,
-    frontier: Int,
-    mode: ReaderMode,
-    onModeChange: (ReaderMode) -> Unit,
-    onSeek: (Float) -> Unit,
-) {
-    val p = Kp.palette
-    val index = ready.index
-    val o = ordinal ?: index.firstOrdinal
-    val fraction = index.fraction(o)
-    val ticks = remember(index) { index.chapters.drop(1).map { index.fraction(it.startOrdinal) } }
-    val frontierFraction = if (frontier >= 0) index.fraction(frontier) else null
-    val chapterName = index.chapterAt(o)?.title ?: stringResource(R.string.reader_this_chapter)
-    val minutes = index.minutesLeftInChapter(o)
-    val left = if (minutes < 1.0) {
-        stringResource(R.string.reader_under_min_in, chapterName)
-    } else {
-        stringResource(R.string.reader_min_left_in, minutes.roundToInt(), chapterName)
-    }
-    Column(Modifier.fillMaxWidth().background(p.bg)) {
-        Hairline()
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 4.dp, bottom = 12.dp)) {
-            ProgressTrack(fraction, frontierFraction, ticks, onSeek)
-            BasicText(
-                stringResource(R.string.reader_progress, (fraction * 100).roundToInt(), left),
-                style = ReaderType.caption(p.text2), maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(12.dp))
-            Segmented(
-                options = listOf(stringResource(R.string.reader_mode_read), stringResource(R.string.reader_mode_read_listen)),
-                selected = if (mode == ReaderMode.READ_LISTEN) 1 else 0,
-                onSelect = { onModeChange(if (it == 1) ReaderMode.READ_LISTEN else ReaderMode.READ) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        Spacer(Modifier.navigationBarsPadding())
-    }
-}
-
-/** 48 dp touch strip; 2 dp track, accent fill, 1×6 chapter ticks, 2×10 frontier mark. */
-@Composable
-private fun ProgressTrack(fraction: Float, frontier: Float?, ticks: List<Float>, onSeek: (Float) -> Unit) {
-    val p = Kp.palette
-    var drag by remember { mutableStateOf<Float?>(null) }
-    val shown = drag ?: fraction
-    val description = stringResource(R.string.reader_progress_track)
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .semantics { contentDescription = description }
-            .pointerInputs(onSeek = onSeek, onDrag = { drag = it }),
-    ) {
-        val y = size.height / 2
-        val track = 2.dp.toPx()
-        drawRect(p.hairline, Offset(0f, y - track / 2), Size(size.width, track))
-        drawRect(p.accent, Offset(0f, y - track / 2), Size(size.width * shown, track))
-        val tickH = 6.dp.toPx()
-        val tickW = 1.dp.toPx()
-        ticks.forEach { t -> drawRect(p.text2, Offset(size.width * t - tickW / 2, y - tickH / 2), Size(tickW, tickH)) }
-        frontier?.let { f ->
-            val w = 2.dp.toPx()
-            val h = 10.dp.toPx()
-            drawRect(p.accent, Offset(size.width * f - w / 2, y - h / 2), Size(w, h))
-        }
-    }
-}
-
-private fun Modifier.pointerInputs(onSeek: (Float) -> Unit, onDrag: (Float?) -> Unit): Modifier = this
-    .then(
-        Modifier.pointerInput(Unit) {
-            detectTapGestures { onSeek((it.x / size.width).coerceIn(0f, 1f)) }
-        },
-    )
-    .then(
-        Modifier.pointerInput(Unit) {
-            var last = 0f
-            detectHorizontalDragGestures(
-                onDragStart = { last = (it.x / size.width).coerceIn(0f, 1f); onDrag(last) },
-                onDragEnd = { onDrag(null); onSeek(last) },
-                onDragCancel = { onDrag(null) },
-                onHorizontalDrag = { change, _ -> last = (change.position.x / size.width).coerceIn(0f, 1f); onDrag(last) },
-            )
-        },
-    )
 
 private enum class SelectionAction { Highlight, Explain, Ask, Card, Define }
 

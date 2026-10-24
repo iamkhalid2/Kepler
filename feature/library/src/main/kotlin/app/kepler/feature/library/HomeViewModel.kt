@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.kepler.core.model.AppSettings
 import app.kepler.core.model.Book
+import app.kepler.core.model.ListenPace
 import app.kepler.core.model.BookId
 import app.kepler.core.model.ImportResult
 import app.kepler.core.model.NarrationState
@@ -92,11 +93,14 @@ fun daysAway(book: Book?, nowMs: Long): Int? {
 /** Review time estimate shown on Home: about 30 s a card, at least a minute. */
 fun reviewMinutes(due: Int): Int = ((due + 1) / 2).coerceAtLeast(1)
 
-/** Minutes left from the saved position: the rest of the sentences at reading pace, scaled by speed when listening. */
-fun minutesLeft(book: Book, speed: Float, listening: Boolean): Int {
+/**
+ * Minutes left from the saved position: reading pace, or when listening the narration pace the player uses
+ * ([ListenPace.msPerSentence] over the book's generated audio), scaled by speed.
+ */
+fun minutesLeft(book: Book, speed: Float, listening: Boolean, msPerSentence: Double = ListenPace.DEFAULT_MS_PER_SENTENCE): Int {
     val left = (book.sentenceCount * (1f - book.positionFraction.coerceIn(0f, 1f))).toInt()
-    val minutes = readMinutes(left)
-    return if (listening) (minutes / speed.coerceIn(0.5f, 3f)).toInt().coerceAtLeast(1) else minutes
+    if (!listening) return readMinutes(left)
+    return (left * msPerSentence / 60_000.0 / speed.coerceIn(0.5f, 3f)).toInt().coerceAtLeast(1)
 }
 
 /** The seven days of the week containing [today], Monday first. */
@@ -139,6 +143,9 @@ class HomeViewModel(
 
     private val books = deps.library.books
     private val current = books.map(::currentBook).distinctUntilChanged()
+    private val pace: Flow<Double> = current.map { it?.id }.distinctUntilChanged()
+        .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else deps.audio.segments(id) }
+        .map(ListenPace::msPerSentence).distinctUntilChanged()
 
     private val narration = current.map { it?.id }.distinctUntilChanged().flatMapLatest { id ->
         if (id == null) flowOf<NarrationState>(NarrationState.Idle) else deps.narration.state(id)
@@ -172,7 +179,9 @@ class HomeViewModel(
         current, books, deps.settings.settings, deps.cards.dueCount(now()), narration,
     ) { book, all, settings: AppSettings, due, n -> Base(book, all, settings, due, n) }
         .combine(deps.cards.reviewedTodayFlow(now())) { b, done -> b to done }
-        .combine(extras) { (b, done), x ->
+        .combine(pace) { pair, pace -> pair to pace }
+        .combine(extras) { (pair, pace), x ->
+            val (b, done) = pair
             val book = b.book
             val mode = book?.let(::primaryMode) ?: HubMode.Read
             HomeUi(
@@ -190,7 +199,7 @@ class HomeViewModel(
                 },
                 daysAway = daysAway(book, now()),
                 chapterTitle = x.chapter,
-                minutesLeft = book?.takeIf { hasStarted(it) }?.let { minutesLeft(it, b.settings.speed, mode == HubMode.Listen) },
+                minutesLeft = book?.takeIf { hasStarted(it) }?.let { minutesLeft(it, b.settings.speed, mode == HubMode.Listen, pace) },
                 recap = x.recap,
                 carousel = b.all.filter { it.id != book?.id }
                     .sortedByDescending { it.lastOpenedAt ?: it.addedAt }.take(10),

@@ -109,7 +109,7 @@
     <string name="interval_month">%1$d mo</string>
     <string name="interval_year">%1$d y</string>
     <string name="nothing_due">Nothing is due today.</string>
-    <string name="review_done">That\'s today\'s review. More cards come due tomorrow.</string>
+    <string name="review_done">More cards come due tomorrow.</string>
     <string name="week_caption">%1$d of %2$d review days this week · %3$d freezes left</string>
     <string name="week_caption_plain">%1$d of %2$d review days this week</string>
 
@@ -144,4 +144,91 @@
     <string name="back">Back</string>
     <string name="send">Send</string>
     <string name="concept_map">Concept map</string>
+
+    <!-- Design v2 additions (Learn, sheets, Review, Notebook) -->
+    <string name="learn_title">Learn</string>
+    <string name="scope_whole">Whole book</string>
+    <string name="scope_here">Up to here</string>
+    <string name="ask_suggested">Try asking</string>
+    <string name="stop">Stop</string>
+    <string name="make_review_card">Make a review card</string>
+    <string name="refresh">Refresh</string>
+    <string name="concepts_preparing">Preparing the concepts from what you have read. This fills in by itself.</string>
+    <string name="map_preparing">Preparing your map from what you have read. This fills in by itself.</string>
+    <string name="what_is">What is %1$s?</string>
+    <string name="covered">Covered</string>
+    <string name="missed">Missed</string>
+    <string name="errt_no_key">Add your OpenRouter key</string>
+    <string name="errt_bad_key">That key was not accepted</string>
+    <string name="errt_budget">Out of free requests for today</string>
+    <string name="errt_credits">That model needs credits</string>
+    <string name="errt_busy">The free models are busy</string>
+    <string name="errt_offline">You seem to be offline</string>
+    <string name="errt_nothing_read">Nothing to go on yet</string>
+    <string name="errt_not_reached">Not there yet</string>
+    <string name="errt_other">That did not work</string>
+
+    <string name="review_title">Daily review</string>
+    <string name="review_card_of">card %1$d of %2$d</string>
+    <string name="hint_label">Hint: %1$s</string>
+    <string name="review_answer_hint">Type your answer (optional)</string>
+    <string name="review_done_title">All caught up</string>
+    <string name="reviewed_label">Reviewed</string>
+    <string name="to_see_again">To see again</string>
+
+    <string name="search">Search</string>
+    <string name="search_notebook">Search your notebook</string>
+    <string name="nothing_found">Nothing matches that search.</string>
+    <string name="more_actions">More</string>
+    <string name="daily_review">Daily review</string>
+    <plurals name="cards_due">
+        <item quantity="one">card due</item>
+        <item quantity="other">cards due</item>
+    </plurals>
+    <string name="caught_up">All caught up</string>
+    <string name="start">Start</string>
+    <string name="due_now">Due</string>
+    <string name="nb_stats">Stats</string>
+    <string name="age_today">today</string>
+    <string name="age_yesterday">yesterday</string>
+    <string name="stat_reviewed_today">Reviewed today</string>
+    <string name="stat_due_now">Due now</string>
+    <string name="stat_maturity">Cards by stage</string>
+    <string name="stat_new">New</string>
+    <string name="stat_learning">Learning</string>
+    <string name="stat_mature">Mature</string>
+    <string name="stat_recall">Chapter recall</string>
+
+    <plurals name="age_days">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+    <plurals name="age_weeks">
+        <item quantity="one">%1$d week ago</item>
+        <item quantity="other">%1$d weeks ago</item>
+    </plurals>
+    <plurals name="age_months">
+        <item quantity="one">%1$d month ago</item>
+        <item quantity="other">%1$d months ago</item>
+    </plurals>
+    <plurals name="age_years">
+        <item quantity="one">%1$d year ago</item>
+        <item quantity="other">%1$d years ago</item>
+    </plurals>
+    <plurals name="n_highlights">
+        <item quantity="one">%1$d highlight</item>
+        <item quantity="other">%1$d highlights</item>
+    </plurals>
+    <plurals name="n_cards">
+        <item quantity="one">%1$d card</item>
+        <item quantity="other">%1$d cards</item>
+    </plurals>
+    <plurals name="notebook_summary">
+        <item quantity="one">%1$d highlight · %2$d cards</item>
+        <item quantity="other">%1$d highlights · %2$d cards</item>
+    </plurals>
+    <plurals name="stat_recall_attempts">
+        <item quantity="one">Average of %1$d attempt</item>
+        <item quantity="other">Average of %1$d attempts</item>
+    </plurals>
 </resources>

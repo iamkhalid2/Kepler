@@ -83,6 +83,11 @@ internal class FirstTokenTimeout : RuntimeException("no first token in time")
 /** The deadlines for one streamed request. Reading stops at [totalMs] and keeps what arrived. */
 class StreamLimits(val firstTokenMs: Long = 8_000, val totalMs: Long = 30_000)
 
+/** Filled in while a stream runs: [complete] turns false when the total deadline cut the answer short. */
+class StreamOutcome {
+    @Volatile var complete: Boolean = true
+}
+
 /** Thin OpenRouter REST client. Maps every failure to [AiError]; never logs keys or prompts. */
 class OpenRouterClient(
     private val http: HttpClient = defaultHttpClient(),
@@ -159,6 +164,7 @@ class OpenRouterClient(
     internal fun chatStream(
         apiKey: String, model: String, messages: List<ChatMessage>, maxTokens: Int = 700, temperature: Double = 0.4,
         reasoning: kotlinx.serialization.json.JsonObject? = null, limits: StreamLimits = StreamLimits(),
+        outcome: StreamOutcome? = null,
     ): Flow<String> = channelFlow {
         val body = buildJsonObject {
             put("model", model)
@@ -227,6 +233,7 @@ class OpenRouterClient(
             }
         } catch (e: StreamDeadline) {
             if (!gotToken.get()) throw FirstTokenTimeout()
+            outcome?.complete = false
         }
     }
 

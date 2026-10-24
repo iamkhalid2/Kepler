@@ -213,6 +213,7 @@
         <string name="home_start">Start</string>
         <string name="home_empty_title">Add your first book</string>
     <string name="home_title">Welcome back</string>
+    <string name="home_title_new">Welcome</string>
     <string name="home_caption">%1$s %2$s</string>
     <string name="part_morning">morning</string>
     <string name="part_afternoon">afternoon</string>
@@ -259,4 +260,46 @@
     <string name="cap_save">Save</string>
     <string name="cap_use_default">Use the default</string>
     <string name="remove_from_library">Remove from library</string>
+
+    <!-- Settings v2 -->
+    <string name="group_listening">Listening</string>
+    <string name="group_ai">AI</string>
+    <string name="group_data">Data</string>
+    <string name="voice">Voice</string>
+    <string name="voice_meta">Chosen when you start a narration</string>
+    <string name="voice_none">Not chosen yet</string>
+    <string name="default_speed">Default speed</string>
+    <string name="default_speed_body">Where playback starts. You can change it any time in the player.</string>
+    <string name="scrubber_scope">Progress bar</string>
+    <string name="scope_chapter">Chapter</string>
+    <string name="scope_book">Whole book</string>
+    <string name="scope_chapter_meta">The bar covers the chapter you are in. Easy to scrub.</string>
+    <string name="scope_book_meta">The bar covers the entire book.</string>
+    <string name="custom">Custom</string>
+    <string name="dark_mode">Dark mode</string>
+    <string name="model_auto_meta">Picks the fastest free model for you</string>
+    <string name="model_fastest_meta">Fastest now: %1$s, %2$s to first words</string>
+    <string name="model_chosen_meta">You chose this model</string>
+    <string name="model_fastest_tag">Fastest free model right now</string>
+    <string name="seconds_short">%1$s s</string>
+
+    <!-- Onboarding v2 -->
+    <string name="skip">Skip</string>
+    <string name="keys_fish_blurb">Natural voices for narration. Optional, with a free tier.</string>
+    <string name="keys_or_blurb">Ask, recap, concepts and cards on free models. Optional.</string>
+    <string name="privacy_1">Your library and your keys stay on this phone.</string>
+    <string name="privacy_2">Only the text you narrate or ask about goes to the services you chose.</string>
+    <string name="privacy_3">Free tiers of those services may use what you send to train their models.</string>
+    <string name="privacy_4">No account and no analytics.</string>
+    <string name="welcome_read_title">Read</string>
+    <string name="welcome_read_body">Your EPUBs on a calm, typeset page.</string>
+    <string name="welcome_listen_title">Listen</string>
+    <string name="welcome_listen_body">Any book as an audiobook, with the text following the voice.</string>
+    <string name="welcome_remember_title">Remember</string>
+    <string name="welcome_remember_body">Ask the book, catch up with recaps, review what matters.</string>
+    <string name="voice_standard">Standard voice</string>
+    <string name="voice_on_device">on this phone</string>
+    <string name="voice_online">online</string>
+    <string name="voice_variant">Variant %1$s · %2$s</string>
+    <string name="slip_characters_line">%1$s characters</string>
 </resources>

@@ -1,41 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="player_close">Close player</string>
-    <string name="player_caps_listening">Listening</string>
-    <string name="player_caps_listening_voice">Listening · %1$s</string>
-    <string name="player_read_along">Read along</string>
+    <string name="player_face_listen">Listen</string>
+    <string name="player_face_read">Read</string>
+    <string name="player_learn">Learn</string>
+    <string name="player_show_listen">Show player</string>
     <string name="player_play">Play</string>
     <string name="player_pause">Pause</string>
     <string name="player_back_15">Back 15 seconds</string>
     <string name="player_forward_30">Forward 30 seconds</string>
-    <string name="player_prev_sentence">Previous sentence</string>
-    <string name="player_next_sentence">Next sentence</string>
+    <string name="player_prev_chapter">Previous chapter</string>
+    <string name="player_next_chapter">Next chapter</string>
     <string name="player_speed">Speed</string>
+    <string name="player_speed_value">Speed %1$s</string>
     <string name="player_sleep">Sleep</string>
+    <string name="player_sleep_on">Sleep timer, %1$s left</string>
     <string name="player_sleep_remaining">%1$s left</string>
-    <string name="player_sleep_section_end">End of section</string>
+    <string name="player_sleep_section_end">End of chapter</string>
+    <string name="player_sleep_chapter_short">Chapter end</string>
     <string name="player_bookmark">Bookmark</string>
+    <string name="player_bookmark_remove">Remove bookmark</string>
     <string name="player_bookmark_saved">Bookmark saved</string>
+    <string name="player_bookmark_removed">Bookmark removed</string>
     <string name="player_chapters">Chapters</string>
+    <string name="player_voice">Voice: %1$s</string>
     <string name="player_narrator_fallback">Narrator</string>
 
-    <string name="player_scrubber_description">Position in the book</string>
-    <string name="player_scrubber_percent">%1$d percent</string>
+    <string name="player_scrubber_description">Position in this chapter</string>
+    <string name="player_left_in_book">%1$s left in book</string>
+    <string name="player_estimated">~%1$s</string>
+    <string name="player_duration_hm">%1$dh %2$dm</string>
+    <string name="player_duration_m">%1$d min</string>
 
-    <plurals name="player_ahead_minutes">
-        <item quantity="one">%d min ahead</item>
-        <item quantity="other">%d min ahead</item>
-    </plurals>
-    <string name="player_binding">Binding narration %1$d%%</string>
-    <string name="player_narration_done">Whole book narrated</string>
-    <string name="player_narration_paused">Narration paused</string>
-    <string name="player_buffering">Preparing the next passage</string>
-    <string name="player_buffering_short">Preparing</string>
-    <string name="player_error_short">Not ready</string>
-    <string name="player_binding_short">Binding</string>
+    <string name="player_preparing">Preparing narration</string>
     <string name="player_try_again">Try again</string>
 
     <string name="speed_sheet_title">Playback speed</string>
+    <string name="speed_slower">Slower</string>
+    <string name="speed_faster">Faster</string>
     <string name="sleep_sheet_title">Sleep timer</string>
     <string name="sleep_off">Off</string>
     <plurals name="sleep_minutes">
@@ -44,8 +46,8 @@
     </plurals>
     <string name="chapters_sheet_title">Chapters</string>
     <string name="chapters_current">Now playing</string>
-
-    <string name="nowbar_open">Open player</string>
-    <string name="nowbar_preparing">Preparing narration</string>
-    <string name="nowbar_fallback_caption">Narration</string>
+    <plurals name="chapters_count">
+        <item quantity="one">%d chapter</item>
+        <item quantity="other">%d chapters</item>
+    </plurals>
 </resources>

@@ -46,6 +46,9 @@ interface LibraryDeps {
     /** Model ids offered in the OpenRouter picker (free models, best first). */
     val freeModels: suspend () -> List<String> get() = { emptyList() }
 
+    /** The model Automatic would use now and its measured time to first words, or null while unmeasured. */
+    val modelSpeed: suspend () -> ModelSpeed? get() = { null }
+
     /** Fish spend so far this month, in USD cents. */
     val spentThisMonthCents: () -> Int get() = { 0 }
 

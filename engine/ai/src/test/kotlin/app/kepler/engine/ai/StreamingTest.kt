@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
@@ -35,7 +37,7 @@ fun sse(vararg frames: String, done: Boolean = true) =
 fun sseOf(vararg deltas: String) = sse(*deltas.map { contentFrame(it) }.toTypedArray())
 
 /** What one model does when asked: stream frames after a delay, or fail with a status. */
-class Reply(val status: HttpStatusCode = HttpStatusCode.OK, val body: String, val delayMs: Long = 0)
+class Reply(val status: HttpStatusCode = HttpStatusCode.OK, val body: String, val delayMs: Long = 0, val stall: Boolean = false)
 
 /** A chat endpoint that decides per model and records which model each request asked for. */
 class StreamMock(
@@ -63,6 +65,12 @@ class StreamMock(
                 val r = handler(model, body, call)
                 if (r.delayMs > 0) delay(r.delayMs)
                 val type = if (r.status.value in 200..299 && r.body.startsWith(":")) "text/event-stream" else "application/json"
+                if (r.stall) {
+                    // The frames arrive, then the connection goes quiet without ending (a stream cut by the deadline).
+                    val ch = io.ktor.utils.io.ByteChannel(autoFlush = true)
+                    kotlinx.coroutines.GlobalScope.launch { ch.writeStringUtf8(r.body) }
+                    return@MockEngine respond(ch, r.status, headersOf(HttpHeaders.ContentType, type))
+                }
                 respond(r.body, r.status, headersOf(HttpHeaders.ContentType, type))
             }
         }
@@ -167,7 +175,7 @@ class ModelProberTest {
         val store: FakeAiStore = FakeAiStore(),
         var now: Long = 1_000_000_000L,
     ) {
-        val budgeter = RequestBudgeter(store, perMinute = 1000, sleeper = {}, clock = { now })
+        val budgeter = RequestBudgeter(store, perMinute = 1000, sleeper = {}, clock = { now }, backgroundSpacingMs = 0)
         fun prober(first: Long = 300) = ModelProber(
             mock.client, store, budgeter, clock = { now },
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO), probeFirstTokenMs = first,
@@ -229,6 +237,48 @@ class ModelProberTest {
         assertTrue("vendor/beta:free" in prober.order("k", rig.models, false).map { it.id })
     }
 
+    @Test fun oneModelsNetworkErrorOrBadKeyDoesNotAbortTheRound() = runBlocking {
+        val rig = Rig(StreamMock(listOf("vendor/alpha:free", "vendor/beta:free", "vendor/gamma:free", "vendor/delta:free")) { model, _, _ ->
+            when (model) {
+                "vendor/alpha:free" -> Reply(HttpStatusCode.Unauthorized, """{"error":{"message":"no"}}""")
+                "vendor/gamma:free" -> Reply(HttpStatusCode.PaymentRequired, """{"error":{"message":"pay"}}""")
+                else -> Reply(body = sseOf("Hello"), delayMs = 20)
+            }
+        })
+        val prober = rig.prober()
+        prober.probeNow("k", rig.models)
+        assertEquals(setOf("vendor/beta:free", "vendor/delta:free"), prober.measurements().keys)
+        val calls = rig.mock.bodies.size
+        prober.order("k", rig.models, awaitFirstUse = false)
+        delay(150)
+        assertEquals("the round counted: no new probe inside a day", calls, rig.mock.bodies.size)
+    }
+
+    @Test fun aRoundWhereNothingAnsweredIsRetriedAfterABackoffNotOnEveryAsk() = runBlocking {
+        val rig = Rig(StreamMock(listOf("vendor/alpha:free", "vendor/beta:free")) { _, _, _ ->
+            Reply(HttpStatusCode.Unauthorized, """{"error":{"message":"bad key"}}""")
+        })
+        val prober = rig.prober()
+        prober.probeNow("k", rig.models.take(2))
+        val calls = rig.mock.bodies.size
+        repeat(5) { prober.order("k", rig.models.take(2), awaitFirstUse = false) }
+        delay(150)
+        assertEquals("no probe storm", calls, rig.mock.bodies.size)
+        rig.now += 4 * 3_600_000L
+        prober.order("k", rig.models.take(2), awaitFirstUse = false)
+        delay(300)
+        assertTrue("retried after the back-off and the models cool-off", rig.mock.bodies.size > calls)
+    }
+
+    @Test fun probesSpendBackgroundBudgetOnly() = runBlocking {
+        // 50/day free tier: BACKGROUND stops at 90% (45), so a probe can never use the user's last requests.
+        val rig = Rig(mock())
+        rig.store.counts[java.time.LocalDate.ofEpochDay(rig.now / 86_400_000L).toString() to "openrouter"] = 45
+        val prober = rig.prober()
+        prober.probeNow("k", rig.models)
+        assertEquals("nothing sent once the background share is spent", 0, rig.mock.bodies.size)
+    }
+
     @Test fun firstUseWaitsForTheFirstAnswerOnly() = runBlocking {
         val rig = Rig(mock())
         val prober = rig.prober()
@@ -274,6 +324,21 @@ class FallbackAndFenceTest {
         assertEquals(3, mock.requestedModels.size)
     }
 
+    @Test fun fallbackAttemptsAreNotChargedAgain() = runBlocking {
+        val mock = StreamMock { model, _, _ ->
+            when (model) {
+                "vendor/alpha:free" -> Reply(HttpStatusCode.TooManyRequests, """{"error":{"message":"busy"}}""")
+                "vendor/beta:free" -> Reply(HttpStatusCode.BadGateway, """{"error":{"message":"down"}}""")
+                else -> Reply(body = sseOf("fine"))
+            }
+        }
+        val store = FakeAiStore()
+        val r = LlmRunner(mock.client, ModelCatalog(mock.client, store), RequestBudgeter(store, perMinute = 1000, sleeper = {}), FakeSettings())
+        assertEquals("fine", r.text(Priority.INTERACTIVE, "s", "u"))
+        assertEquals(3, mock.requestedModels.size)
+        assertEquals("one logical request", 1, store.counts.values.sum())
+    }
+
     @Test fun measuredFastestModelIsTriedFirstAndRealRequestsFeedTheNumbers() = runBlocking {
         val mock = StreamMock { _, _, _ -> Reply(body = sseOf("ok")) }
         val store = FakeAiStore()
@@ -312,6 +377,20 @@ class FallbackAndFenceTest {
         assertEquals(done.answer.text, deltas.trim())
         assertEquals(1, rig.mock.bodies.size) // retrieval only: no chapter pack was generated
         assertTrue("reasoning" in rig.mock.bodies.single()) // low-effort reasoning requested
+    }
+
+    @Test fun aStreamCutByTheDeadlineIsShownButNeverCached() = runBlocking {
+        val store = FakeAiStore()
+        val mock = StreamMock { _, _, _ -> Reply(body = sse(contentFrame("A half"), done = false), stall = true) }
+        val service = OpenRouterAiService(
+            FakeSettings(), FakeSpine(false), FakePositions(29), store, FakeLibrary(testBook(ContentType.NONFICTION)), mock.client,
+            budgeter = RequestBudgeter(store, perMinute = 1000, sleeper = {}), streamLimits = StreamLimits(2_000, 400),
+        )
+        val ask = service.askStream(1, "What is a habit?").toList()
+        assertEquals("A half", (ask.last() as AskEvent.Done).answer.text)
+        service.explainStream(1, 14, "habit").toList()
+        service.defineStream(1, 13, "focus").toList()
+        assertTrue("no truncated answer was stored", store.data.keys.none { it.first in setOf("ask", "explain", "define", "recap") })
     }
 
     @Test fun askFailureArrivesAsAFailedEventNotAnException() = runBlocking {
